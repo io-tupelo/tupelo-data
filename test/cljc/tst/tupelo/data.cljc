@@ -13,20 +13,15 @@
             [tupelo.data :as td :refer [ with-tdb new-tdb eid-count-reset lookup query-triples boolean->binary search-triple
                                         *tdb*
                                         ]]
-            [tupelo.data.index :as tdi]
-            [tupelo.lexical :as lex]
-            [clojure.data.avl :as avl]
-            [schema.core :as s]
-            [clojure.walk :as walk]
             [clojure.set :as set]
-            [tupelo.data.index :as index]))
+            [schema.core :as s]
+            [tupelo.data.index :as index]
+            ))
   #?(:cljs (:require
              [tupelo.test-cljs :refer [define-fixture deftest dotest is isnt is= isnt= is-set= is-nonblank= testing throws?]
               :include-macros true]
              [tupelo.core :as t :refer [spy spyx spyxx] :include-macros true]
              [tupelo.data :as td]
-             [tupelo.lexical :as lex]
-             [clojure.data.avl :as avl]
              [schema.core :as s]
              ))
   )
