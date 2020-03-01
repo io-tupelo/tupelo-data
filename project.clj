@@ -6,22 +6,20 @@
 
   :global-vars {*warn-on-reflection* false}
 
-  :excludes [org.clojure/clojure
-             org.clojure/clojurescript]
-
   :dependencies
-  [ 
-                                       [org.clojure/clojure "1.10.1"]
-                                       [org.clojure/clojurescript "1.10.597"]
-   [prismatic/schema "1.1.12"] 
+  [
+   [org.clojure/clojure "1.10.1"]
+   [org.clojure/clojurescript "1.10.597"]
+   [org.clojure/data.avl "0.1.0"]
+   [prismatic/schema "1.1.12"]
+   [tupelo "0.9.192"]
    ]
 
-  :plugins [ [com.jakemccrary/lein-test-refresh "0.24.1"]]
+  :plugins [[com.jakemccrary/lein-test-refresh "0.24.1"]]
 
   :test-refresh {:quiet true ; true => suppress printing namespaces when testing
                  }
 
-  
   :source-paths ["src/clj" "src/cljc"]
   :test-paths ["test/clj" "test/cljc"]
   :target-path "target/%s"
@@ -35,21 +33,6 @@
                         "releases"     :clojars
                         :sign-releases false}
 
-  :jvm-opts ["-Xms500m" "-Xmx2g" ]
+  :jvm-opts ["-Xms500m" "-Xmx2g"]
   )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

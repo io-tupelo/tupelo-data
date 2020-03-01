@@ -43,9 +43,9 @@
                 (conj it [3 :a])
                 (conj it [2 :a]))
         ss13  (disj ss123 [2 :a])]
-    (is= #{[1 :a] [2 :a] [3 :a]} ss123)
-    (is= [[1 :a] [2 :a] [3 :a]] (vec ss123))
-    (is= #{[1 :a] [3 :a]} ss13))
+    (is= ss123 #{[1 :a] [2 :a] [3 :a]})
+    (is= (vec ss123) [[1 :a] [2 :a] [3 :a]])
+    (is= ss13 #{[1 :a] [3 :a]}))
 
   (is   (map? (td/->Leaf 3)))
   (is   (map? {:a 1}))

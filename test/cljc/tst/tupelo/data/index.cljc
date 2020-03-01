@@ -8,7 +8,6 @@
   #?(:clj (:refer-clojure :exclude [load ->VecNode]))
   (:require
     [clojure.data.avl :as avl]
-    [clojure.walk :as walk]
     [schema.core :as s]
     [tupelo.data :as td]
     [tupelo.data.index :as index]
@@ -22,7 +21,6 @@
        :cljs [tupelo.test-cljs :include-macros true
               :refer [deftest testing is dotest isnt is= isnt= is-set= is-nonblank= throws? define-fixture]])
     ))
-
 
 
 ; #todo fix for cljs

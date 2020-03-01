@@ -6,11 +6,9 @@
 ;   software.
 (ns tupelo.data.index
   (:refer-clojure :exclude [load ->VecNode])
-  ; #?(:clj (:use tupelo.core)) ; #todo remove for cljs
   #?(:clj (:require
             [tupelo.core :as t :refer [spy spyx spyxx spyx-pretty grab glue map-entry indexed
-                                       forv vals->map fetch-in
-                                       ]]
+                                       forv vals->map fetch-in ]]
             [tupelo.lexical :as lex]
             [tupelo.schema :as tsk]
             [clojure.data.avl :as avl]
@@ -25,7 +23,6 @@
              [clojure.set :as set]
              [schema.core :as s]
              ))
-
   )
 
 ; #todo add indexes
