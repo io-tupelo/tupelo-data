@@ -229,34 +229,33 @@
                      [{:leaf 2} {:attr :c} {:eid 1008}]
                      [{:leaf 3} {:attr :a} {:eid 1003}]
                      [{:leaf 3} {:attr :b} {:eid 1006}]
-                     [{:leaf 3} {:attr :c} {:eid 1009}]}} )
+                     [{:leaf 3} {:attr :c} {:eid 1009}]}})
       ;---------------------------------------------------------------------------------------------------
-      (is= (unlazy (lookup [(td/->Eid 1003) nil nil]))
+      (is= (lookup [(td/->Eid 1003) nil nil])
         #{[{:eid 1003} {:attr :a} {:leaf 3}]})
-      (is= (unlazy (lookup [nil (td/->Attr :b) nil]))
+      (is= (lookup [nil (td/->Attr :b) nil])
         #{[{:eid 1004} {:attr :b} {:leaf 1}]
           [{:eid 1005} {:attr :b} {:leaf 2}]
-          [{:eid 1006} {:attr :b} {:leaf 3}]} )
-      (is= (unlazy (lookup [nil nil (td/->Leaf 3)]))
+          [{:eid 1006} {:attr :b} {:leaf 3}]})
+      (is= (lookup [nil nil (td/->Leaf 3)])
         #{[{:eid 1003} {:attr :a} {:leaf 3}]
           [{:eid 1006} {:attr :b} {:leaf 3}]
-          [{:eid 1009} {:attr :c} {:leaf 3}]} )
+          [{:eid 1009} {:attr :c} {:leaf 3}]})
       ;---------------------------------------------------------------------------------------------------
-      (is= (unlazy (lookup [nil (td/->Attr :a) (td/->Leaf 3)]))
+      (is= (lookup [nil (td/->Attr :a) (td/->Leaf 3)])
         #{[{:eid 1003} {:attr :a} {:leaf 3}]})
-      (is= (unlazy (lookup [(td/->Eid 1009) nil (td/->Leaf 3)]))
-        #{[{:eid 1009} {:attr :c} {:leaf 3}]} )
-      (is= (unlazy (lookup [(td/->Eid 1005) (td/->Attr :b) nil]))
-        #{[{:eid 1005} {:attr :b} {:leaf 2}]} ))))
+      (is= (lookup [(td/->Eid 1009) nil (td/->Leaf 3)])
+        #{[{:eid 1009} {:attr :c} {:leaf 3}]})
+      (is= (lookup [(td/->Eid 1005) (td/->Attr :b) nil])
+        #{[{:eid 1005} {:attr :b} {:leaf 2}]}))))
 
-(dotest-focus
+(dotest
   (let [spa (td/->SearchParam :a)
-        spb (td/->SearchParam  b)]
-    (spyxx spa )
-    (spyx (td/search-param? spa))
-    (spyxx spb )
-    (spyx (td/search-param? spb))
-    )
+        spb (td/->SearchParam b)]
+    (is (td/search-param? spa))
+    (is (td/search-param? spb))
+    (is= spa {:param :a})
+    (is= spb {:param (quote b)}))
 
   (with-tdb (new-tdb)
     (eid-count-reset)
@@ -273,41 +272,46 @@
          :idx-vae  #{[{:leaf 1} {:attr :a} {:eid 1001}]
                      [{:leaf 2} {:attr :b} {:eid 1001}]}}))
 
-    (let [search-spec [[(td/->SearchParam :x) (td/->Attr :a) (td/->Leaf 1)]]]
-      (is= (unlazy (query-triples search-spec)) [{{:param :x} {:eid 1001}}]))
+    (prn :-----------------------------------------------------------------------------)
+    (let [search-spec [[{:param :x} {:attr :a} {:leaf 1}]]]
+      (is= (query-triples search-spec)
+        [{{:param :x} {:eid 1001}}]))
 
-    ;(let [search-spec [[(td/->SearchParam :x) (td/->Attr :a) (td/->SearchParam :y)]]]
-    ;  (is= (unlazy (query-triples search-spec)) [{{:param :x} {:eid 1001}, {:param :y} {:leaf 1}}]))
-    ;
-    ;(let [search-spec [[(td/->SearchParam :x) (td/->SearchParam :y) (td/->Leaf 1)]]]
-    ;  (is= (unlazy (query-triples search-spec)) [{{:param :x} {:eid 1001}, {:param :y} {:attr :a}}]))
-    ))
+    (prn :-----------------------------------------------------------------------------)
+    (let [search-spec [[{:param :x} {:attr :a} {:param :y}]]]
+      (is= (query-triples search-spec) [{{:param :x} {:eid 1001},
+                                         {:param :y} {:leaf 1}}]))
 
-(dotest   ; -focus
+    (prn :-----------------------------------------------------------------------------)
+    (let [search-spec [[(td/->SearchParam :x) (td/->SearchParam :y) {:leaf 1}]]]
+      (is= (query-triples search-spec) [{{:param :x} {:eid 1001},
+                                         {:param :y} {:attr :a}}]))))
+
+(dotest-focus
   (with-tdb (new-tdb)
     (eid-count-reset)
     (let [edn-val  {:a 1
                     :b 1}
           root-eid (td/add-edn edn-val)]
       (is= edn-val (td/eid->edn root-eid))
-      (is= (unlazy (deref *tdb*))
+      (is= (deref *tdb*)
         {:eid-type {{:eid 1001} :map},
-         :idx-ave
-                   #{[{:attr :a} {:leaf 1} {:eid 1001}]
+         :idx-ave  #{[{:attr :a} {:leaf 1} {:eid 1001}]
                      [{:attr :b} {:leaf 1} {:eid 1001}]},
-         :idx-eav
-                   #{[{:eid 1001} {:attr :a} {:leaf 1}]
+         :idx-eav  #{[{:eid 1001} {:attr :a} {:leaf 1}]
                      [{:eid 1001} {:attr :b} {:leaf 1}]},
-         :idx-vae
-                   #{[{:leaf 1} {:attr :a} {:eid 1001}]
+         :idx-vae  #{[{:leaf 1} {:attr :a} {:eid 1001}]
                      [{:leaf 1} {:attr :b} {:eid 1001}]}}))
 
+    (prn :-----------------------------------------------------------------------------)
     (let [search-spec [[(td/->SearchParam :x) (td/->Attr :a) (td/->Leaf 1)]]]
       (is= (unlazy (query-triples search-spec)) [{{:param :x} {:eid 1001}}]))
 
+    (prn :-----------------------------------------------------------------------------)
     (let [search-spec [[(td/->SearchParam :x) (td/->Attr :b) (td/->Leaf 1)]]]
       (is= (unlazy (query-triples search-spec)) [{{:param :x} {:eid 1001}}]))
 
+    (prn :-----------------------------------------------------------------------------)
     (let [search-spec [[(td/->SearchParam :x) (td/->SearchParam :y) (td/->Leaf 1)]]]
       (is= (unlazy (query-triples search-spec))
         [{{:param :x} {:eid 1001}, {:param :y} {:attr :a}}

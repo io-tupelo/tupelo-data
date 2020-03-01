@@ -272,52 +272,45 @@
       elem)))
 
 (s/defn ^:no-doc query-impl :- s/Any
-  [ctx :- tsk/KeyMap]
+  [env qspec-list query-result]
   (newline)
+  ;(spyx env)
+  ;(spyx qspec-list)
+  ;(spyx query-result)
   (t/with-spy-indent
-    (let [; #todo => with-map-vals
-          env          (grab :env ctx)
-          qspec-list   (grab :qspec-list ctx)
-          query-result (grab :query-result ctx)]
-      ;(spyx env)
-      ;(spyx qspec-list)
-      ;(spyx query-result)
-      (if (empty? qspec-list)
-        (swap! query-result t/append env)
-        (let-spy
-          [qspec-curr         (xfirst qspec-list)
-           qspec-rest         (xrest qspec-list)
-           qspec-curr-env     (apply-env env qspec-curr)
-           ;>>                 (spyx qspec-curr)
-           ;>>                 (spyx qspec-curr-env)
+    (if (empty? qspec-list)
+      (swap! query-result t/append env)
+      (let-spy
+        [qspec-curr         (xfirst qspec-list)
+         qspec-rest         (xrest qspec-list)
+         qspec-curr-env     (apply-env env qspec-curr)
+         ;>>                 (spyx qspec-curr)
+         ;>>                 (spyx qspec-curr-env)
 
-           {idxs-param :idxs-true
-            idxs-other :idxs-false} (vec/pred-index search-param? qspec-curr-env)
-           qspec-lookup       (vec/set-lax qspec-curr-env idxs-param nil)
-           ;>>                 (spyx idxs-param)
-           ;>>                 (spyx idxs-other)
-           ;>>                 (spyx qspec-lookup)
+         {idxs-param :idxs-true
+          idxs-other :idxs-false} (vec/pred-index search-param? qspec-curr-env)
+         qspec-lookup       (vec/set-lax qspec-curr-env idxs-param nil)
+         ;>>                 (spyx idxs-param)
+         ;>>                 (spyx idxs-other)
+         ;>>                 (spyx qspec-lookup)
 
-           params             (vec/get qspec-curr idxs-param)
-           found-triples      (lookup qspec-lookup)
-           param-frames-found (mapv #(vec/get % idxs-param) found-triples)
-           env-frames-found   (mapv #(zipmap params %) param-frames-found)]
-          ;(spyx params)
-          ;(spyx-pretty found-triples)
-          ;(spyx-pretty param-frames-found)
-          ;(spyx-pretty env-frames-found)
+         params             (vec/get qspec-curr idxs-param)
+         found-triples      (lookup qspec-lookup)
+         param-frames-found (mapv #(vec/get % idxs-param) found-triples)
+         env-frames-found   (mapv #(zipmap params %) param-frames-found)]
+        ;(spyx params)
+        ;(spyx-pretty found-triples)
+        ;(spyx-pretty param-frames-found)
+        ;(spyx-pretty env-frames-found)
 
-          (forv [env-frame env-frames-found]
-            (let [env-next (glue env env-frame)]
-              (query-impl (t/glue ctx {:qspec-list qspec-rest
-                                       :env        env-next})))))))))
+        (forv [env-frame env-frames-found]
+          (let [env-next (glue env env-frame)]
+            (query-impl env-next qspec-rest query-result)))))))
 
 (s/defn query-triples
   [qspec-list :- [tsk/Triple]]
   (let [query-result (atom [])]
-    (query-impl {:query-result query-result
-                 :qspec-list   qspec-list
-                 :env          {}})
+    (query-impl {} qspec-list query-result)
     @query-result))
 
 ;(defn ^:no-doc par-val-fn [arg] (if (symbol? arg) (->SearchParam arg) (->SearchValue arg)))
