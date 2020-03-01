@@ -320,9 +320,15 @@
 
 (defmacro search-triple
   [e a v]
-  (let [e-out (if (symbol? e) (->SearchParam e) (->Eid e))
-        a-out (if (symbol? a) (->SearchParam a) (->Attr a))
-        v-out (if (symbol? v) (->SearchParam v) (->Leaf v))]
+  (let [e-out (if (symbol? e)
+                `(->SearchParam ~e)
+                (->Eid e))
+        a-out (if (symbol? a)
+                `(->SearchParam ~a)
+                (->Attr a))
+        v-out (if (symbol? v)
+                `(->SearchParam ~v)
+                (->Leaf v))]
     [e-out a-out v-out]))
 
 
