@@ -14,7 +14,8 @@
                                        ]]
             [tupelo.data.index :as index]
             [tupelo.schema :as tsk]
-            [tupelo.vec :as tv]
+            [tupelo.vec :as vec]
+
             [clojure.set :as set]
             [schema.core :as s]
             ))
@@ -22,9 +23,11 @@
              [tupelo.core :as t :refer [spy spyx spyxx spyx-pretty grab]] ; #todo :include-macros true
              [tupelo.schema :as tsk]
              [tupelo.data.index :as index]
+
              [clojure.set :as set]
              [schema.core :as s]
-             )))
+             ))
+  )
 
 ; #todo Treeify: {k1 v1 k2 v2} =>
 ; #todo   {:data/id 100 :edn/type :edn/map ::kids [101 102] }
@@ -106,36 +109,21 @@
 (def TripleIndex #{tsk/Triple})
 
 ;-----------------------------------------------------------------------------
-(defprotocol IRaw
-  (raw [this]))
+(def ParamMap {:param s/Int})
+(def EidMap {:eid s/Int})
+(def AttrMap {:attr s/Any})
+(def LeafMap {:leaf s/Any})
 
-;-----------------------------------------------------------------------------
-(s/defrecord Eid ; wraps an Entity Id (EID)
-  [eid :- (s/maybe EidType)]
-  IRaw
-  (raw [this] eid))
+(defmacro ->SearchParam [arg] `{:param (quote ~arg)})
+(s/defn ->Eid [arg :- s/Int] {:eid arg})
+(defn ->Attr [arg] {:attr arg})
+(defn ->Leaf [arg] {:leaf arg})
 
-(s/defrecord Attr ; wraps an attribute
-  [attr :- AttrType]
-  IRaw
-  (raw [this] attr))
-
-(s/defrecord Leaf ; wraps a primitive leaf value
-  [leaf :- (s/maybe LeafType)]
-  IRaw
-  (raw [this] leaf))
-
-;-----------------------------------------------------------------------------
-(s/defrecord SearchParam ; wraps a search variable
-  [param :- s/Symbol]
-  IRaw
-  (raw [this] param))
-(s/defrecord SearchValue ; wraps a search value (kw, str, num, ?)
-  [value :- s/Any]
-  IRaw
-  (raw [this] value))
-(defn search-param? [x] (instance? SearchParam x)) ; #todo maybe inline these?
-(defn search-value? [x] (instance? SearchValue x))
+(defn pair-map? [arg] (and (map? arg) (= 1 (count arg))))
+(defn search-param? [x] (and (pair-map? x) (= :param (key (first x)))))
+(defn eid-map? [x] (and (pair-map? x) (= :eid (key (first x)))))
+(defn attr-map? [x] (and (pair-map? x) (= :attr (key (first x)))))
+(defn leaf-map? [x] (and (pair-map? x) (= :leaf (key (first x)))))
 
 ;-----------------------------------------------------------------------------
 (def ^:dynamic ^:no-doc *tdb* nil)
@@ -166,41 +154,41 @@
   "Returns the next integer EID"
   [] (swap! eid-counter inc))
 
-(s/defn add-edn :- Eid ; EidType ; #todo maybe rename:  load-edn->eid  ???
+(s/defn add-edn :- EidMap ; EidType ; #todo maybe rename:  load-edn->eid  ???
   "Add the EDN arg to the indexes, returning the EID"
-  ([edn-in :- s/Any]
-   (when-not (entity-like? edn-in)
-     (throw (ex-info "invalid edn-in" (vals->map edn-in))))
-   (let [eid-this (->Eid (new-eid))
-         ctx      (cond
-                    (map? edn-in)        {:entity-type :map   :edn-use edn-in}
-                    (array-like? edn-in) {:entity-type :array :edn-use (indexed edn-in)}
-                    :else (throw (ex-info "unknown value found" (vals->map edn-in))))]
-     (t/with-map-vals ctx [entity-type edn-use]
-       ; #todo could switch to transients & reduce here in a single swap
-       (swap! *tdb* update :eid-type assoc eid-this entity-type )
-       (doseq [[attr-edn val-edn] edn-use]
-         (let [attr-rec (->Attr attr-edn)
-               val-rec (if (leaf-val? val-edn)
+  [edn-in :- s/Any]
+  (when-not (entity-like? edn-in)
+    (throw (ex-info "invalid edn-in" (vals->map edn-in))))
+  (let [eid-this (->Eid (new-eid))
+        ctx      (cond
+                   (map? edn-in) {:entity-type :map :edn-use edn-in}
+                   (array-like? edn-in) {:entity-type :array :edn-use (indexed edn-in)}
+                   :else (throw (ex-info "unknown value found" (vals->map edn-in))))]
+    (t/with-map-vals ctx [entity-type edn-use]
+      ; #todo could switch to transients & reduce here in a single swap
+      (swap! *tdb* update :eid-type assoc eid-this entity-type)
+      (doseq [[attr-edn val-edn] edn-use]
+        (let [attr-rec (->Attr attr-edn)
+              val-rec  (if (leaf-val? val-edn)
                          (->Leaf val-edn)
                          (add-edn val-edn))]
-           (swap! *tdb* update :idx-eav index/add-entry [eid-this attr-rec val-rec])
-           (swap! *tdb* update :idx-vae index/add-entry [val-rec attr-rec eid-this])
-           (swap! *tdb* update :idx-ave index/add-entry [attr-rec val-rec eid-this]))))
-     eid-this)))
+          (swap! *tdb* update :idx-eav index/add-entry [eid-this attr-rec val-rec])
+          (swap! *tdb* update :idx-vae index/add-entry [val-rec attr-rec eid-this])
+          (swap! *tdb* update :idx-ave index/add-entry [attr-rec val-rec eid-this]))))
+    eid-this))
 
 ; #todo need to handle sets
 (s/defn eid->edn :- s/Any
   "Returns the EDN subtree rooted at a eid."
-  [eid-in :- Eid]
+  [eid-in :- EidMap]
   (let [eav-matches (index/prefix-matches [eid-in] (grab :idx-eav @*tdb*))
         result-map  (apply glue
                       (forv [[eid-row attr-row val-row] eav-matches]
                        ;(spyx [eid-row attr-row val-row])
                         (assert (= eid-in eid-row)) ; verify is a prefix match
-                        (let [attr-edn (raw attr-row) ; (if (instance? Attr attr-row)
-                              val-edn  (if (instance? Leaf val-row)
-                                         (raw val-row) ; Leaf rec
+                        (let [attr-edn (grab :attr attr-row) ; (if (instance? Attr attr-row)
+                              val-edn  (if (leaf-map? val-row)
+                                         (grab :leaf val-row) ; Leaf rec
                                          (eid->edn val-row))] ; Eid rec
                           (t/map-entry attr-edn val-edn))))
         result-out  (let [entity-type (fetch-in @*tdb* [:eid-type eid-in])]
@@ -277,8 +265,8 @@
 
 (s/defn apply-env
   [env :- tsk/Map
-   listy :- tsk/Vec]
-  (forv [elem listy]
+   elements :- tsk/Vec]
+  (forv [elem elements]
     (if (contains? env elem) ; #todo make sure works witn `nil` value
       (get env elem)
       elem)))
@@ -286,37 +274,43 @@
 (s/defn ^:no-doc query-impl :- s/Any
   [ctx :- tsk/KeyMap]
   (newline)
+  (t/with-spy-indent
+    (let [; #todo => with-map-vals
+          env          (grab :env ctx)
+          qspec-list   (grab :qspec-list ctx)
+          query-result (grab :query-result ctx)]
+      ;(spyx env)
+      ;(spyx qspec-list)
+      ;(spyx query-result)
+      (if (empty? qspec-list)
+        (swap! query-result t/append env)
+        (let-spy
+          [qspec-curr         (xfirst qspec-list)
+           qspec-rest         (xrest qspec-list)
+           qspec-curr-env     (apply-env env qspec-curr)
+           ;>>                 (spyx qspec-curr)
+           ;>>                 (spyx qspec-curr-env)
 
-  (let [  ; #todo => with-map-vals
-        env        (grab :env ctx)
-        qspec-list (grab :qspec-list ctx)
-        query-result (grab :query-result ctx)]
-    (if (empty? qspec-list)
-      (swap! query-result  t/append env)
-      (let [qspec-curr         (xfirst qspec-list)
-            qspec-rest         (xrest qspec-list)
-            qspec-curr-env     (apply-env env qspec-curr)
-            >>                 (spyx qspec-curr)
-            >>                 (spyx qspec-curr-env)
+           {idxs-param :idxs-true
+            idxs-other :idxs-false} (vec/pred-index search-param? qspec-curr-env)
+           qspec-lookup       (vec/set-lax qspec-curr-env idxs-param nil)
+           ;>>                 (spyx idxs-param)
+           ;>>                 (spyx idxs-other)
+           ;>>                 (spyx qspec-lookup)
 
-            {idxs-param :idxs-true
-             idxs-other :idxs-false} (tv/pred-index search-param? qspec-curr-env)
+           params             (vec/get qspec-curr idxs-param)
+           found-triples      (lookup qspec-lookup)
+           param-frames-found (mapv #(vec/get % idxs-param) found-triples)
+           env-frames-found   (mapv #(zipmap params %) param-frames-found)]
+          ;(spyx params)
+          ;(spyx-pretty found-triples)
+          ;(spyx-pretty param-frames-found)
+          ;(spyx-pretty env-frames-found)
 
-            qspec-lookup       (tv/set-lax qspec-curr-env idxs-param nil)
-            >>                 (spyx qspec-lookup)
-            params             (tv/get qspec-curr idxs-param)
-            found-triples      (lookup qspec-lookup)
-            param-frames-found (mapv #(tv/get % idxs-param) found-triples)
-            env-frames-found   (mapv #(zipmap params %) param-frames-found)]
-        (spyx idxs-param)
-        (spyx idxs-other)
-        (spyx-pretty found-triples)
-        (spyx-pretty param-frames-found)
-        (spyx-pretty env-frames-found)
-        (forv [env-frame env-frames-found]
-          (let [env-next (glue env env-frame)]
-            (query-impl (t/glue ctx {:qspec-list qspec-rest
-                                     :env        env-next}))))))))
+          (forv [env-frame env-frames-found]
+            (let [env-next (glue env env-frame)]
+              (query-impl (t/glue ctx {:qspec-list qspec-rest
+                                       :env        env-next})))))))))
 
 (s/defn query-triples
   [qspec-list :- [tsk/Triple]]

@@ -44,16 +44,16 @@
 
   (is   (map? (td/->Leaf 3)))
   (is   (map? {:a 1}))
-  (is   (record? (td/->Leaf 3)))
+  (isnt (record? (td/->Leaf 3)))
   (isnt (record? {:a 1}))
 
   ; Leaf and Hid records sort separately in the index. Eid sorts first since the type name
   ; `tupelo.data.Eid` sorts before `tupelo.data.Leaf`
-  (is= (td/->Leaf 5) #tupelo.data.Leaf{:leaf 5})
-  (is= (td/->Eid 5) #tupelo.data.Eid{:eid 5})
+  (is= (td/->Leaf 5) {:leaf 5})
+  (is= (td/->Eid 5) {:eid 5})
 
   (let [idx      (-> (index/empty-index)
-                   ; using shortcut constructors
+
                    (index/add-entry [1 (td/->Leaf 3)])
                    (index/add-entry [1 (td/->Eid 3)])
                    (index/add-entry [1 (td/->Leaf 1)])
@@ -61,7 +61,6 @@
                    (index/add-entry [1 (td/->Leaf 2)])
                    (index/add-entry [1 (td/->Eid 2)])
 
-                   ; using Clojure record constructors
                    (index/add-entry [0 (td/->Leaf 3)])
                    (index/add-entry [0 (td/->Eid 3)])
                    (index/add-entry [0 (td/->Leaf 1)])
@@ -69,18 +68,18 @@
                    (index/add-entry [0 (td/->Leaf 2)])
                    (index/add-entry [0 (td/->Eid 2)]))
 
-        expected [[0 #tupelo.data.Eid{:eid 1}] ; tagged record literal
-                  [0 #tupelo.data.Eid{:eid 2}]
-                  [0 #tupelo.data.Eid{:eid 3}]
-                  [0 (td/->Leaf 1)]
-                  [0 (td/->Leaf 2)]
-                  [0 (td/->Leaf 3)]
-                  [1 (td/->Eid 1)]
-                  [1 (td/->Eid 2)]
-                  [1 (td/->Eid 3)]
-                  [1 #tupelo.data.Leaf{:leaf 1}]
-                  [1 #tupelo.data.Leaf{:leaf 2}]
-                  [1 #tupelo.data.Leaf{:leaf 3}]]]
+        expected [[0 {:eid 1}]
+                  [0 {:eid 2}]
+                  [0 {:eid 3}]
+                  [0 {:leaf 1}]
+                  [0 {:leaf 2}]
+                  [0 {:leaf 3}]
+                  [1 {:eid 1}]
+                  [1 {:eid 2}]
+                  [1 {:eid 3}]
+                  [1 {:leaf 1}]
+                  [1 {:leaf 2}]
+                  [1 {:leaf 3}]]]
     (is= (vec idx) expected)) )
 
 (dotest
@@ -250,14 +249,21 @@
       (is= (unlazy (lookup [(td/->Eid 1005) (td/->Attr :b) nil]))
         #{[{:eid 1005} {:attr :b} {:leaf 2}]} ))))
 
-(dotest
+(dotest-focus
+  (let [spa (td/->SearchParam :a)
+        spb (td/->SearchParam  b)]
+    (spyxx spa )
+    (spyx (td/search-param? spa))
+    (spyxx spb )
+    (spyx (td/search-param? spb))
+    )
+
   (with-tdb (new-tdb)
     (eid-count-reset)
-    (let [edn-val    {:a 1
-                      :b 2}
-          root-eid   (td/add-edn edn-val)
-          edn-result (td/eid->edn root-eid)]
-      (is= edn-val edn-result)
+    (let [edn-val  {:a 1
+                    :b 2}
+          root-eid (td/add-edn edn-val)]
+      (is= edn-val (td/eid->edn root-eid))
       (is= (unlazy (deref *tdb*))
         {:eid-type {{:eid 1001} :map},
          :idx-ave  #{[{:attr :a} {:leaf 1} {:eid 1001}]
@@ -270,20 +276,20 @@
     (let [search-spec [[(td/->SearchParam :x) (td/->Attr :a) (td/->Leaf 1)]]]
       (is= (unlazy (query-triples search-spec)) [{{:param :x} {:eid 1001}}]))
 
-    (let [search-spec [[(td/->SearchParam :x) (td/->Attr :a) (td/->SearchParam :y)]]]
-      (is= (unlazy (query-triples search-spec)) [{{:param :x} {:eid 1001}, {:param :y} {:leaf 1}}]))
-
-    (let [search-spec [[(td/->SearchParam :x) (td/->SearchParam :y) (td/->Leaf 1)]]]
-      (is= (unlazy (query-triples search-spec)) [{{:param :x} {:eid 1001}, {:param :y} {:attr :a}}]))))
+    ;(let [search-spec [[(td/->SearchParam :x) (td/->Attr :a) (td/->SearchParam :y)]]]
+    ;  (is= (unlazy (query-triples search-spec)) [{{:param :x} {:eid 1001}, {:param :y} {:leaf 1}}]))
+    ;
+    ;(let [search-spec [[(td/->SearchParam :x) (td/->SearchParam :y) (td/->Leaf 1)]]]
+    ;  (is= (unlazy (query-triples search-spec)) [{{:param :x} {:eid 1001}, {:param :y} {:attr :a}}]))
+    ))
 
 (dotest   ; -focus
   (with-tdb (new-tdb)
     (eid-count-reset)
-    (let [edn-val    {:a 1
-                      :b 1}
-          root-eid   (td/add-edn edn-val)
-          edn-result (td/eid->edn root-eid)]
-      (is= edn-val edn-result)
+    (let [edn-val  {:a 1
+                    :b 1}
+          root-eid (td/add-edn edn-val)]
+      (is= edn-val (td/eid->edn root-eid))
       (is= (unlazy (deref *tdb*))
         {:eid-type {{:eid 1001} :map},
          :idx-ave
@@ -343,24 +349,29 @@
   (throws? (boolean->binary ))
   (throws? (boolean->binary 234)) )
 
-(dotest
-  (is= [(td/->SearchParam (quote x)) (td/->SearchParam (quote y)) (td/->SearchParam (quote z))]
-    (td/search-triple x y z))
-  (is= [(td/->Eid 123) (td/->Attr :color) (td/->Leaf "Joey")]
-    (td/search-triple 123 :color "Joey")) )
+(comment  ; #todo finish re ->SearchParam
 
-(dotest   ; -focus
-  (with-tdb (new-tdb)
-    (eid-count-reset)
-    (let [
-          edn-val     {:a {:b 2}}
-          root-eid    (td/add-edn edn-val)
-          search-spec [(search-triple x :a y)
-                       (search-triple y :b 2)]]
-      (is= (unlazy (query-triples search-spec))
-        (quote [{{:param x} {:eid 1001}
-                 {:param y} {:eid 1002}}])))
-    ))
+  (dotest
+    (is= [(td/->SearchParam x)
+          (td/->SearchParam y)
+          (td/->SearchParam z)]
+      (td/search-triple x y z))
+    (is= [(td/->Eid 123) (td/->Attr :color) (td/->Leaf "Joey")]
+      (td/search-triple 123 :color "Joey")))
+
+  (dotest ; -focus
+    (with-tdb (new-tdb)
+      (eid-count-reset)
+      (let [
+            edn-val     {:a {:b 2}}
+            root-eid    (td/add-edn edn-val)
+            search-spec [(search-triple x :a y)
+                         (search-triple y :b 2)]]
+        (is= (unlazy (query-triples search-spec))
+          (quote [{{:param x} {:eid 1001}
+                   {:param y} {:eid 1002}}])))
+      )))
+
 
 
 ;(dotest
