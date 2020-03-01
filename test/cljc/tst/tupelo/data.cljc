@@ -361,20 +361,39 @@
   (is= [(td/->Eid 123) (td/->Attr :color) (td/->Leaf "Joey")]
     (td/search-triple 123 :color "Joey")))
 
-(comment) ; #todo finish re ->SearchParam
-
-(dotest-focus
+(dotest
   (with-tdb (new-tdb)
     (eid-count-reset)
-    (let [
-          edn-val     {:a {:b 2}}
+    (let [edn-val     {:a {:b 2}}
           root-eid    (td/add-edn edn-val)
           search-spec [(search-triple x :a y)
                        (search-triple y :b 2)]]
-      (is= (unlazy (query-triples search-spec))
+      (is= (query-triples search-spec)
         (quote [{{:param x} {:eid 1001}
-                 {:param y} {:eid 1002}}])))
-    ))
+                 {:param y} {:eid 1002}}])))))
+(dotest
+  (with-tdb (new-tdb)
+    (eid-count-reset)
+    (let [edn-val     {:a {:b 2}}
+          root-eid    (td/add-edn edn-val)
+          search-spec [(search-triple y :b 2) (search-triple x :a y) ]]
+      (is= (query-triples search-spec)
+        (quote [{{:param x} {:eid 1001}
+                 {:param y} {:eid 1002}}])))))
+(dotest
+  (with-tdb (new-tdb)
+    (eid-count-reset)
+    (let [ edn-val     {:a {:b 2}}
+          root-eid    (td/add-edn edn-val)
+          search-spec [(search-triple x :a y) (search-triple y :b 99)]]
+      (is= [] (query-triples search-spec)))))
+(dotest
+  (with-tdb (new-tdb)
+    (eid-count-reset)
+    (let [ edn-val     {:a {:b 2}}
+          root-eid    (td/add-edn edn-val)
+          search-spec [(search-triple y :b 99) (search-triple x :a y)]]
+      (is= [] (query-triples search-spec)))))
 
 
 

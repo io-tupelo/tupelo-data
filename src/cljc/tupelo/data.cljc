@@ -272,12 +272,13 @@
       elem)))
 
 (s/defn ^:no-doc query-impl :- s/Any
-  [env qspec-list query-result]
-  (newline)
-  ;(spyx env)
-  ;(spyx qspec-list)
-  ;(spyx query-result)
+  [query-result env qspec-list]
   (t/with-spy-indent
+    (println :---------------------------------------------------------------------------------------------------)
+    (spyx env)
+    (spyx qspec-list)
+    (spyx @query-result)
+    (newline)
     (if (empty? qspec-list)
       (swap! query-result t/append env)
       (let-spy
@@ -305,12 +306,12 @@
 
         (forv [env-frame env-frames-found]
           (let [env-next (glue env env-frame)]
-            (query-impl env-next qspec-rest query-result)))))))
+            (query-impl query-result env-next qspec-rest)))))))
 
 (s/defn query-triples
   [qspec-list :- [tsk/Triple]]
   (let [query-result (atom [])]
-    (query-impl {} qspec-list query-result)
+    (query-impl query-result {} qspec-list)
     @query-result))
 
 ;(defn ^:no-doc par-val-fn [arg] (if (symbol? arg) (->SearchParam arg) (->SearchValue arg)))
