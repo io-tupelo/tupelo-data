@@ -32,7 +32,7 @@
 
 #?(:clj (do
 
-(dotest
+(dotest-focus
   (let [ss123 (t/it-> (index/empty-index)
                 (conj it [1 :a])
                 (conj it [3 :a])
@@ -49,6 +49,9 @@
 
   ; Leaf and Hid records sort separately in the index. Eid sorts first since the type name
   ; `tupelo.data.Eid` sorts before `tupelo.data.Leaf`
+  (is= (td/->Leaf 5) #tupelo.data.Leaf{:leaf 5})
+  (is= (td/->Eid 5) #tupelo.data.Eid{:eid 5})
+
   (let [idx      (-> (index/empty-index)
                    ; using shortcut constructors
                    (index/add-entry [1 (td/->Leaf 3)])

@@ -6,7 +6,7 @@
 ;   software.
 (ns tupelo.data
   (:refer-clojure :exclude [load ->VecNode])
-; #?(:clj (:use tupelo.core)) ; #todo remove for cljs
+  ; #?(:clj (:use tupelo.core)) ; #todo remove for cljs
   #?(:clj (:require
             [tupelo.core :as t :refer [spy spyx spyxx spyx-pretty grab glue map-entry indexed
                                        forv vals->map fetch-in let-spy xfirst xsecond xthird xlast xrest
@@ -24,9 +24,7 @@
              [tupelo.data.index :as index]
              [clojure.set :as set]
              [schema.core :as s]
-             ))
-  )
-
+             )))
 
 ; #todo Treeify: {k1 v1 k2 v2} =>
 ; #todo   {:data/id 100 :edn/type :edn/map ::kids [101 102] }
@@ -93,7 +91,8 @@
   (s/defn leaf-val? :- s/Bool
     "Returns true iff a value is of leaf type (number, string, keyword, nil)"
     [arg :- s/Any] (or (nil? arg) (number? arg) (string? arg) (keyword? arg)))
-  (def LeafType (s/maybe (s/cond-pre s/Num s/Str s/Keyword)))) ; instant, uuid, Time ID (TID) (as strings?)
+  (def LeafType (s/maybe ; maybe nil
+                  (s/cond-pre s/Num s/Str s/Keyword)))) ; instant, uuid, Time ID (TID) (as strings?)
 
 (s/defn array-like? :- s/Bool
   "Returns true for vectors, lists, and seq's."
@@ -105,8 +104,8 @@
   (s/defn entity-like? [arg] (or (map? arg) (array-like? arg))) )
 
 (def TripleIndex #{tsk/Triple})
-;-----------------------------------------------------------------------------
 
+;-----------------------------------------------------------------------------
 (defprotocol IRaw
   (raw [this]))
 
