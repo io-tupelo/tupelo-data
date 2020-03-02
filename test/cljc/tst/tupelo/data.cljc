@@ -396,31 +396,40 @@
       (is= [] (query-triples search-spec)))))
 
 
+(dotest-focus
+  (td/with-tdb (td/new-tdb)
+    (td/eid-count-reset)
+    (let [edn-val  {:num 5
+                    :map {:a 1 :b 2}
+                    :vec [5 6 7]
+                    ;  :set #{3 4}  ; #todo add sets
+                    :str "hello"
+                    :kw  :nothing
+                    }
+          root-hid (td/add-edn edn-val)
 
-;(dotest
-;  (td/with-tdb (td/new-tdb)
-;    (td/hid-count-reset)
-;    (let [edn-val  {:num 5
-;                    :map {:a 1 :b 2}
-;                    :vec [5 6 7]
-;                    :set #{3 4}
-;                    :str "hello"
-;                    :kw  :nothing}
-;          root-hid (td/add-edn edn-val)]
-;      (is= edn-val (td/hid->edn root-hid))
-;      (let [hid-num (only (td/index-find-mapentry-key :num))]
-;        (is= 1002 hid-num)
-;        (is= (unlazy (td/hid->node hid-num)) {:-me-key :num, :-me-val-hid 1003, :-parent-hid 1001} )
-;        (is= (t/map-entry :num 5) (td/hid->edn hid-num)))
-;      (let [hid-b (only (td/index-find-mapentry-key :b))]
-;        (is= 1008 hid-b)
-;        (is= (unlazy (td/hid->node hid-b)) {:-me-key :b, :-me-val-hid 1009, :-parent-hid 1005})
-;        (is= (td/hid->edn hid-b) (t/map-entry :b 2)))
-;      (let [hid-2 (only (td/index-find-arrayentry-idx 2))]
-;        (is= 1016 hid-2)
-;        (is= (unlazy (td/hid->node hid-2))
-;          {:-ae-elem-hid 1017, :-ae-idx 2, :-parent-hid 1011} )
-;        (is= (td/hid->edn hid-2) 7 )) )))
+          ; hids-match   (td/index-find-leaf 1)
+          ]
+      (is= edn-val (td/eid->edn root-hid))
+
+      (spyx-pretty (query-triples [(search-triple e a 1)]))
+
+
+      ;(let [hid-num (only (td/index-find-mapentry-key :num))]
+      ;  (is= 1002 hid-num)
+      ;  (is= (unlazy (td/hid->node hid-num)) {:-me-key :num, :-me-val-hid 1003, :-parent-hid 1001} )
+      ;  (is= (t/map-entry :num 5) (td/hid->edn hid-num)))
+
+      ;(let [hid-b (only (td/index-find-mapentry-key :b))]
+      ;  (is= 1008 hid-b)
+      ;  (is= (unlazy (td/hid->node hid-b)) {:-me-key :b, :-me-val-hid 1009, :-parent-hid 1005})
+      ;  (is= (td/hid->edn hid-b) (t/map-entry :b 2)))
+      ;(let [hid-2 (only (td/index-find-arrayentry-idx 2))]
+      ;  (is= 1016 hid-2)
+      ;  (is= (unlazy (td/hid->node hid-2))
+      ;    {:-ae-elem-hid 1017, :-ae-idx 2, :-parent-hid 1011} )
+      ;  (is= (td/hid->edn hid-2) 7 ))
+      )))
 ;
 ;(dotest
 ;  (td/with-tdb (td/new-tdb)

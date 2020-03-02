@@ -160,7 +160,7 @@
   (when-not (entity-like? edn-in)
     (throw (ex-info "invalid edn-in" (vals->map edn-in))))
   (let [eid-this (->Eid (new-eid))
-        ctx      (cond
+        ctx      (cond ; #todo add set
                    (map? edn-in) {:entity-type :map :edn-use edn-in}
                    (array-like? edn-in) {:entity-type :array :edn-use (indexed edn-in)}
                    :else (throw (ex-info "unknown value found" (vals->map edn-in))))]
@@ -335,10 +335,10 @@
 
 ;(s/defn index-find-leaf
 ;  [target :- LeafType]
-;  (let [idx-entries (index-find-val-impl [target])
-;        hids        (mapv t/xsecond idx-entries)]
-;    hids))
-;
+;  (let [idx-entries (index/index-find-val-impl [target])
+;        eids        (mapv t/xsecond idx-entries)]
+;    eids))
+
 ;(s/defn index-find-mapentry :- [EidType]
 ;  [tgt-me :- tsk/MapEntry]
 ;  (let [[tgt-key tgt-val] (mapentry->kv tgt-me)
