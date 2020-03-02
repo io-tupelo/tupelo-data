@@ -8,7 +8,8 @@
   #?(:clj (:refer-clojure :exclude [load ->VecNode]))
   #?(:clj (:require
             [tupelo.test :refer [define-fixture deftest dotest dotest-focus is isnt is= isnt= is-set= is-nonblank= testing throws?]]
-            [tupelo.core :as t :refer [spy spyx spyxx spy-pretty spyx-pretty unlazy let-spy only forv glue
+            [tupelo.core :as t :refer [spy spyx spyxx spy-pretty spyx-pretty unlazy let-spy
+                                       only forv glue grab
                                        ]]
             [tupelo.data :as td :refer [ with-tdb new-tdb eid-count-reset lookup query-triples boolean->binary search-triple
                                         *tdb*
@@ -327,17 +328,17 @@
                      [{:eid 1002} {:attr :b} {:leaf 2}]},
          :idx-vae  #{[{:eid 1002} {:attr :a} {:eid 1001}]
                      [{:leaf 2} {:attr :b} {:eid 1002}]}})
-      (prn :-----------------------------------------------------------------------------)
+      ; (prn :-----------------------------------------------------------------------------)
       ; compound search
       (is= (query-triples [[{:param :x} {:attr :a} {:param :y}]
                            [{:param :y} {:attr :b} (td/->Leaf 2)]])
         [{{:param :x} {:eid 1001},
           {:param :y} {:eid 1002}}])
-      (prn :-----------------------------------------------------------------------------)
+      ; (prn :-----------------------------------------------------------------------------)
       ; failing search
       (is= [] (query-triples [[{:param :x} {:attr :a} {:param :y}]
                               [{:param :y} {:attr :b} (td/->Leaf 99)]]))
-      (prn :-----------------------------------------------------------------------------)
+      ; (prn :-----------------------------------------------------------------------------)
       ; wildcard search - match all
       (is= (query-triples [[{:param :x} {:param :y} {:param :z}]])
         [{{:param :x} {:eid 1001},
@@ -396,7 +397,7 @@
       (is= [] (query-triples search-spec)))))
 
 
-(dotest-focus
+(dotest   ; -focus
   (td/with-tdb (td/new-tdb)
     (td/eid-count-reset)
     (let [edn-val  {:num 5
@@ -404,15 +405,36 @@
                     :vec [5 6 7]
                     ;  :set #{3 4}  ; #todo add sets
                     :str "hello"
-                    :kw  :nothing
-                    }
-          root-hid (td/add-edn edn-val)
-
-          ; hids-match   (td/index-find-leaf 1)
-          ]
+                    :kw  :nothing }
+          root-hid (td/add-edn edn-val) ]
+      ; (spyx-pretty (grab :idx-eav (deref *tdb*)))
       (is= edn-val (td/eid->edn root-hid))
 
-      (spyx-pretty (query-triples [(search-triple e a 1)]))
+      (when false
+        (let [eids-match (spyx-pretty (td/index-find-leaf 1)) ; only 1 match
+              entity-edn (td/eid->edn (only eids-match))]
+          (is= (spyx entity-edn) {:a 1, :b 2}))
+        (is= (query-triples [(search-triple e :num v)])
+          (quote [{{:param e} {:eid 1001},
+                   {:param v} {:leaf 5}}]))
+        (is= (query-triples [(search-triple e a "hello")])
+          (quote [{{:param e} {:eid 1001}, {:param a} {:attr :str}}]))
+        (is= (query-triples [(search-triple e a 7)])
+          (quote [{{:param e} {:eid 1003}, {:param a} {:attr 2}}])))
+
+      (when false
+        (spyx-pretty
+          (td/query-natural-impl (quote
+                                   [{:eid x :map y}
+                                    {:eid y :a a}]))))
+      (is= (td/query-natural [{:eid x :map y}
+                              {:eid y :a a}])
+        (quote [{{:param x} {:eid 1001},
+                 {:param y} {:eid 1002},
+                 {:param a} {:leaf 1}}]))
+      (is= edn-val (td/eid->edn {:eid 1001}))
+      (is= (td/eid->edn {:eid 1002}) {:a 1 :b 2})
+
 
 
       ;(let [hid-num (only (td/index-find-mapentry-key :num))]

@@ -273,15 +273,15 @@
 
 (s/defn ^:no-doc query-impl :- s/Any
   [query-result env qspec-list]
-  (t/with-spy-indent
-    (println :---------------------------------------------------------------------------------------------------)
-    (spyx env)
-    (spyx qspec-list)
-    (spyx @query-result)
-    (newline)
+  (do     ;  t/with-spy-indent
+    ;(println :---------------------------------------------------------------------------------------------------)
+    ;(spyx env)
+    ;(spyx qspec-list)
+    ;(spyx @query-result)
+    ;(newline)
     (if (empty? qspec-list)
       (swap! query-result t/append env)
-      (let-spy
+      (let ; -spy
         [qspec-curr         (xfirst qspec-list)
          qspec-rest         (xrest qspec-list)
          qspec-curr-env     (apply-env env qspec-curr)
@@ -319,6 +319,20 @@
 ;  [e a v]
 ;  (mapv par-val-fn [e a v]))
 
+(defn search-triple-fn
+  [e a v]
+  ; (spyx [e a v])
+  (let [e-out (if (symbol? e)
+                {:param e}
+                (->Eid e))
+        a-out (if (symbol? a)
+                {:param a}
+                (->Attr a))
+        v-out (if (symbol? v)
+                {:param v}
+                (->Leaf v))]
+    [e-out a-out v-out]))
+
 (defmacro search-triple
   [e a v]
   (let [e-out (if (symbol? e)
@@ -333,11 +347,36 @@
     [e-out a-out v-out]))
 
 
-;(s/defn index-find-leaf
-;  [target :- LeafType]
-;  (let [idx-entries (index/index-find-val-impl [target])
-;        eids        (mapv t/xsecond idx-entries)]
-;    eids))
+(s/defn index-find-leaf :- [{:eid EidType}]
+  [target :- LeafType]
+  (let [results (query-triples [[{:param :e} {:param :a} {:leaf target}]])
+        eids    (mapv #(t/fetch % {:param :e}) results)]
+    eids))
+
+(defn query-natural-impl
+  [arg]
+  (let [triples arg] ; important! forces eval
+    ; (spyx triples)
+    (doseq [triple triples]
+      (s/validate tsk/KeyMap triple))
+    (let [triple-sets (forv [triple triples]
+                        (let [eid-val        (grab :eid triple)
+                              map-remaining  (dissoc triple :eid)
+                              search-triples (forv [[kk vv] map-remaining]
+                                               ; (spyx [kk vv])
+                                               (search-triple-fn eid-val kk vv))]
+                          ; (spyx-pretty search-triples)
+                          search-triples))
+          ; >>          (spyx-pretty triple-sets)
+          all-triples (apply glue triple-sets)]
+      ; (spyx-pretty all-triples)
+      `(let [query-result# (query-triples (quote ~all-triples))]
+         query-result#))))
+(defmacro query-natural
+  [triples]
+  (query-natural-impl triples))
+
+
 
 ;(s/defn index-find-mapentry :- [EidType]
 ;  [tgt-me :- tsk/MapEntry]
@@ -349,7 +388,7 @@
 ;        men-hids         (mapv xlast matching-entries)
 ;        ]
 ;    men-hids))
-;
+
 ;(s/defn index-find-submap
 ;  [target-submap :- tsk/KeyMap]
 ;  (let [map-hids (apply set/intersection
@@ -357,7 +396,7 @@
 ;                     (set (mapv hid->parent-hid
 ;                            (index-find-mapentry tgt-me)))))]
 ;    map-hids))
-;
+
 ;(s/defn index-find-mapentry-key :- [EidType]
 ;  [tgt-key :- LeafType]
 ;  (let [tgt-prefix       [tgt-key]
@@ -367,7 +406,7 @@
 ;        men-hids         (mapv xlast matching-entries)
 ;        ]
 ;    men-hids))
-;
+
 ;(s/defn index-find-arrayentry :- [EidType]
 ;  [tgt-ae :- tsk/MapEntry] ; {idx elem} as a MapEntry
 ;  (let [[tgt-idx tgt-elem] (mapentry->kv tgt-ae)
@@ -378,7 +417,7 @@
 ;        aen-hids         (mapv xlast matching-entries)
 ;        ]
 ;    aen-hids))
-;
+
 ;(s/defn index-find-arrayentry-idx :- [EidType]
 ;  [tgt-idx :- LeafType]
 ;  (let [tgt-prefix       [tgt-idx]
