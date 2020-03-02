@@ -434,8 +434,9 @@
                  {:param a} {:leaf 1}}]))
       (is= edn-val (td/eid->edn {:eid 1001}))
       (is= (td/eid->edn {:eid 1002}) {:a 1 :b 2})
-      (comment ; #todo output should look like
+      (comment ; #todo API:  output should look like
         {:x 1001 :y 1002 :a 1} )
+
 
 
 
