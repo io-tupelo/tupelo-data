@@ -372,24 +372,13 @@
                           search-triples))
           ; >>          (spyx-pretty triple-sets)
           all-triples (apply glue triple-sets)]
-      ; (spyx-pretty all-triples)
-      `(let [query-result# (query-triples (quote ~all-triples))]
-         query-result#))))
+      (spyx-pretty all-triples)
+      `(query-triples ~all-triples))))
 
 (defmacro query-maps
   [maps]
   (query-maps-impl maps))
 
-(defn array-entry
-  []
-  )
-
-(defn query-array-impl
-  [args-in]
-  (let [args args-in ] ; force eval!
-    )
-
-  )
 
 
 

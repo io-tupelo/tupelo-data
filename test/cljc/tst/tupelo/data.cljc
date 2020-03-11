@@ -455,6 +455,7 @@
 
 
 
+
       ;(let [hid-num (only (td/index-find-mapentry-key :num))]
       ;  (is= 1002 hid-num)
       ;  (is= (unlazy (td/hid->node hid-num)) {:-me-key :num, :-me-val-hid 1003, :-parent-hid 1001} )
