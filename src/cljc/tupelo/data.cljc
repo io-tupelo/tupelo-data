@@ -356,8 +356,9 @@
         eids    (mapv #(t/fetch % {:param :e}) results)]
     eids))
 
-(defn ^:no-doc query-maps-impl
+(defn ^:no-doc query-maps->triples
   [args]
+  ; (newline)
   (let [qmaps args] ; important! forces eval
     ; (spyx qmaps)
     (doseq [qmap qmaps]
@@ -372,12 +373,12 @@
                           search-triples))
           ; >>          (spyx-pretty triple-sets)
           all-triples (apply glue triple-sets)]
-      (spyx-pretty all-triples)
-      `(query-triples ~all-triples))))
+      ; (spyx-pretty all-triples)
+      all-triples )))
 
 (defmacro query-maps
   [maps]
-  (query-maps-impl maps))
+  `(query-triples ~(query-maps->triples maps)))
 
 
 

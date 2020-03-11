@@ -431,7 +431,7 @@
 
       (when false
         (spyx-pretty
-          (td/query-maps-impl (quote
+          (td/query-maps->triples (quote
                                    [{:eid x :map y}
                                     {:eid y :a a}]))))
       (is= (td/query-maps [{:eid x :map y}
