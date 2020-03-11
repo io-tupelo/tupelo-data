@@ -14,6 +14,7 @@
             [tupelo.data :as td :refer [ with-tdb new-tdb eid-count-reset lookup query-triples boolean->binary search-triple
                                         *tdb*
                                         ]]
+            [tupelo.misc :as misc]
             [clojure.set :as set]
             [schema.core :as s]
             [tupelo.data.index :as index]
@@ -22,8 +23,6 @@
              [tupelo.test-cljs :refer [define-fixture deftest dotest is isnt is= isnt= is-set= is-nonblank= testing throws?]
               :include-macros true]
              [tupelo.core :as t :refer [spy spyx spyxx] :include-macros true]
-             [tupelo.data :as td]
-             [schema.core :as s]
              ))
   )
 
@@ -32,6 +31,7 @@
 #?(:cljs (enable-console-print!))
 
 #?(:clj (do
+
 
 (dotest
   (let [ss123 (t/it-> (index/empty-index)
@@ -256,7 +256,7 @@
     (is (td/search-param? spa))
     (is (td/search-param? spb))
     (is= spa {:param :a})
-    (is= spb {:param (quote b)}))
+    (is= spb {:param :b}))
 
   (with-tdb (new-tdb)
     (eid-count-reset)
@@ -355,12 +355,13 @@
   (throws? (boolean->binary 234)) )
 
 (dotest
-  (is= [(td/->SearchParam x)
-        (td/->SearchParam y)
-        (td/->SearchParam z)]
-    (td/search-triple x y z))
-  (is= [(td/->Eid 123) (td/->Attr :color) (td/->Leaf "Joey")]
-    (td/search-triple 123 :color "Joey")))
+  (is= (td/search-triple x y z)
+    [(td/->SearchParam x)
+     (td/->SearchParam y)
+     (td/->SearchParam z)]
+    [{:param :x} {:param :y} {:param :z}])
+  (is= (td/search-triple 123 :color "Joey")
+    [(td/->Eid 123) (td/->Attr :color) (td/->Leaf "Joey")]))
 
 (dotest
   (with-tdb (new-tdb)
@@ -370,8 +371,8 @@
           search-spec [(search-triple x :a y)
                        (search-triple y :b 2)]]
       (is= (query-triples search-spec)
-        (quote [{{:param x} {:eid 1001}
-                 {:param y} {:eid 1002}}])))))
+        (quote [{{:param :x} {:eid 1001}
+                 {:param :y} {:eid 1002}}])))))
 (dotest
   (with-tdb (new-tdb)
     (eid-count-reset)
@@ -379,8 +380,8 @@
           root-eid    (td/add-edn edn-val)
           search-spec [(search-triple y :b 2) (search-triple x :a y) ]]
       (is= (query-triples search-spec)
-        (quote [{{:param x} {:eid 1001}
-                 {:param y} {:eid 1002}}])))))
+        [{{:param :x} {:eid 1001}
+          {:param :y} {:eid 1002}}]))))
 (dotest
   (with-tdb (new-tdb)
     (eid-count-reset)
@@ -410,32 +411,46 @@
       ; (spyx-pretty (grab :idx-eav (deref *tdb*)))
       (is= edn-val (td/eid->edn root-hid))
 
-      (when false
-        (let [eids-match (spyx-pretty (td/index-find-leaf 1)) ; only 1 match
+      (when true
+        (let [eids-match (td/index-find-leaf 1) ; only 1 match
               entity-edn (td/eid->edn (only eids-match))]
-          (is= (spyx entity-edn) {:a 1, :b 2}))
+          (is= entity-edn {:a 1, :b 2}))
         (is= (query-triples [(search-triple e :num v)])
-          (quote [{{:param e} {:eid 1001},
-                   {:param v} {:leaf 5}}]))
+          [{{:param :e} {:eid 1001},
+            {:param :v} {:leaf 5}}])
         (is= (query-triples [(search-triple e a "hello")])
-          (quote [{{:param e} {:eid 1001}, {:param a} {:attr :str}}]))
+          [{{:param :e} {:eid 1001},
+            {:param :a} {:attr :str}}])
         (is= (query-triples [(search-triple e a 7)])
-          (quote [{{:param e} {:eid 1003}, {:param a} {:attr 2}}])))
+          [{{:param :e} {:eid 1003},
+            {:param :a} {:attr 2}}]))
+
+      (is= {:param :x}
+        (td/->SearchParam-impl (quote x))
+        (td/->SearchParam-impl :x))
 
       (when false
         (spyx-pretty
-          (td/query-natural-impl (quote
+          (td/query-maps-impl (quote
                                    [{:eid x :map y}
                                     {:eid y :a a}]))))
-      (is= (td/query-natural [{:eid x :map y}
-                              {:eid y :a a}])
-        (quote [{{:param x} {:eid 1001},
-                 {:param y} {:eid 1002},
-                 {:param a} {:leaf 1}}]))
+      (is= (td/query-maps [{:eid x :map y}
+                           {:eid y :a a}])
+        [{{:param :x} {:eid 1001},
+          {:param :y} {:eid 1002},
+          {:param :a} {:leaf 1}}])
       (is= edn-val (td/eid->edn {:eid 1001}))
       (is= (td/eid->edn {:eid 1002}) {:a 1 :b 2})
       (comment ; #todo API:  output should look like
         {:x 1001 :y 1002 :a 1} )
+
+      (let [r1 (only (td/query-triples [(search-triple e i 7)]))
+            r2 (only (td/index-find-leaf 7))]
+        (is= r1 {{:param :e} {:eid 1003}
+                 {:param :i} {:attr 2}})
+        (is= (td/eid->edn {:eid 1003}) [5 6 7])
+        (is= r2 {:eid 1003})
+        (is= (td/eid->edn r2) [5 6 7]))
 
 
 

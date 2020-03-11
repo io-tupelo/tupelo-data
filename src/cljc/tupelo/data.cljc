@@ -114,7 +114,6 @@
 (def AttrMap {:attr s/Any})
 (def LeafMap {:leaf s/Any})
 
-(defmacro ->SearchParam [arg] `{:param (quote ~arg)})
 (s/defn ->Eid [arg :- s/Int] {:eid arg})
 (defn ->Attr [arg] {:attr arg})
 (defn ->Leaf [arg] {:leaf arg})
@@ -319,33 +318,50 @@
 ;  [e a v]
 ;  (mapv par-val-fn [e a v]))
 
-(defn search-triple-fn
+
+(defn ^:no-doc ->SearchParam-impl
+  [arg]
+  (let [result (cond
+                 (keyword? arg) arg
+                 (symbol? arg) (t/sym->kw arg)
+                 :else (throw (ex-info "->SearchParam:  only symbol & keyword are accepted" {:arg arg})))]
+    {:param result}))
+
+(defmacro ->SearchParam
+  [arg]
+  (->SearchParam-impl arg))
+
+
+(defn ^:no-doc search-triple-impl
   [e a v]
-  ; (spyx [e a v])
   (let [e-out (if (symbol? e)
-                {:param e}
+                (->SearchParam-impl e) ; {:param e}
                 (->Eid e))
+
         a-out (if (symbol? a)
-                {:param a}
+                (->SearchParam-impl a) ; {:param a}
                 (->Attr a))
         v-out (if (symbol? v)
-                {:param v}
+                (->SearchParam-impl v) ; {:param v}
                 (->Leaf v))]
     [e-out a-out v-out]))
+
+;(defmacro search-triple-0
+;  [e a v]
+;  (let [e-out (if (symbol? e)
+;                `(->SearchParam ~e)
+;                (->Eid e))
+;        a-out (if (symbol? a)
+;                `(->SearchParam ~a)
+;                (->Attr a))
+;        v-out (if (symbol? v)
+;                `(->SearchParam ~v)
+;                (->Leaf v))]
+;    [e-out a-out v-out]))
 
 (defmacro search-triple
   [e a v]
-  (let [e-out (if (symbol? e)
-                `(->SearchParam ~e)
-                (->Eid e))
-        a-out (if (symbol? a)
-                `(->SearchParam ~a)
-                (->Attr a))
-        v-out (if (symbol? v)
-                `(->SearchParam ~v)
-                (->Leaf v))]
-    [e-out a-out v-out]))
-
+  (search-triple-impl e a v))
 
 (s/defn index-find-leaf :- [{:eid EidType}]
   [target :- LeafType]
@@ -353,28 +369,41 @@
         eids    (mapv #(t/fetch % {:param :e}) results)]
     eids))
 
-(defn query-natural-impl
-  [arg]
-  (let [triples arg] ; important! forces eval
-    ; (spyx triples)
-    (doseq [triple triples]
-      (s/validate tsk/KeyMap triple))
-    (let [triple-sets (forv [triple triples]
+(defn ^:no-doc query-maps-impl
+  [args]
+  (let [qmaps args] ; important! forces eval
+    ; (spyx qmaps)
+    (doseq [qmap qmaps]
+      (s/validate tsk/KeyMap qmap))
+    (let [triple-sets (forv [triple qmaps]
                         (let [eid-val        (grab :eid triple)
                               map-remaining  (dissoc triple :eid)
                               search-triples (forv [[kk vv] map-remaining]
                                                ; (spyx [kk vv])
-                                               (search-triple-fn eid-val kk vv))]
-                          ; (spyx-pretty search-triples)
+                                               (search-triple-impl eid-val kk vv))]
+                          ; (spyx-pretty qmaps)
                           search-triples))
           ; >>          (spyx-pretty triple-sets)
           all-triples (apply glue triple-sets)]
       ; (spyx-pretty all-triples)
       `(let [query-result# (query-triples (quote ~all-triples))]
          query-result#))))
-(defmacro query-natural
-  [triples]
-  (query-natural-impl triples))
+
+(defmacro query-maps
+  [maps]
+  (query-maps-impl maps))
+
+(defn array-entry
+  []
+  )
+
+(defn query-array-impl
+  [args-in]
+  (let [args args-in ] ; force eval!
+    )
+
+  )
+
 
 
 
