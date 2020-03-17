@@ -9,7 +9,7 @@
   #?(:clj (:require
             [tupelo.test :refer [define-fixture deftest dotest dotest-focus is isnt is= isnt= is-set= is-nonblank= testing throws?]]
             [tupelo.core :as t :refer [spy spyx spyxx spy-pretty spyx-pretty unlazy let-spy
-                                       only forv glue grab
+                                       only forv glue grab nl
                                        ]]
             [tupelo.data :as td :refer [ with-tdb new-tdb eid-count-reset lookup query-triples boolean->binary search-triple
                                         *tdb*
@@ -452,7 +452,8 @@
         (is= r2 {:eid 1003})
         (is= (td/eid->edn r2) [5 6 7]))
 
-
+      (nl)
+      (td/query-maps [{:eid x :map {:a a}} ])
 
 
 
@@ -470,8 +471,10 @@
       ;  (is= (unlazy (td/hid->node hid-2))
       ;    {:-ae-elem-hid 1017, :-ae-idx 2, :-parent-hid 1011} )
       ;  (is= (td/hid->edn hid-2) 7 ))
-      )))
-;
+
+)))
+
+
 ;(dotest
 ;  (td/with-tdb (td/new-tdb)
 ;    (td/hid-count-reset)

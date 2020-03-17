@@ -6,13 +6,14 @@
 
   :global-vars {*warn-on-reflection* false}
 
+  :deploy-repositories [["clojars" "http://beta.clojars.org/repo/"]]
   :dependencies
   [
-   [org.clojure/clojure "1.10.1"]
+   [org.clojure/clojure "1.10.2-alpha1"]
    [org.clojure/clojurescript "1.10.597"]
    [org.clojure/data.avl "0.1.0"]
    [prismatic/schema "1.1.12"]
-   [tupelo "0.9.198"]
+   [tupelo "0.9.199"]
    ]
 
   :plugins [[com.jakemccrary/lein-test-refresh "0.24.1"]]
@@ -28,10 +29,6 @@
   :clean-targets ^{:protect false} ["resources/public/js/compiled"
                                     "out"
                                     :target-path]
-
-  :deploy-repositories {"snapshots"    :clojars
-                        "releases"     :clojars
-                        :sign-releases false}
 
   :jvm-opts ["-Xms500m" "-Xmx2g"]
   )
