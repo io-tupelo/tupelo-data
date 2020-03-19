@@ -480,8 +480,8 @@
         (is= (symbol "a") (td/autosym-resolve :a (quote ?)))
         (throws? (td/autosym-resolve :a (quote ?)))) ;attempted duplicate throws
 
-      (throws? (td/exclude-tmp-eid {:a {:tmp-eid-123 :x}}))
-      (throws? (td/exclude-tmp-eid (quote {:a {:x [1 2 3 tmp-eid-123 4 5 6]}})))
+      (throws? (td/exclude-reserved-identifiers {:a {:tmp-eid-123 :x}}))
+      (throws? (td/exclude-reserved-identifiers (quote {:a {:x [1 2 3 tmp-eid-123 4 5 6]}})))
       (throws? (td/query-maps-impl (quote [{:map {:a tmp-eid-123}}])))
 
       (is= (td/query-maps [{:map {:a ?}}])

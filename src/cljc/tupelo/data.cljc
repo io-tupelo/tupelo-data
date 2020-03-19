@@ -462,8 +462,8 @@
                              qres)) ]
     results-filtered))
 
-(defn ^:no-doc exclude-tmp-eid
-  "Verifies the use has not reserved symbols or keywords like `tmp-eid-9999` "
+(defn ^:no-doc exclude-reserved-identifiers
+  "Verify search data does not include reserved identifiers like `tmp-eid-9999` "
   [form]
   (t/walk-with-parents-readonly form
     {:enter (fn [-parents- item]
@@ -474,7 +474,7 @@
   [maps]
   ; (println "query-maps-impl")
   ; (spyx maps)
-  (exclude-tmp-eid maps)
+  (exclude-reserved-identifiers maps)
   (binding [*all-triples* (atom [])
             *autosyms-seen* (atom #{}) ]
     (query-maps->triples maps)
