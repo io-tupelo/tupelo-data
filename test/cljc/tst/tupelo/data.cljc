@@ -454,8 +454,6 @@
         (is= r2 {:eid 1003})
         (is= (td/eid->edn r2) [5 6 7]))
 
-  )
-
       (is (td/param-tmp-eid? {:param :tmp-eid-99999} ))
 
       (when false
@@ -474,6 +472,14 @@
         [{{:param :a} {:leaf 1}}])
       (is= (td/query-maps [{:hashmap {:a a}}])
         [{{:param :a} {:leaf 21}}])
+
+  )
+      (binding [td/*autosyms-seen* (atom #{})]
+        (is= (symbol "a") (td/autosym-resolve :a (quote ?)))
+        (throws? (td/autosym-resolve :a (quote ?)))) ;attempted duplicate throws
+
+      (is= (td/query-maps [{:map {:a ?}}])
+        [{{:param :a} {:leaf 1}}])
 
 
 

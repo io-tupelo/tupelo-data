@@ -377,8 +377,8 @@
     eids))
 
 
-; #todo (spy value) prints:   spy-line-xxxx => value
-(defn spyq ; #todo => tupelo.core
+; #todo (spyl value) prints:   spy-line-xxxx => value
+(defn spyq ; #todo => tupelo.core/spy
   "(spyq <value>) - Spy Quiet
         This variant is intended for use in very simple situations and is the same as the
         2-argument arity where <msg-string> defaults to 'spy'.  For example (spy (+ 2 3))
@@ -389,34 +389,49 @@
   value)
 
 (def ^:no-doc ^:dynamic *all-triples* nil)
+(def ^:no-doc ^:dynamic *autosyms-seen* nil)
+
+(s/defn ^:no-doc autosym-resolve :- s/Symbol
+  [kk :- s/Any
+   vv :- s/Symbol]
+  (if (and (keyword? kk)
+        (= (symbol "?") vv))
+    (let [kk-sym (t/kw->sym kk)]
+      (when (contains? (deref *autosyms-seen*) kk-sym)
+        (throw (ex-info "Duplicate autosym found:" (vals->map kk kk-sym))))
+      (swap! *autosyms-seen* conj kk-sym)
+      kk-sym)
+    vv))
 
 (defn ^:no-doc query-maps->triples
   [qmaps]
   (with-spy-indent
-    ; (newline)
-    ; (spyq :query-maps->triples)
-    ; (spyx-pretty (deref *all-triples*))
-    ; (spyx qmaps)
+    (newline)
+    (spyq :query-maps->triples)
+    (spyx-pretty (deref *all-triples*))
+    (spyx qmaps)
     (doseq [qmap qmaps]
-      ; (spyx-pretty qmap)
+      (spyx-pretty qmap)
       (s/validate tsk/KeyMap qmap)
       (let [eid-val       (if (contains? qmap :eid)
                             (grab :eid qmap)
                             (gensym "tmp-eid-"))
             map-remaining (dissoc qmap :eid)]
         (forv [[kk vv] map-remaining]
-          ; (spyx [kk vv])
+          (spyx [kk vv])
           (if (map? vv)
             (let [tmp-eid         (gensym "tmp-eid-")
                   triple-modified (search-triple-fn eid-val kk tmp-eid)
                   ; >>              (spyx triple-modified)
                   qmaps-modified  [(glue {:eid tmp-eid} vv)]]
-              ; (spyx qmaps-modified)
+              (spyx qmaps-modified)
               (swap! *all-triples* append triple-modified)
               (query-maps->triples qmaps-modified))
-            (let [triple (search-triple-fn eid-val kk vv)]
-              ; (spyx triple)
-              (swap! *all-triples* append triple)))))) ))
+            (do
+              (let [sym-to-use (autosym-resolve kk vv)
+                    triple (search-triple-fn eid-val kk sym-to-use)]
+                (spyx triple)
+                (swap! *all-triples* append triple))))))) ))
 
 (defn param-tmp-eid?
   "Returns true iff arg is a map that looks like {:param :tmp-eid-99999}"
@@ -438,7 +453,8 @@
   [maps]
   ; (println "query-maps-impl")
   ; (spyx maps)
-  (binding [*all-triples* (atom [])]
+  (binding [*all-triples* (atom [])
+            *autosyms-seen* (atom #{}) ]
     (query-maps->triples maps)
     ; (spyx *all-triples*)
     ; (spyx-pretty (deref *all-triples*))
