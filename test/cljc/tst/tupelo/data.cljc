@@ -403,6 +403,7 @@
     (td/eid-count-reset)
     (let [edn-val  {:num 5
                     :map {:a 1 :b 2}
+                    :hashmap {:a 21 :b 22}
                     :vec [5 6 7]
                     ;  :set #{3 4}  ; #todo add sets
                     :str "hello"
@@ -411,6 +412,7 @@
       ; (spyx-pretty (grab :idx-eav (deref *tdb*)))
       (is= edn-val (td/eid->edn root-hid))
 
+(comment
       (when true
         (let [eids-match (td/index-find-leaf 1) ; only 1 match
               entity-edn (td/eid->edn (only eids-match))]
@@ -426,8 +428,8 @@
             {:param :a} {:attr 2}}]))
 
       (is= {:param :x}
-        (td/->SearchParam-impl (quote x))
-        (td/->SearchParam-impl :x))
+        (td/->SearchParam-fn (quote x))
+        (td/->SearchParam-fn :x))
 
       (when false
         (spyx-pretty
@@ -452,8 +454,27 @@
         (is= r2 {:eid 1003})
         (is= (td/eid->edn r2) [5 6 7]))
 
-      (nl)
-      (td/query-maps [{:eid x :map {:a a}} ])
+  )
+
+      (is (td/param-tmp-eid? {:param :tmp-eid-99999} ))
+
+      (when false
+        (nl)
+        (spyx-pretty
+          (td/query-maps-impl (quote [{:eid x :map {:a a}}]))))
+      (is= (td/query-maps [{:eid x :map {:a a}}])
+        [{{:param :x} {:eid 1001},
+          {:param :a} {:leaf 1}}])
+      (is= :x (td/unwrap-param {:param :x}))
+      (is= 1234 (td/unwrap-eid  {:eid 1234}))
+      (is= :color (td/unwrap-attr {:attr :color}))
+      (is= 42 (td/unwrap-leaf {:leaf 42}))
+
+      (is= (td/query-maps [{:map {:a a}}])
+        [{{:param :a} {:leaf 1}}])
+      (is= (td/query-maps [{:hashmap {:a a}}])
+        [{{:param :a} {:leaf 21}}])
+
 
 
 

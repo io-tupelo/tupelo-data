@@ -8,9 +8,10 @@
   (:refer-clojure :exclude [load ->VecNode])
   ; #?(:clj (:use tupelo.core)) ; #todo remove for cljs
   #?(:clj (:require
-            [tupelo.core :as t :refer [spy spyx spyxx spyx-pretty grab glue map-entry indexed
+            [tupelo.core :as t :refer [spy spyx spyxx spyx-pretty with-spy-indent
+                                       grab glue map-entry indexed
                                        forv vals->map fetch-in let-spy xfirst xsecond xthird xlast xrest
-                                       keep-if drop-if
+                                       keep-if drop-if append prepend
                                        ]]
             [tupelo.data.index :as index]
             [tupelo.schema :as tsk]
@@ -109,7 +110,7 @@
 (def TripleIndex #{tsk/Triple})
 
 ;-----------------------------------------------------------------------------
-(def ParamMap {:param s/Int})
+(def ParamMap {:param s/Any})
 (def EidMap {:eid s/Int})
 (def AttrMap {:attr s/Any})
 (def LeafMap {:leaf s/Any})
@@ -123,6 +124,31 @@
 (defn eid-map? [x] (and (pair-map? x) (= :eid (key (first x)))))
 (defn attr-map? [x] (and (pair-map? x) (= :attr (key (first x)))))
 (defn leaf-map? [x] (and (pair-map? x) (= :leaf (key (first x)))))
+
+(s/defn unwrap-param :- s/Keyword
+  "Unwraps a ParamMap to return the param name as a keyword
+    (unwrap-param {:param :x} )  =>  :x "
+  [arg :- ParamMap]
+  (t/validate search-param? arg)
+  (val (t/only arg)))
+(s/defn unwrap-eid :- s/Int
+  "Unwraps an EidMap to return the eid value
+    (unwrap-param {:eid 1234} )  =>  1234 "
+  [arg :- EidMap]
+  (t/validate eid-map? arg)
+  (val (t/only arg)))
+(s/defn unwrap-attr :- s/Any
+  "Unwraps an AttrMap to return the attr value
+    (unwrap-param {:attr :color} )  =>  :color "
+  [arg :- AttrMap]
+  (t/validate attr-map? arg)
+  (val (t/only arg)))
+(s/defn unwrap-leaf :- s/Any
+  "Unwraps an LeafMap to return the leaf value
+    (unwrap-param {:leaf :color} )  =>  :color "
+  [arg :- LeafMap]
+  (t/validate leaf-map? arg)
+  (val (t/only arg)))
 
 ;-----------------------------------------------------------------------------
 (def ^:dynamic ^:no-doc *tdb* nil)
@@ -313,13 +339,7 @@
     (query-impl query-result {} qspec-list)
     @query-result))
 
-;(defn ^:no-doc par-val-fn [arg] (if (symbol? arg) (->SearchParam arg) (->SearchValue arg)))
-;(defmacro search-triple
-;  [e a v]
-;  (mapv par-val-fn [e a v]))
-
-
-(defn ^:no-doc ->SearchParam-impl
+(defn ^:no-doc ->SearchParam-fn
   [arg]
   (let [result (cond
                  (keyword? arg) arg
@@ -329,26 +349,26 @@
 
 (defmacro ->SearchParam
   [arg]
-  (->SearchParam-impl arg))
+  (->SearchParam-fn arg))
 
 
-(defn ^:no-doc search-triple-impl
+(defn ^:no-doc search-triple-fn
   [e a v]
   (let [e-out (if (symbol? e)
-                (->SearchParam-impl e) ; {:param e}
+                (->SearchParam-fn e) ; {:param e}
                 (->Eid e))
 
         a-out (if (symbol? a)
-                (->SearchParam-impl a) ; {:param a}
+                (->SearchParam-fn a) ; {:param a}
                 (->Attr a))
         v-out (if (symbol? v)
-                (->SearchParam-impl v) ; {:param v}
+                (->SearchParam-fn v) ; {:param v}
                 (->Leaf v))]
     [e-out a-out v-out]))
 
 (defmacro search-triple
   [e a v]
-  (search-triple-impl e a v))
+  (search-triple-fn e a v))
 
 (s/defn index-find-leaf :- [{:eid EidType}]
   [target :- LeafType]
@@ -356,29 +376,79 @@
         eids    (mapv #(t/fetch % {:param :e}) results)]
     eids))
 
+
+; #todo (spy value) prints:   spy-line-xxxx => value
+(defn spyq ; #todo => tupelo.core
+  "(spyq <value>) - Spy Quiet
+        This variant is intended for use in very simple situations and is the same as the
+        2-argument arity where <msg-string> defaults to 'spy'.  For example (spy (+ 2 3))
+        prints 'spy => 5' to stdout.  "
+  [value]
+  (when t/*spy-enabled*
+    (println (str (t/spy-indent-spaces) (pr-str value))))
+  value)
+
+(def ^:no-doc ^:dynamic *all-triples* nil)
+
 (defn ^:no-doc query-maps->triples
-  [args]
-  ; (newline)
-  (let [qmaps args] ; important! forces eval
+  [qmaps]
+  (with-spy-indent
+    ; (newline)
+    ; (spyq :query-maps->triples)
+    ; (spyx-pretty (deref *all-triples*))
     ; (spyx qmaps)
     (doseq [qmap qmaps]
-      (s/validate tsk/KeyMap qmap))
-    (let [triple-sets (forv [triple qmaps]
-                        (let [eid-val        (grab :eid triple)
-                              map-remaining  (dissoc triple :eid)
-                              search-triples (forv [[kk vv] map-remaining]
-                                               ; (spyx [kk vv])
-                                               (search-triple-impl eid-val kk vv))]
-                          ; (spyx-pretty qmaps)
-                          search-triples))
-          ; >>          (spyx-pretty triple-sets)
-          all-triples (apply glue triple-sets)]
-      ; (spyx-pretty all-triples)
-      all-triples )))
+      ; (spyx-pretty qmap)
+      (s/validate tsk/KeyMap qmap)
+      (let [eid-val       (if (contains? qmap :eid)
+                            (grab :eid qmap)
+                            (gensym "tmp-eid-"))
+            map-remaining (dissoc qmap :eid)]
+        (forv [[kk vv] map-remaining]
+          ; (spyx [kk vv])
+          (if (map? vv)
+            (let [tmp-eid         (gensym "tmp-eid-")
+                  triple-modified (search-triple-fn eid-val kk tmp-eid)
+                  ; >>              (spyx triple-modified)
+                  qmaps-modified  [(glue {:eid tmp-eid} vv)]]
+              ; (spyx qmaps-modified)
+              (swap! *all-triples* append triple-modified)
+              (query-maps->triples qmaps-modified))
+            (let [triple (search-triple-fn eid-val kk vv)]
+              ; (spyx triple)
+              (swap! *all-triples* append triple)))))) ))
+
+(defn param-tmp-eid?
+  "Returns true iff arg is a map that looks like {:param :tmp-eid-99999}"
+  [arg]
+  (and (search-param? arg)
+    (let [param-val (val (first arg))]
+      (and (keyword? param-val)
+        (.startsWith (name param-val) "tmp-eid-")))))
+
+(defn ^:no-doc query-results-filter-tmp-eid-mapentry
+  [query-results]
+  (let [results-filtered (forv [qres query-results]
+                           (drop-if
+                             (fn [k v] (param-tmp-eid? k))
+                             qres)) ]
+    results-filtered))
+
+(defn query-maps-impl
+  [maps]
+  ; (println "query-maps-impl")
+  ; (spyx maps)
+  (binding [*all-triples* (atom [])]
+    (query-maps->triples maps)
+    ; (spyx *all-triples*)
+    ; (spyx-pretty (deref *all-triples*))
+    `(let [unfiltered-results# (query-triples (quote ~(deref *all-triples*))) ]
+       ; (spyx unfiltered-results#)
+       (query-results-filter-tmp-eid-mapentry unfiltered-results# ))))
 
 (defmacro query-maps
   [maps]
-  `(query-triples ~(query-maps->triples maps)))
+  (query-maps-impl maps))
 
 
 
