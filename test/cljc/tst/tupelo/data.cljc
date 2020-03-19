@@ -43,31 +43,31 @@
     (is= (vec ss123) [[1 :a] [2 :a] [3 :a]])
     (is= ss13 #{[1 :a] [3 :a]}))
 
-  (is   (map? (td/->Leaf 3)))
+  (is   (map? (td/wrap-leaf 3)))
   (is   (map? {:a 1}))
-  (isnt (record? (td/->Leaf 3)))
+  (isnt (record? (td/wrap-leaf 3)))
   (isnt (record? {:a 1}))
 
   ; Leaf and Hid records sort separately in the index. Eid sorts first since the type name
   ; `tupelo.data.Eid` sorts before `tupelo.data.Leaf`
-  (is= (td/->Leaf 5) {:leaf 5})
-  (is= (td/->Eid 5) {:eid 5})
+  (is= (td/wrap-leaf 5) {:leaf 5})
+  (is= (td/wrap-eid 5) {:eid 5})
 
   (let [idx      (-> (index/empty-index)
 
-                   (index/add-entry [1 (td/->Leaf 3)])
-                   (index/add-entry [1 (td/->Eid 3)])
-                   (index/add-entry [1 (td/->Leaf 1)])
-                   (index/add-entry [1 (td/->Eid 1)])
-                   (index/add-entry [1 (td/->Leaf 2)])
-                   (index/add-entry [1 (td/->Eid 2)])
+                   (index/add-entry [1 (td/wrap-leaf 3)])
+                   (index/add-entry [1 (td/wrap-eid 3)])
+                   (index/add-entry [1 (td/wrap-leaf 1)])
+                   (index/add-entry [1 (td/wrap-eid 1)])
+                   (index/add-entry [1 (td/wrap-leaf 2)])
+                   (index/add-entry [1 (td/wrap-eid 2)])
 
-                   (index/add-entry [0 (td/->Leaf 3)])
-                   (index/add-entry [0 (td/->Eid 3)])
-                   (index/add-entry [0 (td/->Leaf 1)])
-                   (index/add-entry [0 (td/->Eid 1)])
-                   (index/add-entry [0 (td/->Leaf 2)])
-                   (index/add-entry [0 (td/->Eid 2)]))
+                   (index/add-entry [0 (td/wrap-leaf 3)])
+                   (index/add-entry [0 (td/wrap-eid 3)])
+                   (index/add-entry [0 (td/wrap-leaf 1)])
+                   (index/add-entry [0 (td/wrap-eid 1)])
+                   (index/add-entry [0 (td/wrap-leaf 2)])
+                   (index/add-entry [0 (td/wrap-eid 2)]))
 
         expected [[0 {:eid 1}]
                   [0 {:eid 2}]
@@ -90,7 +90,7 @@
       {:eid-type {} :idx-eav #{} :idx-vae #{} :idx-ave #{}})
     (let [edn-val  {:a 1}
           root-eid (td/add-edn edn-val)]
-      (is= (td/->Eid 1001) root-eid)
+      (is= (td/wrap-eid 1001) root-eid)
       (is= (unlazy (deref *tdb*))
         {:eid-type {{:eid 1001} :map},
          :idx-ave  #{[{:attr :a} {:leaf 1} {:eid 1001}]},
@@ -102,7 +102,7 @@
     (eid-count-reset)
     (let [edn-val  {:a 1 :b 2}
           root-eid (td/add-edn edn-val)]
-      (is= (td/->Eid 1001) root-eid)
+      (is= (td/wrap-eid 1001) root-eid)
       (is= (unlazy (deref *tdb*))
         {:eid-type {{:eid 1001} :map},
          :idx-ave  #{[{:attr :a} {:leaf 1} {:eid 1001}]
@@ -117,7 +117,7 @@
     (eid-count-reset)
     (let [edn-val  {:a 1 :b 2 :c {:d 4}}
           root-eid (td/add-edn edn-val)]
-      (is= (td/->Eid 1001) root-eid)
+      (is= (td/wrap-eid 1001) root-eid)
       (is= (unlazy (deref *tdb*))
         {:eid-type {{:eid 1001} :map,
                     {:eid 1002} :map},
@@ -178,7 +178,7 @@
                      [{:leaf 11} {:attr 1} {:eid 1002}]
                      [{:leaf 12} {:attr 2} {:eid 1002}]}})
       (is= edn-val (td/eid->edn root-eid))
-      (is= (td/eid->edn (td/->Eid 1002)) [10 11 12]))))
+      (is= (td/eid->edn (td/wrap-eid 1002)) [10 11 12]))))
 
 (dotest
   (with-tdb (new-tdb)
@@ -232,22 +232,22 @@
                      [{:leaf 3} {:attr :b} {:eid 1006}]
                      [{:leaf 3} {:attr :c} {:eid 1009}]}})
       ;---------------------------------------------------------------------------------------------------
-      (is= (lookup [(td/->Eid 1003) nil nil])
+      (is= (lookup [(td/wrap-eid 1003) nil nil])
         #{[{:eid 1003} {:attr :a} {:leaf 3}]})
-      (is= (lookup [nil (td/->Attr :b) nil])
+      (is= (lookup [nil (td/wrap-attr :b) nil])
         #{[{:eid 1004} {:attr :b} {:leaf 1}]
           [{:eid 1005} {:attr :b} {:leaf 2}]
           [{:eid 1006} {:attr :b} {:leaf 3}]})
-      (is= (lookup [nil nil (td/->Leaf 3)])
+      (is= (lookup [nil nil (td/wrap-leaf 3)])
         #{[{:eid 1003} {:attr :a} {:leaf 3}]
           [{:eid 1006} {:attr :b} {:leaf 3}]
           [{:eid 1009} {:attr :c} {:leaf 3}]})
       ;---------------------------------------------------------------------------------------------------
-      (is= (lookup [nil (td/->Attr :a) (td/->Leaf 3)])
+      (is= (lookup [nil (td/wrap-attr :a) (td/wrap-leaf 3)])
         #{[{:eid 1003} {:attr :a} {:leaf 3}]})
-      (is= (lookup [(td/->Eid 1009) nil (td/->Leaf 3)])
+      (is= (lookup [(td/wrap-eid 1009) nil (td/wrap-leaf 3)])
         #{[{:eid 1009} {:attr :c} {:leaf 3}]})
-      (is= (lookup [(td/->Eid 1005) (td/->Attr :b) nil])
+      (is= (lookup [(td/wrap-eid 1005) (td/wrap-attr :b) nil])
         #{[{:eid 1005} {:attr :b} {:leaf 2}]}))))
 
 (dotest
@@ -301,13 +301,13 @@
          :idx-vae  #{[{:leaf 1} {:attr :a} {:eid 1001}]
                      [{:leaf 1} {:attr :b} {:eid 1001}]}}))
 
-    (let [search-spec [[(td/->SearchParam :x) (td/->Attr :a) (td/->Leaf 1)]]]
+    (let [search-spec [[(td/->SearchParam :x) (td/wrap-attr :a) (td/wrap-leaf 1)]]]
       (is= (query-triples search-spec) [{{:param :x} {:eid 1001}}]))
 
-    (let [search-spec [[(td/->SearchParam :x) (td/->Attr :b) (td/->Leaf 1)]]]
+    (let [search-spec [[(td/->SearchParam :x) (td/wrap-attr :b) (td/wrap-leaf 1)]]]
       (is= (query-triples search-spec) [{{:param :x} {:eid 1001}}]))
 
-    (let [search-spec [[(td/->SearchParam :x) (td/->SearchParam :y) (td/->Leaf 1)]]]
+    (let [search-spec [[(td/->SearchParam :x) (td/->SearchParam :y) (td/wrap-leaf 1)]]]
       (is= (query-triples search-spec)
         [{{:param :x} {:eid 1001},
           {:param :y} {:attr :a}}
@@ -331,13 +331,13 @@
       ; (prn :-----------------------------------------------------------------------------)
       ; compound search
       (is= (query-triples [[{:param :x} {:attr :a} {:param :y}]
-                           [{:param :y} {:attr :b} (td/->Leaf 2)]])
+                           [{:param :y} {:attr :b} (td/wrap-leaf 2)]])
         [{{:param :x} {:eid 1001},
           {:param :y} {:eid 1002}}])
       ; (prn :-----------------------------------------------------------------------------)
       ; failing search
       (is= [] (query-triples [[{:param :x} {:attr :a} {:param :y}]
-                              [{:param :y} {:attr :b} (td/->Leaf 99)]]))
+                              [{:param :y} {:attr :b} (td/wrap-leaf 99)]]))
       ; (prn :-----------------------------------------------------------------------------)
       ; wildcard search - match all
       (is= (query-triples [[{:param :x} {:param :y} {:param :z}]])
@@ -361,7 +361,7 @@
      (td/->SearchParam z)]
     [{:param :x} {:param :y} {:param :z}])
   (is= (td/search-triple 123 :color "Joey")
-    [(td/->Eid 123) (td/->Attr :color) (td/->Leaf "Joey")]))
+    [(td/wrap-eid 123) (td/wrap-attr :color) (td/wrap-leaf "Joey")]))
 
 (dotest
   (with-tdb (new-tdb)

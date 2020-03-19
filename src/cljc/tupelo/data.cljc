@@ -110,45 +110,67 @@
 (def TripleIndex #{tsk/Triple})
 
 ;-----------------------------------------------------------------------------
-(def ParamMap {:param s/Any})
-(def EidMap {:eid s/Int})
-(def AttrMap {:attr s/Any})
-(def LeafMap {:leaf s/Any})
+(def WrappedParam {:param s/Any})
+(def WrappedEid {:eid s/Int})
+(def WrappedAttr {:attr s/Any})
+(def WrappedLeaf {:leaf s/Any})
 
-(s/defn ->Eid [arg :- s/Int] {:eid arg})
-(defn ->Attr [arg] {:attr arg})
-(defn ->Leaf [arg] {:leaf arg})
+(s/defn wrap-eid  :- WrappedEid
+  [arg :- s/Int] {:eid arg})
+(s/defn wrap-attr :- WrappedAttr
+  [arg] {:attr arg})
+(s/defn wrap-leaf :- WrappedLeaf
+  [arg] {:leaf arg})
 
 (defn pair-map? [arg] (and (map? arg) (= 1 (count arg))))
-(defn search-param? [x] (and (pair-map? x) (= :param (key (first x)))))
-(defn eid-map? [x] (and (pair-map? x) (= :eid (key (first x)))))
-(defn attr-map? [x] (and (pair-map? x) (= :attr (key (first x)))))
-(defn leaf-map? [x] (and (pair-map? x) (= :leaf (key (first x)))))
+(defn search-param? [x] (and (pair-map? x) (= :param (key (t/only x)))))
+(defn eid-map? [x] (and (pair-map? x) (= :eid (key (t/only x)))))
+(defn attr-map? [x] (and (pair-map? x) (= :attr (key (t/only x)))))
+(defn leaf-map? [x] (and (pair-map? x) (= :leaf (key (t/only x)))))
 
 (s/defn unwrap-param :- s/Keyword
   "Unwraps a ParamMap to return the param name as a keyword
     (unwrap-param {:param :x} )  =>  :x "
-  [arg :- ParamMap]
+  [arg :- WrappedParam]
   (t/validate search-param? arg)
   (val (t/only arg)))
 (s/defn unwrap-eid :- s/Int
   "Unwraps an EidMap to return the eid value
     (unwrap-param {:eid 1234} )  =>  1234 "
-  [arg :- EidMap]
+  [arg :- WrappedEid]
   (t/validate eid-map? arg)
   (val (t/only arg)))
 (s/defn unwrap-attr :- s/Any
   "Unwraps an AttrMap to return the attr value
     (unwrap-param {:attr :color} )  =>  :color "
-  [arg :- AttrMap]
+  [arg :- WrappedAttr]
   (t/validate attr-map? arg)
   (val (t/only arg)))
 (s/defn unwrap-leaf :- s/Any
   "Unwraps an LeafMap to return the leaf value
     (unwrap-param {:leaf :color} )  =>  :color "
-  [arg :- LeafMap]
+  [arg :- WrappedLeaf]
   (t/validate leaf-map? arg)
   (val (t/only arg)))
+
+(s/defn tmp-eid-prefix-str? :- s/Bool
+  "Returns true iff arg is a String like `tmp-eid-99999`"
+  [arg :- s/Str]
+  (.startsWith arg "tmp-eid-"))
+
+(s/defn tmp-eid-sym? :- s/Bool
+  "Returns true iff arg is a symbol like `tmp-eid-99999`"
+  [arg :- s/Symbol] (and (symbol? arg) (tmp-eid-prefix-str? (t/sym->str arg))))
+
+(s/defn tmp-eid-kw? :- s/Bool
+  "Returns true iff arg is a symbol like `tmp-eid-99999`"
+  [arg :- s/Keyword] (and (keyword? arg) (tmp-eid-prefix-str? (t/kw->str arg))))
+
+(s/defn ^:no-doc param-tmp-eid? :- s/Bool
+  "Returns true iff arg is a map that looks like {:param :tmp-eid-99999}"
+  [arg]
+  (and (search-param? arg)
+    (tmp-eid-kw? (unwrap-param arg))))
 
 ;-----------------------------------------------------------------------------
 (def ^:dynamic ^:no-doc *tdb* nil)
@@ -179,12 +201,12 @@
   "Returns the next integer EID"
   [] (swap! eid-counter inc))
 
-(s/defn add-edn :- EidMap ; EidType ; #todo maybe rename:  load-edn->eid  ???
+(s/defn add-edn :- WrappedEid ; EidType ; #todo maybe rename:  load-edn->eid  ???
   "Add the EDN arg to the indexes, returning the EID"
   [edn-in :- s/Any]
   (when-not (entity-like? edn-in)
     (throw (ex-info "invalid edn-in" (vals->map edn-in))))
-  (let [eid-this (->Eid (new-eid))
+  (let [eid-this (wrap-eid (new-eid))
         ctx      (cond ; #todo add set
                    (map? edn-in) {:entity-type :map :edn-use edn-in}
                    (array-like? edn-in) {:entity-type :array :edn-use (indexed edn-in)}
@@ -193,9 +215,9 @@
       ; #todo could switch to transients & reduce here in a single swap
       (swap! *tdb* update :eid-type assoc eid-this entity-type)
       (doseq [[attr-edn val-edn] edn-use]
-        (let [attr-rec (->Attr attr-edn)
+        (let [attr-rec (wrap-attr attr-edn)
               val-rec  (if (leaf-val? val-edn)
-                         (->Leaf val-edn)
+                         (wrap-leaf val-edn)
                          (add-edn val-edn))]
           (swap! *tdb* update :idx-eav index/add-entry [eid-this attr-rec val-rec])
           (swap! *tdb* update :idx-vae index/add-entry [val-rec attr-rec eid-this])
@@ -205,7 +227,7 @@
 ; #todo need to handle sets
 (s/defn eid->edn :- s/Any
   "Returns the EDN subtree rooted at a eid."
-  [eid-in :- EidMap]
+  [eid-in :- WrappedEid]
   (let [eav-matches (index/prefix-matches [eid-in] (grab :idx-eav @*tdb*))
         result-map  (apply glue
                       (forv [[eid-row attr-row val-row] eav-matches]
@@ -356,14 +378,14 @@
   [e a v]
   (let [e-out (if (symbol? e)
                 (->SearchParam-fn e) ; {:param e}
-                (->Eid e))
+                (wrap-eid e))
 
         a-out (if (symbol? a)
                 (->SearchParam-fn a) ; {:param a}
-                (->Attr a))
+                (wrap-attr a))
         v-out (if (symbol? v)
                 (->SearchParam-fn v) ; {:param v}
-                (->Leaf v))]
+                (wrap-leaf v))]
     [e-out a-out v-out]))
 
 (defmacro search-triple
@@ -375,7 +397,6 @@
   (let [results (query-triples [[{:param :e} {:param :a} {:leaf target}]])
         eids    (mapv #(t/fetch % {:param :e}) results)]
     eids))
-
 
 ; #todo (spyl value) prints:   spy-line-xxxx => value
 (defn spyq ; #todo => tupelo.core/spy
@@ -432,14 +453,6 @@
                     triple (search-triple-fn eid-val kk sym-to-use)]
                 (spyx triple)
                 (swap! *all-triples* append triple))))))) ))
-
-(defn param-tmp-eid?
-  "Returns true iff arg is a map that looks like {:param :tmp-eid-99999}"
-  [arg]
-  (and (search-param? arg)
-    (let [param-val (val (first arg))]
-      (and (keyword? param-val)
-        (.startsWith (name param-val) "tmp-eid-")))))
 
 (defn ^:no-doc query-results-filter-tmp-eid-mapentry
   [query-results]
