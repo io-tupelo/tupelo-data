@@ -413,6 +413,7 @@
       (is= edn-val (td/eid->edn root-hid))
 
 (comment
+
       (when true
         (let [eids-match (td/index-find-leaf 1) ; only 1 match
               entity-edn (td/eid->edn (only eids-match))]
@@ -474,6 +475,10 @@
         [{{:param :a} {:leaf 21}}])
 
   )
+
+      (throws? (td/exclude-tmp-eid {:a {:tmp-eid-123 :x}}))
+      (throws? (td/exclude-tmp-eid (quote {:a {:x [1 2 3 tmp-eid-123 4 5 6]}})))
+
       (binding [td/*autosyms-seen* (atom #{})]
         (is= (symbol "a") (td/autosym-resolve :a (quote ?)))
         (throws? (td/autosym-resolve :a (quote ?)))) ;attempted duplicate throws

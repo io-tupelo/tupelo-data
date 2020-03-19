@@ -160,11 +160,11 @@
 
 (s/defn tmp-eid-sym? :- s/Bool
   "Returns true iff arg is a symbol like `tmp-eid-99999`"
-  [arg :- s/Symbol] (and (symbol? arg) (tmp-eid-prefix-str? (t/sym->str arg))))
+  [arg :- s/Any] (and (symbol? arg) (tmp-eid-prefix-str? (t/sym->str arg))))
 
 (s/defn tmp-eid-kw? :- s/Bool
   "Returns true iff arg is a symbol like `tmp-eid-99999`"
-  [arg :- s/Keyword] (and (keyword? arg) (tmp-eid-prefix-str? (t/kw->str arg))))
+  [arg :- s/Any] (and (keyword? arg) (tmp-eid-prefix-str? (t/kw->str arg))))
 
 (s/defn ^:no-doc param-tmp-eid? :- s/Bool
   "Returns true iff arg is a map that looks like {:param :tmp-eid-99999}"
@@ -461,6 +461,14 @@
                              (fn [k v] (param-tmp-eid? k))
                              qres)) ]
     results-filtered))
+
+(defn ^:no-doc exclude-tmp-eid
+  "Verifies the use has not reserved symbols or keywords like `tmp-eid-9999` "
+  [form]
+  (t/walk-with-parents-readonly form
+    {:enter (fn [-parents- item]
+              (when (or (tmp-eid-sym? item) (tmp-eid-kw? item))
+                (throw (ex-info "Error: detected reserved tmp-eid-xxxx value" (vals->map item)))))}))
 
 (defn query-maps-impl
   [maps]
