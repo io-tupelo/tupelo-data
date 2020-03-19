@@ -474,6 +474,7 @@
   [maps]
   ; (println "query-maps-impl")
   ; (spyx maps)
+  (exclude-tmp-eid maps)
   (binding [*all-triples* (atom [])
             *autosyms-seen* (atom #{}) ]
     (query-maps->triples maps)
