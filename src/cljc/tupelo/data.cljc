@@ -123,34 +123,34 @@
   [arg] {:leaf arg})
 
 (defn pair-map? [arg] (and (map? arg) (= 1 (count arg))))
-(defn search-param? [x] (and (pair-map? x) (= :param (key (t/only x)))))
-(defn eid-map? [x] (and (pair-map? x) (= :eid (key (t/only x)))))
-(defn attr-map? [x] (and (pair-map? x) (= :attr (key (t/only x)))))
-(defn leaf-map? [x] (and (pair-map? x) (= :leaf (key (t/only x)))))
+(defn wrapped-param? [x] (and (pair-map? x) (= :param (key (t/only x)))))
+(defn wrapped-eid? [x] (and (pair-map? x) (= :eid (key (t/only x)))))
+(defn wrapped-attr? [x] (and (pair-map? x) (= :attr (key (t/only x)))))
+(defn wrapped-leaf? [x] (and (pair-map? x) (= :leaf (key (t/only x)))))
 
 (s/defn unwrap-param :- s/Keyword
   "Unwraps a ParamMap to return the param name as a keyword
     (unwrap-param {:param :x} )  =>  :x "
   [arg :- WrappedParam]
-  (t/validate search-param? arg)
+  (t/validate wrapped-param? arg)
   (val (t/only arg)))
 (s/defn unwrap-eid :- s/Int
   "Unwraps an EidMap to return the eid value
     (unwrap-param {:eid 1234} )  =>  1234 "
   [arg :- WrappedEid]
-  (t/validate eid-map? arg)
+  (t/validate wrapped-eid? arg)
   (val (t/only arg)))
 (s/defn unwrap-attr :- s/Any
   "Unwraps an AttrMap to return the attr value
     (unwrap-param {:attr :color} )  =>  :color "
   [arg :- WrappedAttr]
-  (t/validate attr-map? arg)
+  (t/validate wrapped-attr? arg)
   (val (t/only arg)))
 (s/defn unwrap-leaf :- s/Any
   "Unwraps an LeafMap to return the leaf value
     (unwrap-param {:leaf :color} )  =>  :color "
   [arg :- WrappedLeaf]
-  (t/validate leaf-map? arg)
+  (t/validate wrapped-leaf? arg)
   (val (t/only arg)))
 
 (s/defn tmp-eid-prefix-str? :- s/Bool
@@ -169,7 +169,7 @@
 (s/defn ^:no-doc param-tmp-eid? :- s/Bool
   "Returns true iff arg is a map that looks like {:param :tmp-eid-99999}"
   [arg]
-  (and (search-param? arg)
+  (and (wrapped-param? arg)
     (tmp-eid-kw? (unwrap-param arg))))
 
 ;-----------------------------------------------------------------------------
@@ -234,7 +234,7 @@
                        ;(spyx [eid-row attr-row val-row])
                         (assert (= eid-in eid-row)) ; verify is a prefix match
                         (let [attr-edn (grab :attr attr-row) ; (if (instance? Attr attr-row)
-                              val-edn  (if (leaf-map? val-row)
+                              val-edn  (if (wrapped-leaf? val-row)
                                          (grab :leaf val-row) ; Leaf rec
                                          (eid->edn val-row))] ; Eid rec
                           (t/map-entry attr-edn val-edn))))
@@ -307,7 +307,9 @@
 
                                   :else (throw (ex-info "invalid known-flags" (vals->map triple known-flgs))))
                   result-index  (t/with-map-vals found-entries [e-vals a-vals v-vals]
-                                  (index/->index (map vector e-vals a-vals v-vals)))]
+                                  (set ; was: index/->index
+                                    (map vector e-vals a-vals v-vals))) ; #todo can just return a vec/set instead of an index (?)
+                  ]
               result-index))))
 
 (s/defn apply-env
@@ -328,24 +330,23 @@
     ;(newline)
     (if (empty? qspec-list)
       (swap! query-result t/append env)
-      (let ; -spy
-        [qspec-curr         (xfirst qspec-list)
-         qspec-rest         (xrest qspec-list)
-         qspec-curr-env     (apply-env env qspec-curr)
-         ;>>                 (spyx qspec-curr)
-         ;>>                 (spyx qspec-curr-env)
+      (let [qspec-curr         (xfirst qspec-list)
+            qspec-rest         (xrest qspec-list)
+            qspec-curr-env     (apply-env env qspec-curr)
+            ;>>                 (spyx qspec-curr)
+            ;>>                 (spyx qspec-curr-env)
 
-         {idxs-param :idxs-true
-          idxs-other :idxs-false} (vec/pred-index search-param? qspec-curr-env)
-         qspec-lookup       (vec/set-lax qspec-curr-env idxs-param nil)
-         ;>>                 (spyx idxs-param)
-         ;>>                 (spyx idxs-other)
-         ;>>                 (spyx qspec-lookup)
+            {idxs-param :idxs-true
+             idxs-other :idxs-false} (vec/pred-index wrapped-param? qspec-curr-env)
+            qspec-lookup       (vec/set-lax qspec-curr-env idxs-param nil)
+            ;>>                 (spyx idxs-param)
+            ;>>                 (spyx idxs-other)
+            ;>>                 (spyx qspec-lookup)
 
-         params             (vec/get qspec-curr idxs-param)
-         found-triples      (lookup qspec-lookup)
-         param-frames-found (mapv #(vec/get % idxs-param) found-triples)
-         env-frames-found   (mapv #(zipmap params %) param-frames-found)]
+            params             (vec/get qspec-curr idxs-param)
+            found-triples      (lookup qspec-lookup)
+            param-frames-found (mapv #(vec/get % idxs-param) found-triples)
+            env-frames-found   (mapv #(zipmap params %) param-frames-found) ]
         ;(spyx params)
         ;(spyx-pretty found-triples)
         ;(spyx-pretty param-frames-found)
@@ -427,32 +428,38 @@
 (defn ^:no-doc query-maps->triples
   [qmaps]
   (with-spy-indent
-    (newline)
-    (spyq :query-maps->triples)
-    (spyx-pretty (deref *all-triples*))
-    (spyx qmaps)
+    ;(newline)
+    ;(spyq :query-maps->triples)
+    ;(spyx-pretty (deref *all-triples*))
+    ;(spyx qmaps)
     (doseq [qmap qmaps]
-      (spyx-pretty qmap)
-      (s/validate tsk/KeyMap qmap)
+      ; (spyx-pretty qmap)
+      (s/validate tsk/Map qmap)
       (let [eid-val       (if (contains? qmap :eid)
                             (grab :eid qmap)
                             (gensym "tmp-eid-"))
             map-remaining (dissoc qmap :eid)]
         (forv [[kk vv] map-remaining]
-          (spyx [kk vv])
-          (if (map? vv)
-            (let [tmp-eid         (gensym "tmp-eid-")
-                  triple-modified (search-triple-fn eid-val kk tmp-eid)
-                  ; >>              (spyx triple-modified)
-                  qmaps-modified  [(glue {:eid tmp-eid} vv)]]
-              (spyx qmaps-modified)
-              (swap! *all-triples* append triple-modified)
-              (query-maps->triples qmaps-modified))
-            (do
-              (let [sym-to-use (autosym-resolve kk vv)
-                    triple (search-triple-fn eid-val kk sym-to-use)]
-                (spyx triple)
-                (swap! *all-triples* append triple))))))) ))
+          ; (spyx [kk vv])
+          (cond
+            (sequential? vv) (throw (ex-info "not implemented" {:type :sequential :value vv}))
+            (map? vv) (let [tmp-eid         (gensym "tmp-eid-")
+                            triple-modified (search-triple-fn eid-val kk tmp-eid)
+                            ; >>              (spyx triple-modified)
+                            qmaps-modified  [(glue {:eid tmp-eid} vv)]]
+                        ; (spyx qmaps-modified)
+                        (swap! *all-triples* append triple-modified)
+                        (query-maps->triples qmaps-modified))
+            (leaf-val? vv) (let [triple (search-triple-fn eid-val kk vv)]
+                             ; (spyx triple)
+                             (swap! *all-triples* append triple))
+            (symbol? vv) (do
+                           (let [sym-to-use (autosym-resolve kk vv)
+                                 triple     (search-triple-fn eid-val kk sym-to-use)]
+                             ; (spyx triple)
+                             (swap! *all-triples* append triple)))
+            :else (throw (ex-info "unrecognized value" (vals->map kk vv map-remaining)))
+            ))))))
 
 (defn ^:no-doc query-results-filter-tmp-eid-mapentry
   [query-results]
@@ -470,24 +477,44 @@
               (when (or (tmp-eid-sym? item) (tmp-eid-kw? item))
                 (throw (ex-info "Error: detected reserved tmp-eid-xxxx value" (vals->map item)))))}))
 
-(defn query-maps-impl
+(defn query-maps->wrapped-impl
   [maps]
-  ; (println "query-maps-impl")
-  ; (spyx maps)
   (exclude-reserved-identifiers maps)
   (binding [*all-triples* (atom [])
             *autosyms-seen* (atom #{}) ]
     (query-maps->triples maps)
-    ; (spyx *all-triples*)
-    ; (spyx-pretty (deref *all-triples*))
+    ;(spyx *all-triples*)
+    ;(spyx-pretty (deref *all-triples*))
     `(let [unfiltered-results# (query-triples (quote ~(deref *all-triples*))) ]
-       ; (spyx unfiltered-results#)
+       ;(spyx unfiltered-results#)
        (query-results-filter-tmp-eid-mapentry unfiltered-results# ))))
+
+(defmacro query-maps->wrapped
+  [maps]
+  (query-maps->wrapped-impl maps))
+
+(s/defn unwrap-query-results
+  [query-results]
+  (forv [qres query-results]
+    (apply glue
+      (for [mapentry qres]
+        (let [[kk vv] mapentry
+              param-raw (unwrap-param kk)
+              val-raw   (cond
+                          (wrapped-eid? vv) (unwrap-eid vv)
+                          (wrapped-attr? vv) (unwrap-attr vv)
+                          (wrapped-leaf? vv) (unwrap-leaf vv)
+                          :else (throw (ex-info "Unrecognized query result value" (vals->map vv))))]
+          {param-raw val-raw})))))
+
+(defn query-maps-impl
+  [maps]
+  ; #todo need a linter to catch nonsensical maps (attr <> keyword for example)
+  `(unwrap-query-results (query-maps->wrapped ~maps)))
 
 (defmacro query-maps
   [maps]
   (query-maps-impl maps))
-
 
 
 
