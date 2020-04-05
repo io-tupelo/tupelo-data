@@ -582,149 +582,140 @@
                                    :salary     0
                                    :position   :volunteer}
                                }}
-         root-hid             (td/add-edn hospital)
-         nm-sal-all           (td/query-maps [{:first-name ? :salary ?}])
-         nm-sal-attending     (td/query-maps [{:first-name ? :salary ? :position :attending}])
-         nm-sal-resident      (td/query-maps [{:first-name ? :salary ? :position :resident}])
-         nm-sal-volunteer     (td/query-maps [{:first-name ? :salary ? :position :volunteer}])
-         avg-fn               (fn [vals]
-                                (let [n      (count vals)
-                                      total  (reduce + 0 vals)
-                                      result (/ total n)]
-                                  result))
-         salary-avg-attending (avg-fn (mapv :salary nm-sal-attending))
-         salary-avg-resident  (avg-fn (mapv :salary nm-sal-resident))
-         salary-avg-volunteer (avg-fn (mapv :salary nm-sal-volunteer))
-         ]
-        (is= nm-sal-all [{:first-name "Joey", :salary 42000}
-                         {:first-name "Dear", :salary 102000}
-                         {:first-name "Jane", :salary 100000}
-                         {:first-name "John", :salary 40000}
-                         {:first-name "Sam", :salary 0}
-                         {:first-name "Sammy", :salary 0}])
-        (is= nm-sal-attending
-          [{:first-name "Dear", :salary 102000}
-           {:first-name "Jane", :salary 100000}])
+          root-hid             (td/add-edn hospital)
+          nm-sal-all           (td/query-maps [{:first-name ? :salary ?}])
+          nm-sal-attending     (td/query-maps [{:first-name ? :salary ? :position :attending}])
+          nm-sal-resident      (td/query-maps [{:first-name ? :salary ? :position :resident}])
+          nm-sal-volunteer     (td/query-maps [{:first-name ? :salary ? :position :volunteer}])
+          avg-fn               (fn [vals]
+                                 (let [n      (count vals)
+                                       total  (reduce + 0 vals)
+                                       result (/ total n)]
+                                   result))
+          salary-avg-attending (avg-fn (mapv :salary nm-sal-attending))
+          salary-avg-resident  (avg-fn (mapv :salary nm-sal-resident))
+          salary-avg-volunteer (avg-fn (mapv :salary nm-sal-volunteer))
+          ]
+      (is= nm-sal-all [{:first-name "Joey", :salary 42000}
+                       {:first-name "Dear", :salary 102000}
+                       {:first-name "Jane", :salary 100000}
+                       {:first-name "John", :salary 40000}
+                       {:first-name "Sam", :salary 0}
+                       {:first-name "Sammy", :salary 0}])
+      (is= nm-sal-attending
+        [{:first-name "Dear", :salary 102000}
+         {:first-name "Jane", :salary 100000}])
 
-        (is= salary-avg-attending 101000)
-        (is= salary-avg-resident 41000)
-        (is= salary-avg-volunteer 0))))
+      (is= salary-avg-attending 101000)
+      (is= salary-avg-resident 41000)
+      (is= salary-avg-volunteer 0))))
+
+(dotest
+  (td/with-tdb (td/new-tdb)
+    (td/eid-count-reset)
+    (let [edn-val  {:aa [1 2 3]
+                    :bb [2 3 4]
+                    :cc [3 4 5 6]}
+          root-eid (td/add-edn edn-val)]
+      (comment
+        (spyx-pretty (unlazy (deref td/*tdb*)))
+        {:eid-type
+         {{:eid 1009} :map,
+          {:eid 1010} :array,
+          {:eid 1011} :array,
+          {:eid 1012} :array},
+         :idx-ave
+         #{[{:attr :aa} {:eid 1010} {:eid 1009}]
+           [{:attr :bb} {:eid 1011} {:eid 1009}]
+           [{:attr :cc} {:eid 1012} {:eid 1009}]
+           [{:attr 0} {:leaf 1} {:eid 1010}] [{:attr 0} {:leaf 2} {:eid 1011}]
+           [{:attr 0} {:leaf 3} {:eid 1012}] [{:attr 1} {:leaf 2} {:eid 1010}]
+           [{:attr 1} {:leaf 3} {:eid 1011}] [{:attr 1} {:leaf 4} {:eid 1012}]
+           [{:attr 2} {:leaf 3} {:eid 1010}] [{:attr 2} {:leaf 4} {:eid 1011}]
+           [{:attr 2} {:leaf 5} {:eid 1012}]
+           [{:attr 3} {:leaf 6} {:eid 1012}]},
+         :idx-eav
+         #{[{:eid 1009} {:attr :aa} {:eid 1010}]
+           [{:eid 1009} {:attr :bb} {:eid 1011}]
+           [{:eid 1009} {:attr :cc} {:eid 1012}]
+           [{:eid 1010} {:attr 0} {:leaf 1}] [{:eid 1010} {:attr 1} {:leaf 2}]
+           [{:eid 1010} {:attr 2} {:leaf 3}] [{:eid 1011} {:attr 0} {:leaf 2}]
+           [{:eid 1011} {:attr 1} {:leaf 3}] [{:eid 1011} {:attr 2} {:leaf 4}]
+           [{:eid 1012} {:attr 0} {:leaf 3}] [{:eid 1012} {:attr 1} {:leaf 4}]
+           [{:eid 1012} {:attr 2} {:leaf 5}]
+           [{:eid 1012} {:attr 3} {:leaf 6}]},
+         :idx-vae
+         #{[{:eid 1010} {:attr :aa} {:eid 1009}]
+           [{:eid 1011} {:attr :bb} {:eid 1009}]
+           [{:eid 1012} {:attr :cc} {:eid 1009}]
+           [{:leaf 1} {:attr 0} {:eid 1010}] [{:leaf 2} {:attr 0} {:eid 1011}]
+           [{:leaf 2} {:attr 1} {:eid 1010}] [{:leaf 3} {:attr 0} {:eid 1012}]
+           [{:leaf 3} {:attr 1} {:eid 1011}] [{:leaf 3} {:attr 2} {:eid 1010}]
+           [{:leaf 4} {:attr 1} {:eid 1012}] [{:leaf 4} {:attr 2} {:eid 1011}]
+           [{:leaf 5} {:attr 2} {:eid 1012}] [{:leaf 6} {:attr 3} {:eid 1012}]}})
+      (let [found (td/query-triples [(td/search-triple ? 1 2)])]
+        (is= (td/eid->edn root-eid) {:aa [1 2 3], :bb [2 3 4], :cc [3 4 5 6]})
+        (is= (td/eid->edn (val (t/only2 found))) [1 2 3]))
+      (let [found    (td/query-triples [(td/search-triple eid idx 3)])
+            entities (t/it-> found
+                       (mapv #(grab {:param :eid} %) it)
+                       (mapv td/eid->edn it))]
+        (is-set= found
+          [{{:param :eid} {:eid 1004}, {:param :idx} {:attr 0}}
+           {{:param :eid} {:eid 1003}, {:param :idx} {:attr 1}}
+           {{:param :eid} {:eid 1002}, {:param :idx} {:attr 2}}])
+        (is-set= entities [[1 2 3] [2 3 4] [3 4 5 6]]))
+
+      (is= (td/eid->edn (val (t/only2 (td/query-triples [(td/search-triple eid 2 3)])))) [1 2 3])
+      (is= (td/eid->edn (val (t/only2 (td/query-triples [(td/search-triple eid 1 3)])))) [2 3 4])
+      (is= (td/eid->edn (val (t/only2 (td/query-triples [(td/search-triple eid 0 3)])))) [3 4 5 6])
+      )))
 
 
+  (dotest
+    (td/with-tdb (td/new-tdb)
+      (let [edn-val    {:a 1 :b 2}
+            root-eid (td/add-edn edn-val)]
+        (is= edn-val (td/eid->edn root-eid))))
 
-;(dotest
-  ;  (td/with-tdb (td/new-tdb)
-  ;    (td/hid-count-reset)
-  ;    (let [edn-val  {:aa [1 2 3]
-  ;                    :bb [2 3 4]
-  ;                    :cc [3 4 5 6]}
-  ;          root-hid (td/add-edn edn-val)]
-  ;      (is= (unlazy @td/*tdb*)
-  ;        {:idx-array-entry-ei #{[1 0 1004] [2 0 1012] [2 1 1006] [3 0 1020] [3 1 1014] [3 2 1008]
-  ;                               [4 1 1022] [4 2 1016] [5 2 1024] [6 3 1026]},
-  ;         :idx-array-entry-ie #{[0 1 1004] [0 2 1012] [0 3 1020] [1 2 1006] [1 3 1014] [1 4 1022]
-  ;                               [2 3 1008] [2 4 1016] [2 5 1024] [3 6 1026]},
-  ;         :idx-hid            {1001 {:-mn-data {:aa 1002, :bb 1010, :cc 1018}, :-parent-hid nil},
-  ;                              1002 {:-me-key :aa, :-me-val-hid 1003, :-parent-hid 1001},
-  ;                              1003 {:-an-data {0 1004, 1 1006, 2 1008}, :-parent-hid 1002},
-  ;                              1004 {:-ae-elem-hid 1005, :-ae-idx 0, :-parent-hid 1003},
-  ;                              1005 {:-leaf-val 1, :-parent-hid 1004},
-  ;                              1006 {:-ae-elem-hid 1007, :-ae-idx 1, :-parent-hid 1003},
-  ;                              1007 {:-leaf-val 2, :-parent-hid 1006},
-  ;                              1008 {:-ae-elem-hid 1009, :-ae-idx 2, :-parent-hid 1003},
-  ;                              1009 {:-leaf-val 3, :-parent-hid 1008},
-  ;                              1010 {:-me-key :bb, :-me-val-hid 1011, :-parent-hid 1001},
-  ;                              1011 {:-an-data {0 1012, 1 1014, 2 1016}, :-parent-hid 1010},
-  ;                              1012 {:-ae-elem-hid 1013, :-ae-idx 0, :-parent-hid 1011},
-  ;                              1013 {:-leaf-val 2, :-parent-hid 1012},
-  ;                              1014 {:-ae-elem-hid 1015, :-ae-idx 1, :-parent-hid 1011},
-  ;                              1015 {:-leaf-val 3, :-parent-hid 1014},
-  ;                              1016 {:-ae-elem-hid 1017, :-ae-idx 2, :-parent-hid 1011},
-  ;                              1017 {:-leaf-val 4, :-parent-hid 1016},
-  ;                              1018 {:-me-key :cc, :-me-val-hid 1019, :-parent-hid 1001},
-  ;                              1019 {:-an-data {0 1020, 1 1022, 2 1024, 3 1026}, :-parent-hid 1018},
-  ;                              1020 {:-ae-elem-hid 1021, :-ae-idx 0, :-parent-hid 1019},
-  ;                              1021 {:-leaf-val 3, :-parent-hid 1020},
-  ;                              1022 {:-ae-elem-hid 1023, :-ae-idx 1, :-parent-hid 1019},
-  ;                              1023 {:-leaf-val 4, :-parent-hid 1022},
-  ;                              1024 {:-ae-elem-hid 1025, :-ae-idx 2, :-parent-hid 1019},
-  ;                              1025 {:-leaf-val 5, :-parent-hid 1024},
-  ;                              1026 {:-ae-elem-hid 1027, :-ae-idx 3, :-parent-hid 1019},
-  ;                              1027 {:-leaf-val 6, :-parent-hid 1026}},
-  ;         :idx-leaf           #{[1 1005] [2 1007] [2 1013] [3 1009] [3 1015] [3 1021] [4 1017]
-  ;                               [4 1023] [5 1025] [6 1027]},
-  ;         :idx-map-entry-kv   #{},
-  ;         :idx-map-entry-vk   #{}})
-  ;      (let [hid-1-2 (only (td/index-find-arrayentry (t/map-entry 1 2)))]
-  ;        (is= 1006 hid-1-2)
-  ;        (is= (unlazy (td/hid->node hid-1-2))
-  ;          {:-ae-elem-hid 1007, :-ae-idx 1, :-parent-hid 1003} )
-  ;        (is= (td/hid->edn (td/hid->parent-hid hid-1-2)) [1 2 3]))
-  ;      (let [hid-0-2 (only (td/index-find-arrayentry (t/map-entry 0 2)))]
-  ;        (is= (td/hid->edn (td/hid->parent-hid hid-0-2)) [2 3 4]))
-  ;      (is= [1 2 3] (it-> 2
-  ;                     (t/map-entry it 3)
-  ;                     (td/index-find-arrayentry it)
-  ;                     (only it)
-  ;                     (td/hid->parent-hid it)
-  ;                     (td/hid->edn it)))
-  ;      (is= [2 3 4] (it-> 1
-  ;                     (t/map-entry it 3)
-  ;                     (td/index-find-arrayentry it)
-  ;                     (only it)
-  ;                     (td/hid->parent-hid it)
-  ;                     (td/hid->edn it)))
-  ;      (is= [3 4 5 6] (it-> 0
-  ;                       (t/map-entry it 3)
-  ;                       (td/index-find-arrayentry it)
-  ;                       (only it)
-  ;                       (td/hid->parent-hid it)
-  ;                       (td/hid->edn it))))))
-  ;
-  ;(dotest
-  ;  (td/with-tdb (td/new-tdb)
-  ;    (let [edn-0    {:a 1 :b 2}
-  ;          root-hid (td/add-edn edn-0)]
-  ;      (is= edn-0 (td/hid->edn root-hid))))
-  ;
-  ;  (td/with-tdb (td/new-tdb)
-  ;    (let [edn-0    [1 2 3]
-  ;          root-hid (td/add-edn edn-0)]
-  ;      (is= edn-0 (td/hid->edn root-hid))))
-  ;
-  ;  (td/with-tdb (td/new-tdb)
-  ;    (let [edn-0    "hello"
-  ;          root-hid (td/add-edn edn-0)]
-  ;      (is= edn-0 (td/hid->edn root-hid))))
-  ;
-  ;  (td/with-tdb (td/new-tdb)
-  ;    (let [data-1   {:a [{:b 2}
-  ;                        {:c 3}
-  ;                        {:d 4}]
-  ;                    :e {:f 6}
-  ;                    :g :green
-  ;                    :h "hotel"
-  ;                    :i 1}
-  ;          root-hid (td/add-edn data-1)]
-  ;      (is= data-1 (td/hid->edn root-hid)))))
-  ;
-  ;(dotest
-  ;  (td/with-tdb (td/new-tdb)
-  ;    (let [edn-0      #{1 2 3}
-  ;          root-hid   (td/add-edn edn-0)
-  ;          edn-result (td/hid->edn root-hid)]
-  ;      (is (set? edn-result)) ; ***** Sets are coerced to vectors! *****
-  ;      (is-set= [1 2 3] edn-result)))
-  ;  (td/with-tdb (td/new-tdb)
-  ;    (let [edn-0    #{:a 1 :b 2}
-  ;          root-hid (td/add-edn edn-0)]
-  ;      (is= edn-0 (td/hid->edn root-hid))))
-  ;  (td/with-tdb (td/new-tdb)
-  ;    (let [edn-0    {:a 1 :b #{1 2 3}}
-  ;          root-hid (td/add-edn edn-0)]
-  ;      (is= edn-0 (td/hid->edn root-hid)))))
-  ;
-  ;
+    (td/with-tdb (td/new-tdb)
+      (let [edn-val    [1 2 3]
+            root-eid (td/add-edn edn-val)]
+        (is= edn-val (td/eid->edn root-eid))))
+
+    (td/with-tdb (td/new-tdb)
+      (let [edn-val  {:val "hello"}
+            root-eid (td/add-edn edn-val)]
+        (is= edn-val (td/eid->edn root-eid))))
+
+    (td/with-tdb (td/new-tdb)
+      (let [data-val {:a [{:b 2}
+                          {:c 3}
+                          {:d 4}]
+                      :e {:f 6}
+                      :g :green
+                      :h "hotel"
+                      :i 1}
+            root-eid (td/add-edn data-val)]
+        (is= data-val (td/eid->edn root-eid)))))
+
+  (dotest
+    (td/with-tdb (td/new-tdb)
+      (let [edn-val      #{1 2 3}
+            root-hid   (td/add-edn edn-val)
+            ; >> (spyx-pretty (deref td/*tdb*))
+            edn-result (td/eid->edn root-hid)]
+        (is (set? edn-result)) ; ***** Sets are coerced to vectors! *****
+        (is-set= [1 2 3] edn-result)))
+    (td/with-tdb (td/new-tdb)
+      (let [edn-val    #{:a 1 :b 2}
+            root-hid (td/add-edn edn-val)]
+        (is= edn-val (td/eid->edn root-hid))))
+    (td/with-tdb (td/new-tdb)
+      (let [edn-val    {:a 1 :b #{1 2 3}}
+            root-hid (td/add-edn edn-val)]
+        (is= edn-val (td/eid->edn root-hid)))))
+
   ;(dotest
   ;  (td/with-tdb (td/new-tdb)
   ;    (td/hid-count-reset)

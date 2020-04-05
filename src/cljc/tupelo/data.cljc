@@ -116,7 +116,7 @@
  ; #todo add tsk/Set
 (do       ; keep these in sync
   (def EntityType (s/cond-pre tsk/Map tsk/Vec))
-  (s/defn entity-like? [arg] (or (map? arg) (array-like? arg))) )
+  (s/defn entity-like? [arg] (or (map? arg) (set? arg) (array-like? arg))) )
 
 (def TripleIndex #{tsk/Triple})
 
@@ -220,12 +220,14 @@
   (let [eid-this (wrap-eid (new-eid))
         ctx      (cond ; #todo add set
                    (map? edn-in) {:entity-type :map :edn-use edn-in}
+                   (set? edn-in) {:entity-type :set :edn-use (zipmap edn-in edn-in)}
                    (array-like? edn-in) {:entity-type :array :edn-use (indexed edn-in)}
                    :else (throw (ex-info "unknown value found" (vals->map edn-in))))]
     (t/with-map-vals ctx [entity-type edn-use]
       ; #todo could switch to transients & reduce here in a single swap
       (swap! *tdb* update :eid-type assoc eid-this entity-type)
       (doseq [[attr-edn val-edn] edn-use]
+        ; (spyx [attr-edn val-edn])
         (let [attr-rec (wrap-attr attr-edn)
               val-rec  (if (leaf-val? val-edn)
                          (wrap-leaf val-edn)
@@ -242,7 +244,7 @@
   (let [eav-matches (index/prefix-matches [eid-in] (grab :idx-eav @*tdb*))
         result-map  (apply glue
                       (forv [[eid-row attr-row val-row] eav-matches]
-                       ;(spyx [eid-row attr-row val-row])
+                        ; (spyx [eid-row attr-row val-row])
                         (assert (= eid-in eid-row)) ; verify is a prefix match
                         (let [attr-edn (grab :attr attr-row) ; (if (instance? Attr attr-row)
                               val-edn  (if (wrapped-leaf? val-row)
@@ -252,7 +254,7 @@
         result-out  (let [entity-type (fetch-in @*tdb* [:eid-type eid-in])]
                       (cond
                         (= entity-type :map) result-map
-
+                        (= entity-type :set) (into #{} (keys result-map))
                         (= entity-type :array) (let [result-keys (keys result-map)
                                                      result-vals (vec (vals result-map))]
                                                  ; if array entity, keys should be in 0..N-1
