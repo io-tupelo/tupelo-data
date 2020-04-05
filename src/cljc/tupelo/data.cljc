@@ -28,7 +28,7 @@
              [clojure.set :as set]
              [schema.core :as s]
              ))
-  )
+  (:import [com.google.common.base Verify]))
 
 ; #todo Treeify: {k1 v1 k2 v2} =>
 ; #todo   {:data/id 100 :edn/type :edn/map ::kids [101 102] }
@@ -62,7 +62,18 @@
 
 #?(:clj (do
 
-; #todo Tupelo Data Language (TDL)
+; #todo (spyl value) prints:   spy-line-xxxx => value
+(defn spyq ; #todo => tupelo.core/spy
+  "(spyq <value>) - Spy Quiet
+        This variant is intended for use in very simple situations and is the same as the
+        2-argument arity where <msg-string> defaults to 'spy'.  For example (spy (+ 2 3))
+        prints 'spy => 5' to stdout.  "
+  [value]
+  (when t/*spy-enabled*
+    (println (str (t/spy-indent-spaces) (pr-str value))))
+  value)
+
+          ; #todo Tupelo Data Language (TDL)
 
 (def customers ; #todo be able to process this data & delete unwise users
   [{:customer-id 1
@@ -370,28 +381,36 @@
                  :else (throw (ex-info "->SearchParam:  only symbol & keyword are accepted" {:arg arg})))]
     {:param result}))
 
+(defn ^:no-doc ->SearchParam-impl
+  [arg] `(->SearchParam-fn (quote ~arg)))
+
 (defmacro ->SearchParam
   [arg]
-  (->SearchParam-fn arg))
-
+  (->SearchParam-impl arg))
 
 (defn ^:no-doc search-triple-fn
-  [e a v]
-  (let [e-out (if (symbol? e)
-                (->SearchParam-fn e) ; {:param e}
-                (wrap-eid e))
+  [args]
+  (assert (= 3 (count args)))
+  (with-spy-indent
+    (let [[e a v] args
+          e-out (if (symbol? e)
+                  (->SearchParam-fn e)
+                  (wrap-eid e))
+          a-out (if (symbol? a)
+                  (->SearchParam-fn a)
+                  (wrap-attr a))
+          v-out (if (symbol? v)
+                  (->SearchParam-fn v)
+                  (wrap-leaf v))]
+      [e-out a-out v-out])))
 
-        a-out (if (symbol? a)
-                (->SearchParam-fn a) ; {:param a}
-                (wrap-attr a))
-        v-out (if (symbol? v)
-                (->SearchParam-fn v) ; {:param v}
-                (wrap-leaf v))]
-    [e-out a-out v-out]))
+(defn ^:no-doc search-triple-impl
+  [args]
+  `(search-triple-fn (quote ~args)))
 
 (defmacro search-triple
-  [e a v]
-  (search-triple-fn e a v))
+  [& args]
+  (search-triple-impl args))
 
 (s/defn index-find-leaf :- [{:eid EidType}]
   [target :- LeafType]
@@ -399,31 +418,20 @@
         eids    (mapv #(t/fetch % {:param :e}) results)]
     eids))
 
-; #todo (spyl value) prints:   spy-line-xxxx => value
-(defn spyq ; #todo => tupelo.core/spy
-  "(spyq <value>) - Spy Quiet
-        This variant is intended for use in very simple situations and is the same as the
-        2-argument arity where <msg-string> defaults to 'spy'.  For example (spy (+ 2 3))
-        prints 'spy => 5' to stdout.  "
-  [value]
-  (when t/*spy-enabled*
-    (println (str (t/spy-indent-spaces) (pr-str value))))
-  value)
-
 (def ^:no-doc ^:dynamic *all-triples* nil)
 (def ^:no-doc ^:dynamic *autosyms-seen* nil)
 
 (s/defn ^:no-doc autosym-resolve :- s/Symbol
   [kk :- s/Any
    vv :- s/Symbol]
-  (if (and (keyword? kk)
-        (= (symbol "?") vv))
-    (let [kk-sym (t/kw->sym kk)]
-      (when (contains? (deref *autosyms-seen*) kk-sym)
-        (throw (ex-info "Duplicate autosym found:" (vals->map kk kk-sym))))
-      (swap! *autosyms-seen* conj kk-sym)
-      kk-sym)
-    vv))
+  (t/with-nil-default vv
+    (when (and (keyword? kk)
+          (= (quote ?) vv))
+      (let [kk-sym (t/kw->sym kk)]
+        (when (contains? (deref *autosyms-seen*) kk-sym)
+          (throw (ex-info "Duplicate autosym found:" (vals->map kk kk-sym))))
+        (swap! *autosyms-seen* conj kk-sym)
+        kk-sym))))
 
 (defn ^:no-doc query-maps->triples
   [qmaps]
@@ -436,27 +444,27 @@
       ; (spyx-pretty qmap)
       (s/validate tsk/Map qmap)
       (let [eid-val       (if (contains? qmap :eid)
-                            (grab :eid qmap)
+                            (autosym-resolve :eid (grab :eid qmap))
                             (gensym "tmp-eid-"))
             map-remaining (dissoc qmap :eid)]
         (forv [[kk vv] map-remaining]
-          ; (spyx [kk vv])
+          ;(spyx [kk vv])
           (cond
             (sequential? vv) (throw (ex-info "not implemented" {:type :sequential :value vv}))
             (map? vv) (let [tmp-eid         (gensym "tmp-eid-")
-                            triple-modified (search-triple-fn eid-val kk tmp-eid)
-                            ; >>              (spyx triple-modified)
+                            triple-modified (search-triple-fn [eid-val kk tmp-eid])
+                            ;>>              (spyx triple-modified)
                             qmaps-modified  [(glue {:eid tmp-eid} vv)]]
-                        ; (spyx qmaps-modified)
+                        ;(spyx qmaps-modified)
                         (swap! *all-triples* append triple-modified)
                         (query-maps->triples qmaps-modified))
-            (leaf-val? vv) (let [triple (search-triple-fn eid-val kk vv)]
-                             ; (spyx triple)
+            (leaf-val? vv) (let [triple (search-triple-fn [eid-val kk vv])]
+                             ;(spyx triple)
                              (swap! *all-triples* append triple))
             (symbol? vv) (do
                            (let [sym-to-use (autosym-resolve kk vv)
-                                 triple     (search-triple-fn eid-val kk sym-to-use)]
-                             ; (spyx triple)
+                                 triple     (search-triple-fn [eid-val kk sym-to-use])]
+                             ;(spyx triple)
                              (swap! *all-triples* append triple)))
             :else (throw (ex-info "unrecognized value" (vals->map kk vv map-remaining)))
             ))))))
@@ -470,24 +478,28 @@
     results-filtered))
 
 (defn ^:no-doc exclude-reserved-identifiers
-  "Verify search data does not include reserved identifiers like `tmp-eid-9999` "
+  " Verify search data does not include reserved identifiers like `tmp-eid-9999` "
   [form]
   (t/walk-with-parents-readonly form
     {:enter (fn [-parents- item]
               (when (or (tmp-eid-sym? item) (tmp-eid-kw? item))
                 (throw (ex-info "Error: detected reserved tmp-eid-xxxx value" (vals->map item)))))}))
 
-(defn query-maps->wrapped-impl
+(defn ^:no-doc query-maps->wrapped-fn
   [maps]
-  (exclude-reserved-identifiers maps)
   (binding [*all-triples* (atom [])
             *autosyms-seen* (atom #{}) ]
-    (query-maps->triples maps)
-    ;(spyx *all-triples*)
-    ;(spyx-pretty (deref *all-triples*))
-    `(let [unfiltered-results# (query-triples (quote ~(deref *all-triples*))) ]
-       ;(spyx unfiltered-results#)
+    (query-maps->triples maps) ; returns result in *all-triples*
+    ; (spyx *all-triples*)
+    ; (spyx-pretty (deref *all-triples*))
+    (let [unfiltered-results# (query-triples (deref *all-triples*)) ]
+       ; (spyx unfiltered-results#)
        (query-results-filter-tmp-eid-mapentry unfiltered-results# ))))
+
+(defn ^:no-doc query-maps->wrapped-impl
+  [maps]
+  (exclude-reserved-identifiers maps)
+  `(query-maps->wrapped-fn (quote ~maps)))
 
 (defmacro query-maps->wrapped
   [maps]
