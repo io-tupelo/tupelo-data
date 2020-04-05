@@ -9,7 +9,7 @@
   #?(:clj (:require
             [tupelo.test :refer [define-fixture deftest dotest dotest-focus is isnt is= isnt= is-set= is-nonblank= testing throws?]]
             [tupelo.core :as t :refer [spy spyx spyxx spy-pretty spyx-pretty unlazy let-spy
-                                       only forv glue grab nl
+                                       only only2 forv glue grab nl
                                        ]]
             [tupelo.data :as td :refer [ with-tdb new-tdb eid-count-reset lookup query-triples boolean->binary search-triple
                                         *tdb*
@@ -716,135 +716,101 @@
             root-hid (td/add-edn edn-val)]
         (is= edn-val (td/eid->edn root-hid)))))
 
-  ;(dotest
-  ;  (td/with-tdb (td/new-tdb)
-  ;    (td/hid-count-reset)
-  ;    (let [data     {:a [{:b 2}
-  ;                        {:c 3}
-  ;                        {:d 4}]
-  ;                    :e {:f 6}
-  ;                    :g :green
-  ;                    :h "hotel"
-  ;                    :i 1}
-  ;          root-hid (td/add-edn data)]
-  ;
-  ;      (is= (td/hid->edn (only (td/hid-nav root-hid [:a])))
-  ;        [{:b 2} {:c 3} {:d 4}])
-  ;
-  ;      (is= (td/hid->edn (only (td/hid-nav root-hid [:a 0]))) {:b 2})
-  ;      (is= (td/hid->edn (only (td/hid-nav root-hid [:a 2]))) {:d 4})
-  ;      (is= (td/hid->edn (only (td/hid-nav root-hid [:a 2 :d]))) 4)
-  ;      (is= (td/hid->edn (only (td/hid-nav root-hid [:e]))) {:f 6})
-  ;      (is= (td/hid->edn (only (td/hid-nav root-hid [:e :f]))) 6)
-  ;      (is= (td/hid->edn (only (td/hid-nav root-hid [:h]))) "hotel")
-  ;      (is= (td/hid->edn (only (td/hid-nav root-hid [:i]))) 1)
-  ;      (let [kid-hids     (td/hid-nav root-hid [:a :*])
-  ;            parent-hids  (mapv td/hid->parent-hid kid-hids)
-  ;            parent-hid   (t/xfirst parent-hids)
-  ;            parent-hid-2 (td/hid->parent-hid parent-hid)
-  ;            ]
-  ;        (is= (mapv td/hid->edn kid-hids)
-  ;          [{:b 2} {:c 3} {:d 4}])
-  ;        (is (apply = parent-hids))
-  ;        (is= (td/hid->edn parent-hid)
-  ;          [{:b 2} {:c 3} {:d 4}])
-  ;        (is= (td/hid->edn parent-hid-2) data))
-  ;      (let [four-hid          (only (td/hid-nav root-hid [:a 2 :d]))
-  ;            four-hid-parent-3 (-> four-hid
-  ;                                td/hid->parent-hid
-  ;                                td/hid->parent-hid
-  ;                                td/hid->parent-hid)]
-  ;        (is= 4 (td/hid->edn four-hid))
-  ;        (is= data (td/hid->edn four-hid-parent-3))))))
-  ;
-  ;(dotest
-  ;  (td/with-tdb (td/new-tdb)
-  ;    (td/hid-count-reset)
-  ;    (let [data         [{:a 1 :b :first}
-  ;                        {:a 2 :b :second}
-  ;                        {:a 3 :b :third}
-  ;                        {:a 4 :b "fourth"}
-  ;                        {:a 5 :b "fifth"}
-  ;                        {:a 1 :b 101}
-  ;                        {:a 1 :b 102}]
-  ;          root-hid     (td/add-edn data)
-  ;          hids-match   (td/index-find-leaf 1)
-  ;          edn-match    (mapv td/hid->edn hids-match)
-  ;          edn-parents  (it-> hids-match
-  ;                         (mapv td/hid->parent-hid it)
-  ;                         (mapv td/hid->edn it))]
-  ;      (is= edn-match [1 1 1])
-  ;      (is= edn-parents
-  ;        [{:a 1, :b :first}
-  ;         {:a 1, :b 101}
-  ;         {:a 1, :b 102}])
-  ;
-  ;      (is= (t/map-entry :b 101) (td/hid->edn (only (td/index-find-mapentry (t/map-entry :b 101)))))
-  ;      (is= {:a 1 :b 101} (td/hid->edn (td/hid->parent-hid (only (td/index-find-mapentry (map-entry :b 101))))))
-  ;      (is= {:a 2 :b :second} (td/hid->edn (td/hid->parent-hid (only (td/index-find-mapentry (map-entry :b :second))))))
-  ;      (is= {:a 3 :b :third} (td/hid->edn (td/hid->parent-hid (only (td/index-find-mapentry (map-entry :a 3))))))) )
-  ;
-  ;  (td/with-tdb (td/new-tdb)
-  ;    (let [data      [{:a 1 :x :first}
-  ;                     {:a 2 :x :second}
-  ;                     {:a 3 :x :third}
-  ;                     {:b 1 :x 101}
-  ;                     {:b 2 :x 102}
-  ;                     {:c 1 :x 301}
-  ;                     {:c 2 :x 302}]
-  ;          root-hid  (td/add-edn data)
-  ;          hid-match (only (td/index-find-mapentry
-  ;                              (->map-entry {:a 1})))
-  ;          edn-match (td/hid->edn (td/hid->parent-hid hid-match))]
-  ;      (is= edn-match {:a 1 :x :first})))
-  ;
-  ;  (td/with-tdb (td/new-tdb)
-  ;    (let [data     [{:a 1 :b 1 :c 1}
-  ;                    {:a 1 :b 2 :c 2}
-  ;                    {:a 1 :b 1 :c 3}
-  ;                    {:a 2 :b 2 :c 4}
-  ;                    {:a 2 :b 1 :c 5}
-  ;                    {:a 2 :b 2 :c 6}]
-  ;          root-hid (td/add-edn data)]
-  ;      ;(t/spy-pretty (deref td/*tdb*))
-  ;      (let [edns (mapv #(td/hid->edn (td/hid->parent-hid %))
-  ;                   (td/index-find-mapentry (map-entry :a 1)))]
-  ;        (is= edns
-  ;          [{:a 1, :b 1, :c 1}
-  ;           {:a 1, :b 2, :c 2}
-  ;           {:a 1, :b 1, :c 3}]))
-  ;      (let [edns (mapv #(td/hid->edn (td/hid->parent-hid %))
-  ;                   (td/index-find-mapentry (map-entry :a 2)))]
-  ;        (is= edns
-  ;          [{:a 2, :b 2, :c 4}
-  ;           {:a 2, :b 1, :c 5}
-  ;           {:a 2, :b 2, :c 6}]))
-  ;      (let [edns (mapv #(td/hid->edn (td/hid->parent-hid %))
-  ;                   (td/index-find-mapentry (map-entry :b 1)))]
-  ;        (is= edns
-  ;          [{:a 1, :b 1, :c 1}
-  ;           {:a 1, :b 1, :c 3}
-  ;           {:a 2, :b 1, :c 5}]))
-  ;      (let [edns (mapv #(td/hid->edn (td/hid->parent-hid %))
-  ;                   (td/index-find-mapentry (map-entry :c 6)))]
-  ;        (is= edns [{:a 2, :b 2, :c 6}]))))
-  ;
-  ;  (td/with-tdb (td/new-tdb)
-  ;    (let [data     [{:a 1 :b 1 :c 1}
-  ;                    {:a 1 :b 2 :c 2}
-  ;                    {:a 1 :b 1 :c 3}
-  ;                    {:a 2 :b 2 :c 4}
-  ;                    {:a 2 :b 1 :c 5}
-  ;                    {:a 2 :b 2 :c 6}]
-  ;          root-hid (td/add-edn data)]
-  ;      (let [hid (only (td/index-find-submap {:a 1 :b 2}))
-  ;            edn (td/hid->edn hid)]
-  ;        (is= edn {:a 1 :b 2 :c 2}))
-  ;      (let [hids (td/index-find-submap {:a 1 :b 1})
-  ;            edns (mapv td/hid->edn hids)]
-  ;        (is-set= edns [{:a 1, :b 1, :c 1}
-  ;                       {:a 1, :b 1, :c 3}])))) )
-  ;
+(dotest
+  (td/with-tdb (td/new-tdb)
+    (let [data     {:a [{:b 2}
+                        {:c 3}
+                        {:d 4}]
+                    :e {:f 6}
+                    :g :green
+                    :h "hotel"
+                    :i 1}
+          root-hid (td/add-edn data)]
+      (let [found (td/query-maps [{:a ?}])]
+        (is= (td/eid->edn (td/wrap-eid (val (only2 found))))
+          [{:b 2} {:c 3} {:d 4}]))
+      (let [found (td/query-maps [{:a e1}
+                                  {:eid e1 0 val}])]
+        (is= (td/eid->edn (td/wrap-eid (:val (only found))))
+          {:b 2}))
+      (let [found (td/query-triples [(td/search-triple e1 :a e2)
+                                     (td/search-triple e2 2 e3)])]
+        (is= (td/eid->edn (grab {:param :e3} (only found))) {:d 4}))
+
+      (let [found (td/query-triples [(td/search-triple e1 a1 e2)
+                                     (td/search-triple e2 a2 e3)
+                                     (td/search-triple e3 a3 4)])]
+        (is= data (td/eid->edn (grab {:param :e1} (only found))))))))
+
+(dotest
+  (td/with-tdb (td/new-tdb)
+    (td/eid-count-reset)
+    (let [data          [{:a 1 :b :first}
+                         {:a 2 :b :second}
+                         {:a 3 :b :third}
+                         {:a 4 :b "fourth"}
+                         {:a 5 :b "fifth"}
+                         {:a 1 :b 101}
+                         {:a 1 :b 102}]
+          root-hid      (td/add-edn data)
+          found         (td/query-maps [{:eid ? a1 1}])
+          eids          (mapv #(grab :eid %) found)
+          one-leaf-maps (mapv #(td/eid->edn (td/wrap-eid %)) eids)]
+      (is-set= found [{:eid 1008, :a1 :a} {:eid 1007, :a1 :a} {:eid 1002, :a1 :a}])
+      (is-set= one-leaf-maps [{:a 1, :b :first}
+                              {:a 1, :b 101}
+                              {:a 1, :b 102}])))
+
+    (td/with-tdb (td/new-tdb)
+      (let [data      [{:a 1 :x :first}
+                       {:a 2 :x :second}
+                       {:a 3 :x :third}
+                       {:b 1 :x 101}
+                       {:b 2 :x 102}
+                       {:c 1 :x 301}
+                       {:c 2 :x 302}]
+            root-hid  (td/add-edn data)
+            found     (td/query-maps [{:eid ? :a 1}]) ]
+        (is= (td/eid->edn (only found))
+          {:a 1 :x :first}))) )
+
+(dotest
+  (td/with-tdb (td/new-tdb)
+    (let [data     [{:a 1 :b 1 :c 1}
+                    {:a 1 :b 2 :c 2}
+                    {:a 1 :b 1 :c 3}
+                    {:a 2 :b 2 :c 4}
+                    {:a 2 :b 1 :c 5}
+                    {:a 2 :b 2 :c 6}]
+          root-hid (td/add-edn data)]
+
+      (let [found (td/query-maps [{:eid ? :a 1}])]
+        (is-set= (mapv td/eid->edn found)
+          [{:a 1, :b 1, :c 1}
+           {:a 1, :b 2, :c 2}
+           {:a 1, :b 1, :c 3}]))
+      (let [found (td/query-maps [{:eid ? :a 2}])]
+        (is-set= (mapv td/eid->edn found)
+          [{:a 2, :b 2, :c 4}
+           {:a 2, :b 1, :c 5}
+           {:a 2, :b 2, :c 6}]))
+      (let [found (td/query-maps [{:eid ? :b 1}])]
+        (is-set= (mapv td/eid->edn found)
+          [{:a 1, :b 1, :c 1}
+           {:a 1, :b 1, :c 3}
+           {:a 2, :b 1, :c 5}]))
+      (let [found (td/query-maps [{:eid ? :c 6}])]
+        (is-set= (mapv td/eid->edn found)
+          [{:a 2, :b 2, :c 6}]))
+
+      (let [found (td/query-maps [{:eid ? :a 1 :b 2}])]
+        (is-set= (mapv td/eid->edn found)
+          [{:a 1, :b 2, :c 2}]))
+      (let [found (td/query-maps [{:eid ? :a 1 :b 1}])]
+        (is-set= (mapv td/eid->edn found)
+          [{:a 1, :b 1, :c 1}
+           {:a 1, :b 1, :c 3}])))))
+
   ;(dotest
   ;  (td/with-tdb (td/new-tdb)
   ;    (td/hid-count-reset)
