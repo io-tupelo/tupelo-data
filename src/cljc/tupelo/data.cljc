@@ -164,6 +164,7 @@
   (t/validate wrapped-leaf? arg)
   (val (t/only arg)))
 
+;-----------------------------------------------------------------------------
 (s/defn tmp-eid-prefix-str? :- s/Bool
   "Returns true iff arg is a String like `tmp-eid-99999`"
   [arg :- s/Str]
@@ -182,6 +183,27 @@
   [arg]
   (and (wrapped-param? arg)
     (tmp-eid-kw? (unwrap-param arg))))
+
+;-----------------------------------------------------------------------------
+(s/defn tmp-attr-prefix-str? :- s/Bool
+  "Returns true iff arg is a String like `tmp-attr-99999`"
+  [arg :- s/Str]
+  (.startsWith arg "tmp-attr-"))
+
+(s/defn tmp-attr-sym? :- s/Bool
+  "Returns true iff arg is a symbol like `tmp-attr-99999`"
+  [arg :- s/Any] (and (symbol? arg) (tmp-attr-prefix-str? (t/sym->str arg))))
+
+(s/defn tmp-attr-kw? :- s/Bool
+  "Returns true iff arg is a symbol like `tmp-attr-99999`"
+  [arg :- s/Any] (and (keyword? arg) (tmp-attr-prefix-str? (t/kw->str arg))))
+
+(s/defn ^:no-doc param-tmp-attr? :- s/Bool
+  "Returns true iff arg is a map that looks like {:param :tmp-attr-99999}"
+  [arg]
+  (and (wrapped-param? arg)
+    (tmp-attr-kw? (unwrap-param arg))))
+
 
 ;-----------------------------------------------------------------------------
 (def ^:dynamic ^:no-doc *tdb* nil)
@@ -215,27 +237,34 @@
 (s/defn add-edn :- WrappedEid ; EidType ; #todo maybe rename:  load-edn->eid  ???
   "Add the EDN arg to the indexes, returning the EID"
   [edn-in :- s/Any]
-  (when-not (entity-like? edn-in)
-    (throw (ex-info "invalid edn-in" (vals->map edn-in))))
-  (let [eid-this (wrap-eid (new-eid))
-        ctx      (cond ; #todo add set
-                   (map? edn-in) {:entity-type :map :edn-use edn-in}
-                   (set? edn-in) {:entity-type :set :edn-use (zipmap edn-in edn-in)}
-                   (array-like? edn-in) {:entity-type :array :edn-use (indexed edn-in)}
-                   :else (throw (ex-info "unknown value found" (vals->map edn-in))))]
-    (t/with-map-vals ctx [entity-type edn-use]
-      ; #todo could switch to transients & reduce here in a single swap
-      (swap! *tdb* update :eid-type assoc eid-this entity-type)
-      (doseq [[attr-edn val-edn] edn-use]
-        ; (spyx [attr-edn val-edn])
-        (let [attr-rec (wrap-attr attr-edn)
-              val-rec  (if (leaf-val? val-edn)
-                         (wrap-leaf val-edn)
-                         (add-edn val-edn))]
-          (swap! *tdb* update :idx-eav index/add-entry [eid-this attr-rec val-rec])
-          (swap! *tdb* update :idx-vae index/add-entry [val-rec attr-rec eid-this])
-          (swap! *tdb* update :idx-ave index/add-entry [attr-rec val-rec eid-this]))))
-    eid-this))
+  ;(spyq :-----------------------------------------------------------------------------)
+  ;(newline)
+  ;(spyx-pretty edn-in)
+  (with-spy-indent
+    (when-not (entity-like? edn-in)
+      (throw (ex-info "invalid edn-in" (vals->map edn-in))))
+    (let [eid-this (wrap-eid (new-eid))
+          ctx      (cond ; #todo add set
+                     (map? edn-in) {:entity-type :map :edn-use edn-in}
+                     (set? edn-in) {:entity-type :set :edn-use (zipmap edn-in edn-in)}
+                     (array-like? edn-in) {:entity-type :array :edn-use (indexed edn-in)}
+                     :else (throw (ex-info "unknown value found" (vals->map edn-in))))]
+      (t/with-map-vals ctx [entity-type edn-use]
+        ;(newline)
+        ;(spyx-pretty entity-type )
+        ;(spyx-pretty edn-use)
+        ; #todo could switch to transients & reduce here in a single swap
+        (swap! *tdb* update :eid-type assoc eid-this entity-type)
+        (doseq [[attr-edn val-edn] edn-use]
+          ;(spyx [attr-edn val-edn])
+          (let [attr-rec (wrap-attr attr-edn)
+                val-rec  (if (leaf-val? val-edn)
+                           (wrap-leaf val-edn)
+                           (add-edn val-edn))]
+            (swap! *tdb* update :idx-eav index/add-entry [eid-this attr-rec val-rec])
+            (swap! *tdb* update :idx-vae index/add-entry [val-rec attr-rec eid-this])
+            (swap! *tdb* update :idx-ave index/add-entry [attr-rec val-rec eid-this]))))
+      eid-this)))
 
 ; #todo need to handle sets
 (s/defn eid->edn :- s/Any
@@ -435,6 +464,14 @@
         (swap! *autosyms-seen* conj kk-sym)
         kk-sym))))
 
+(s/defn seq->idx-map  :- tsk/Map
+  "Converts a sequential like [:a :b :c] into an indexed-map like
+  {0 :a
+   1 :b
+   2 :c} "
+  [seq-entity :- tsk/List]
+  (into {} (indexed seq-entity)) )
+
 (defn ^:no-doc query-maps->triples
   [qmaps]
   (with-spy-indent
@@ -443,31 +480,48 @@
     ;(spyx-pretty (deref *all-triples*))
     ;(spyx qmaps)
     (doseq [qmap qmaps]
-      ; (spyx-pretty qmap)
+      ;(spyx-pretty qmap)
       (s/validate tsk/Map qmap)
       (let [eid-val       (if (contains? qmap :eid)
                             (autosym-resolve :eid (grab :eid qmap))
                             (gensym "tmp-eid-"))
             map-remaining (dissoc qmap :eid)]
+        ;(spyx map-remaining)
         (forv [[kk vv] map-remaining]
           ;(spyx [kk vv])
           (cond
-            (sequential? vv) (throw (ex-info "not implemented" {:type :sequential :value vv}))
+            (sequential? vv) ; (throw (ex-info "not implemented" {:type :sequential :value vv}))
+            (let [array-val       vv
+                  tmp-eid         (gensym "tmp-eid-")
+                  triple-modified (search-triple-fn [eid-val kk tmp-eid])
+                  ;>>              (spyx triple-modified)
+                  qmaps-modified  (forv [elem array-val]
+                                    {:eid tmp-eid (gensym "tmp-attr-") elem}) ]
+              ;(spyx qmaps-modified)
+              (swap! *all-triples* append triple-modified)
+              ;(spyx-pretty *all-triples*)
+              (query-maps->triples qmaps-modified))
+
             (map? vv) (let [tmp-eid         (gensym "tmp-eid-")
                             triple-modified (search-triple-fn [eid-val kk tmp-eid])
                             ;>>              (spyx triple-modified)
                             qmaps-modified  [(glue {:eid tmp-eid} vv)]]
                         ;(spyx qmaps-modified)
                         (swap! *all-triples* append triple-modified)
+                        ;(spyx-pretty *all-triples*)
                         (query-maps->triples qmaps-modified))
             (leaf-val? vv) (let [triple (search-triple-fn [eid-val kk vv])]
                              ;(spyx triple)
-                             (swap! *all-triples* append triple))
+                             (swap! *all-triples* append triple)
+                             ; (spyx-pretty *all-triples*)
+                             )
             (symbol? vv) (do
                            (let [sym-to-use (autosym-resolve kk vv)
                                  triple     (search-triple-fn [eid-val kk sym-to-use])]
                              ;(spyx triple)
-                             (swap! *all-triples* append triple)))
+                             (swap! *all-triples* append triple)
+                             ; (spyx-pretty *all-triples*)
+                             ))
             :else (throw (ex-info "unrecognized value" (vals->map kk vv map-remaining)))
             ))))))
 
