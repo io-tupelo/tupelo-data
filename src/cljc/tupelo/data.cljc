@@ -548,7 +548,14 @@
                  :else (throw (ex-info "unrecognized value" (vals->map kk vv map-remaining)))
                  ))))))
 
-     ; (defn query-results-filter-tmp-attr-mapentry ; #todo copy same as tmp-eid below
+     (defn ^:no-doc query-results-filter-tmp-attr-mapentry ; #todo make public & optional
+       [query-results]
+       (let [results-filtered (forv [qres query-results]
+                                (drop-if
+                                  (fn [k v] (param-tmp-attr? k))
+                                  qres))]
+         results-filtered))
+
      (defn ^:no-doc query-results-filter-tmp-eid-mapentry ; #todo make public & optional
        [query-results]
        (let [results-filtered (forv [qres query-results]
@@ -575,9 +582,9 @@
          ; (spyx-pretty (deref *all-triples*))
          (let [unfiltered-results# (query-triples (deref *all-triples*))]
            ; (spyx unfiltered-results#)
-           (query-results-filter-tmp-eid-mapentry unfiltered-results#)
-           ; #todo filter out tmp-attr
-           )))
+           (query-results-filter-tmp-attr-mapentry
+             (query-results-filter-tmp-eid-mapentry
+               unfiltered-results#)) )))
 
      (defn ^:no-doc query-maps->wrapped-impl
        [maps]

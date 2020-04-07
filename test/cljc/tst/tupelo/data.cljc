@@ -856,25 +856,22 @@
                            {:id [4 44] :color :blue}]}
              root-eid (td/add-edn data)]
          ; (spyx-pretty (deref td/*tdb*))
-         ;  #todo ***** don't have any way to wildcard test this yet *****
-         ; (spyx-pretty (td/query-maps [{:a [{:color cc}]}]))
-         (comment ;result
-           [{:tmp-attr-34369 {:idx 0}, :cc :red}
-            {:tmp-attr-34369 {:idx 2}, :cc :blue}
-            {:tmp-attr-34369 {:idx 1}, :cc :yellow}])))
+         (is= (td/query-maps [{:a [{:color cc}]}])
+           [{:cc :red}
+            {:cc :blue}
+            {:cc :yellow}])))
 
      (td/with-tdb (td/new-tdb)
        (td/eid-count-reset)
        (let [data     {:a [{:id [2 22] :color :red}
                            {:id [3 33] :color :yellow}
                            {:id [4 44] :color :blue}]}
-             root-eid (td/add-edn data)]
-         ;(spyx-pretty (td/query-maps [{:a [{:color :red}
-         ;                                  {:color :blue}]}]))
-         (comment ; result
-           [{:tmp-attr-35094 {:idx 0}
-             :tmp-attr-35095 {:idx 2}}])
-         )))
+             root-eid (td/add-edn data)
+             result   (td/query-maps [{:a [{:eid eid-red :color :red}]}])]
+         (is= result ; #todo fix duplicates for array search
+           [{:eid-red 1003}
+            {:eid-red 1003}
+            {:eid-red 1003}]) )))
 
    (dotest
      (td/with-tdb (td/new-tdb)
@@ -888,21 +885,19 @@
                                {:ident 3 :flower :daisy}
                                {:ident 4 :flower :tulip}
                                ]}}
-             root-hid (td/add-edn data)]
-         (comment ;result
-           (spyx-pretty (td/query-maps [{:eid ? :a [{:id ?}]}])) =>
-           [{:eid 1001, :tmp-attr-37209 {:idx 0}, :id 2}
-            {:eid 1001, :tmp-attr-37209 {:idx 4}, :id 6}
-            {:eid 1001, :tmp-attr-37209 {:idx 1}, :id 3}
-            {:eid 1001, :tmp-attr-37209 {:idx 2}, :id 4}
-            {:eid 1001, :tmp-attr-37209 {:idx 3}, :id 5}])
+             root-hid (td/add-edn data)
+             result   (td/query-maps [{:eid ? :a [{:id ?}]}])]
+         (is= result
+           [{:eid 1001, :id 2}
+            {:eid 1001, :id 6}
+            {:eid 1001, :id 3}
+            {:eid 1001, :id 4}
+            {:eid 1001, :id 5}])
 
-         (comment
-           (spyx-pretty (td/query-maps [{:b {:eid ? :c [{:ident ?}]}}])) ; =>
-           [{:eid 1008, :tmp-attr-40045 {:idx 0}, :ident 2}
-            {:eid 1008, :tmp-attr-40045 {:idx 2}, :ident 4}
-            {:eid 1008, :tmp-attr-40045 {:idx 1}, :ident 3}])
-         )))
+         (is= (td/query-maps [{:b {:eid ? :c [{:ident ?}]}}]) ; =>
+           [{:eid 1008, :ident 2}
+            {:eid 1008, :ident 4}
+            {:eid 1008, :ident 3}]))))
 
    (dotest
      (td/with-tdb (td/new-tdb)
@@ -1071,87 +1066,75 @@
    (dotest
      (td/eid-count-reset)
      (td/with-tdb (td/new-tdb)
-       (let [data      {:people [{:name "jimmy" :id 1}
-                                 {:name "joel" :id 2}
-                                 {:name "tim" :id 3}
-                                 ]
-                        :addrs  {1 [{:addr     "123 street ave"
-                                     :address2 "apt 2"
-                                     :city     "Townville"
-                                     :state    "IN"
-                                     :zip      "46201"
-                                     :pref     true}
-                                    {:addr     "534 street ave",
-                                     :address2 "apt 5",
-                                     :city     "Township",
-                                     :state    "IN",
-                                     :zip      "00666"
-                                     :pref     false}]
-                                 2 [{:addr     "2026 park ave"
-                                     :address2 "apt 200"
-                                     :city     "Town"
-                                     :state    "CA"
-                                     :zip      "86753"
-                                     :pref     true}]
-                                 3 [{:addr     "1448 street st"
-                                     :address2 "apt 1"
-                                     :city     "City"
-                                     :state    "WA"
-                                     :zip      "92456"
-                                     :pref     true}]
-                                 }
-                        :visits {1 [{:date "12-25-1900" :geo-loc {:zip "46203"}}
-                                    {:date "12-31-1900" :geo-loc {:zip "00666"}}]
-                                 2 [{:date "1-1-1970" :geo-loc {:zip "12345"}}
-                                    {:date "2-1-1970" :geo-loc {:zip "86753"}}]
-                                 3 [{:date "4-4-4444" :geo-loc {:zip "54221"}}
-                                    {:date "5-4-4444" :geo-loc {:zip "92456"}}]
-                                 }}
+       (let [data     {:people [{:name "jimmy" :id 1}
+                                {:name "joel" :id 2}
+                                {:name "tim" :id 3}
+                                ]
+                       :addrs  {1 [{:addr     "123 street ave"
+                                    :address2 "apt 2"
+                                    :city     "Townville"
+                                    :state    "IN"
+                                    :zip      "46201"
+                                    :pref     true}
+                                   {:addr     "534 street ave",
+                                    :address2 "apt 5",
+                                    :city     "Township",
+                                    :state    "IN",
+                                    :zip      "00666"
+                                    :pref     false}]
+                                2 [{:addr     "2026 park ave"
+                                    :address2 "apt 200"
+                                    :city     "Town"
+                                    :state    "CA"
+                                    :zip      "86753"
+                                    :pref     true}]
+                                3 [{:addr     "1448 street st"
+                                    :address2 "apt 1"
+                                    :city     "City"
+                                    :state    "WA"
+                                    :zip      "92456"
+                                    :pref     true}]
+                                }
+                       :visits {1 [{:date "12-25-1900" :geo-loc {:zip "46203"}}
+                                   {:date "12-31-1900" :geo-loc {:zip "00666"}}]
+                                2 [{:date "1-1-1970" :geo-loc {:zip "12345"}}
+                                   {:date "2-1-1970" :geo-loc {:zip "86753"}}]
+                                3 [{:date "4-4-4444" :geo-loc {:zip "54221"}}
+                                   {:date "5-4-4444" :geo-loc {:zip "92456"}}]
+                                }}
 
-             root-eid  (td/add-edn data)
-
-
-
-             ;results-filtered (t/walk-with-parents results
-             ;                   {:enter (fn [parents item]
-             ;                             (t/cond-it-> item
-             ;                               (map? item) (t/drop-if (fn [k v] (td/tmp-attr-kw? k))
-             ;                                             item)))})
-             ]
+             root-eid (td/add-edn data)]
          ; (spyx-pretty td/*tdb*)
          (let [results (td/query-maps [{:people [{:name ? :id id}]}])]
-           (comment
-             (spyx-pretty results) ;  =>
-             [{:tmp-attr-57457 {:idx 0}, :name "jimmy", :id 1}
-              {:tmp-attr-57457 {:idx 1}, :name "joel", :id 2}
-              {:tmp-attr-57457 {:idx 2}, :name "tim", :id 3}]))
+           (is= results
+             [{:name "jimmy", :id 1}
+              {:name "joel", :id 2}
+              {:name "tim", :id 3}]))
 
-         (let [ results-2 (td/query-maps [{:addrs {id [{:zip ? :pref true}]}}]) ]
-           (comment
-             (spyx-pretty results-2)
-             [{:id 1, :tmp-attr-35191 {:idx 0}, :zip "46203"}]))
+         (let [results-2 (td/query-maps [{:addrs {id [{:zip ? :pref true}]}}])]
+           (is= results-2
+             [{:id 2, :zip "86753"}
+              {:id 1, :zip "46201"}
+              {:id 3, :zip "92456"}]))
 
+         ; ***** this is the big one! *****
          (let [results (td/query-maps
                          [{:people [{:name ? :id id}]}
                           {:addrs {id [{:zip ? :pref false}]}}
                           {:visits {id [{:date ? :geo-loc {:zip zip}}]}}])]
-           (comment
-             (spyx-pretty (unlazy results)) ;  =>
-             [{:date           "12-31-1900",
-               :id             1,
-               :name           "jimmy",
-               :tmp-attr-28288 {:idx 0},
-               :tmp-attr-28293 {:idx 1},
-               :tmp-attr-28298 {:idx 1},
-               :zip            "00666"}]))
+           (is= results [{:date "12-31-1900"
+                          :id   1
+                          :name "jimmy"
+                          :zip  "00666"}]))
 
+         ; can break it down into low level, including array index values
          (let [results-3 (td/query-triples [(search-triple eid-pers :name name)
                                             (search-triple eid-pers :id id)
                                             (search-triple eid-addrs id eid-addr-deets)
                                             (search-triple eid-addr-deets idx-deet eid-addr-deet)
                                             (search-triple eid-addr-deet :zip zip)
                                             (search-triple eid-addr-deet :pref true)])]
-           (is=  results-3
+           (is= results-3
              [{{:param :eid-pers}       {:eid 1005},
                {:param :name}           "tim",
                {:param :id}             3,
@@ -1176,9 +1159,7 @@
                {:param :idx-deet}       {:idx 0},
                {:param :eid-addr-deet}  {:eid 1008},
                {:param :zip}            "46201"}]
-             ))
-
-         )))
+             )))))
 
 
 
