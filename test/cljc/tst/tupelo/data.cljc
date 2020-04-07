@@ -347,99 +347,98 @@
      (throws? (boolean->binary))
      (throws? (boolean->binary 234)))
 
-   ;(dotest
-   ;  (is= (td/search-triple-impl (quote [:a :b :c]))
-   ;    '(tupelo.data/search-triple-fn (quote [:a :b :c])))
-   ;  (is= (td/search-triple-impl (quote [a b c]))
-   ;    '(tupelo.data/search-triple-fn (quote [a b c])))
-   ;
-   ;  (is= (td/search-triple x y z)
-   ;    [(td/->SearchParam x)
-   ;     (td/->SearchParam y)
-   ;     (td/->SearchParam z)]
-   ;    [{:param :x} {:param :y} {:param :z}])
-   ;  (is= (td/search-triple 123 :color "Joey")
-   ;    [(td/wrap-eid 123) (td/wrap-attr :color) (td/wrap-leaf "Joey")]))
-   ;
-   ;(dotest
-   ;  (with-tdb (new-tdb)
-   ;    (eid-count-reset)
-   ;    (let [edn-val     {:a {:b 2}}
-   ;          root-eid    (td/add-edn edn-val)
-   ;          search-spec [(search-triple x :a y)
-   ;                       (search-triple y :b 2)]]
-   ;      (is= (query-triples search-spec)
-   ;        (quote [{{:param :x} {:eid 1001}
-   ;                 {:param :y} {:eid 1002}}]))))
-   ;
-   ;  (with-tdb (new-tdb)
-   ;    (eid-count-reset)
-   ;    (let [edn-val     {:a {:b 2}}
-   ;          root-eid    (td/add-edn edn-val)
-   ;          search-spec [(search-triple y :b 2) (search-triple x :a y)]]
-   ;      (is= (query-triples search-spec)
-   ;        [{{:param :x} {:eid 1001}
-   ;          {:param :y} {:eid 1002}}])))
-   ;
-   ;  (with-tdb (new-tdb)
-   ;    (eid-count-reset)
-   ;    (let [edn-val     {:a {:b 2}}
-   ;          root-eid    (td/add-edn edn-val)
-   ;          search-spec [(search-triple x :a y) (search-triple y :b 99)]]
-   ;      (is= [] (query-triples search-spec))))
-   ;
-   ;  (with-tdb (new-tdb)
-   ;    (eid-count-reset)
-   ;    (let [edn-val     {:a {:b 2}}
-   ;          root-eid    (td/add-edn edn-val)
-   ;          search-spec [(search-triple y :b 99) (search-triple x :a y)]]
-   ;      (is= [] (query-triples search-spec))))
-   ;  )
-   ;
-   ;(dotest
-   ;  (binding [td/*all-triples*   (atom []) ; receives output!
-   ;            td/*autosyms-seen* (atom #{})]
-   ;    (td/query-maps->triples (quote
-   ;                              [{:eid x :map y}
-   ;                               {:eid y :a a}]))
-   ;    (is= (deref td/*all-triples*)
-   ;      [[{:param :x} {:attr :map} {:param :y}]
-   ;       [{:param :y} {:attr :a} {:param :a}]]))
-   ;
-   ;  (binding [td/*all-triples*   (atom []) ; receives output!
-   ;            td/*autosyms-seen* (atom #{})]
-   ;    (td/query-maps->triples (quote [{:eid ? :map y}]))
-   ;    (is= (deref td/*all-triples*)
-   ;      [[{:param :eid} {:attr :map} {:param :y}]]))
-   ;
-   ;  (binding [td/*all-triples*   (atom []) ; receives output!
-   ;            td/*autosyms-seen* (atom #{})]
-   ;    (td/query-maps->triples (quote [{:eid ? :map y}
-   ;                                    {:eid y :a a}]))
-   ;    (is= (deref td/*all-triples*)
-   ;      [[{:param :eid} {:attr :map} {:param :y}]
-   ;       [{:param :y} {:attr :a} {:param :a}]]))
-   ;
-   ;  (binding [td/*all-triples*   (atom []) ; receives output!
-   ;            td/*autosyms-seen* (atom #{})]
-   ;    (throws? (td/query-maps->triples
-   ;               (quote [{:eid ? :map y}
-   ;                       {:eid ? :a a}])))))
-   ;
-   ;(dotest
-   ;  (is (td/param-tmp-eid? {:param :tmp-eid-99999}))
-   ;  (is (td/tmp-attr-kw? :tmp-attr-99999)))
-   ;
-   ;(def edn-val  (glue (sorted-map)
-   ;                {:num     5
-   ;                 :map     {:a 1 :b 2}
-   ;                 :hashmap {:a 21 :b 22}
-   ;                 :vec     [5 6 7]
-   ;                 ;  :set #{3 4}  ; #todo add sets
-   ;                 :str     "hello"
-   ;                 :kw      :nothing}) )
-   ;
-   ;
+   (dotest
+     (is= (td/search-triple-impl (quote [:a :b :c]))
+       '(tupelo.data/search-triple-fn (quote [:a :b :c])))
+     (is= (td/search-triple-impl (quote [a b c]))
+       '(tupelo.data/search-triple-fn (quote [a b c])))
+
+     (is= (td/search-triple x y z)
+       [(td/->SearchParam x)
+        (td/->SearchParam y)
+        (td/->SearchParam z)]
+       [{:param :x} {:param :y} {:param :z}])
+     (is= (td/search-triple 123 :color "Joey")
+       [(td/wrap-eid 123) :color  "Joey"]))
+
+   (dotest
+     (with-tdb (new-tdb)
+       (eid-count-reset)
+       (let [edn-val     {:a {:b 2}}
+             root-eid    (td/add-edn edn-val)
+             search-spec [(search-triple x :a y)
+                          (search-triple y :b 2)]]
+         (is= (query-triples search-spec)
+           (quote [{{:param :x} {:eid 1001}
+                    {:param :y} {:eid 1002}}]))))
+
+     (with-tdb (new-tdb)
+       (eid-count-reset)
+       (let [edn-val     {:a {:b 2}}
+             root-eid    (td/add-edn edn-val)
+             search-spec [(search-triple y :b 2) (search-triple x :a y)]]
+         (is= (query-triples search-spec)
+           [{{:param :x} {:eid 1001}
+             {:param :y} {:eid 1002}}])))
+
+     (with-tdb (new-tdb)
+       (eid-count-reset)
+       (let [edn-val     {:a {:b 2}}
+             root-eid    (td/add-edn edn-val)
+             search-spec [(search-triple x :a y) (search-triple y :b 99)]]
+         (is= [] (query-triples search-spec))))
+
+     (with-tdb (new-tdb)
+       (eid-count-reset)
+       (let [edn-val     {:a {:b 2}}
+             root-eid    (td/add-edn edn-val)
+             search-spec [(search-triple y :b 99) (search-triple x :a y)]]
+         (is= [] (query-triples search-spec)))))
+
+   (dotest
+     (binding [td/*all-triples*   (atom []) ; receives output!
+               td/*autosyms-seen* (atom #{})]
+       (td/query-maps->triples (quote
+                                 [{:eid x :map y}
+                                  {:eid y :a a}]))
+       (is= (deref td/*all-triples*)
+         [[{:param :x} :map {:param :y}]
+          [{:param :y} :a {:param :a}]]))
+
+     (binding [td/*all-triples*   (atom []) ; receives output!
+               td/*autosyms-seen* (atom #{})]
+       (td/query-maps->triples (quote [{:eid ? :map y}]))
+       (is= (deref td/*all-triples*)
+         [[{:param :eid}  :map {:param :y}]]))
+
+     (binding [td/*all-triples*   (atom []) ; receives output!
+               td/*autosyms-seen* (atom #{})]
+       (td/query-maps->triples (quote [{:eid ? :map y}
+                                       {:eid y :a a}]))
+       (is= (deref td/*all-triples*)
+         [[{:param :eid} :map {:param :y}]
+          [{:param :y} :a {:param :a}]]))
+
+     (binding [td/*all-triples*   (atom []) ; receives output!
+               td/*autosyms-seen* (atom #{})]
+       (throws? (td/query-maps->triples
+                  (quote [{:eid ? :map y}
+                          {:eid ? :a a}])))))
+
+   (dotest
+     (is (td/param-tmp-eid? {:param :tmp-eid-99999}))
+     (is (td/tmp-attr-kw? :tmp-attr-99999)))
+
+   (def edn-val  (glue (sorted-map)
+                   {:num     5
+                    :map     {:a 1 :b 2}
+                    :hashmap {:a 21 :b 22}
+                    :vec     [5 6 7]
+                    ;  :set #{3 4}  ; #todo add sets
+                    :str     "hello"
+                    :kw      :nothing}) )
+
+
    ;(dotest
    ;  (td/with-tdb (td/new-tdb)
    ;    (td/eid-count-reset)
