@@ -1071,38 +1071,37 @@
    (dotest
      (td/eid-count-reset)
      (td/with-tdb (td/new-tdb)
-       (let [data      {:people
-                                [{:name "jimmy" :id 1}
+       (let [data      {:people [{:name "jimmy" :id 1}
                                  {:name "joel" :id 2}
                                  {:name "tim" :id 3}
                                  ]
-                        :addrs
-                                {1 [{ :addr  "123 street ave"
-                                      :address2  "apt 2"
-                                     :city      "Townville"
-                                     :state     "IN"
-                                     :zip  "46201"
-                                     :pref true}
-                                    { :addr  "534 street ave",
-                                      :address2  "apt 5",
-                                     :city      "Township",
-                                     :state     "IN",
-                                     :zip  "46203"
-                                     :pref false}]
-                                 2 [{ :addr  "2026 park ave"
-                                      :address2  "apt 200"
-                                     :city      "Town"
-                                     :state     "CA"
-                                     :zip  "86753"
-                                     :pref true}]
-                                 3 [{ :addr  "1448 street st"
-                                      :address2  "apt 1"
-                                     :city      "City"
-                                     :state     "WA"
-                                     :zip  "92456"
-                                     :pref true}]
+                        :addrs  {1 [{:addr     "123 street ave"
+                                     :address2 "apt 2"
+                                     :city     "Townville"
+                                     :state    "IN"
+                                     :zip      "46201"
+                                     :pref     true}
+                                    {:addr     "534 street ave",
+                                     :address2 "apt 5",
+                                     :city     "Township",
+                                     :state    "IN",
+                                     :zip      "00666"
+                                     :pref     false}]
+                                 2 [{:addr     "2026 park ave"
+                                     :address2 "apt 200"
+                                     :city     "Town"
+                                     :state    "CA"
+                                     :zip      "86753"
+                                     :pref     true}]
+                                 3 [{:addr     "1448 street st"
+                                     :address2 "apt 1"
+                                     :city     "City"
+                                     :state    "WA"
+                                     :zip      "92456"
+                                     :pref     true}]
                                  }
-                        :visits {1 [{:date "12-31-1900" :geo-loc {:zip "46203"}}]
+                        :visits {1 [{:date "12-25-1900" :geo-loc {:zip "46203"}}
+                                    {:date "12-31-1900" :geo-loc {:zip "00666"}}]
                                  2 [{:date "1-1-1970" :geo-loc {:zip "12345"}}
                                     {:date "2-1-1970" :geo-loc {:zip "86753"}}]
                                  3 [{:date "4-4-4444" :geo-loc {:zip "54221"}}
@@ -1126,10 +1125,12 @@
              [{:tmp-attr-57457 {:idx 0}, :name "jimmy", :id 1}
               {:tmp-attr-57457 {:idx 1}, :name "joel", :id 2}
               {:tmp-attr-57457 {:idx 2}, :name "tim", :id 3}]))
+
          (let [ results-2 (td/query-maps [{:addrs {id [{:zip ? :pref true}]}}]) ]
            (comment
              (spyx-pretty results-2)
              [{:id 1, :tmp-attr-35191 {:idx 0}, :zip "46203"}]))
+
          (let [results (td/query-maps
                          [{:people [{:name ? :id id}]}
                           {:addrs {id [{:zip ? :pref false}]}}
@@ -1139,10 +1140,10 @@
              [{:date           "12-31-1900",
                :id             1,
                :name           "jimmy",
-               :tmp-attr-50923 {:idx 0},
-               :tmp-attr-50928 {:idx 1},
-               :tmp-attr-50933 {:idx 0},
-               :zip            "46203"}]))
+               :tmp-attr-28288 {:idx 0},
+               :tmp-attr-28293 {:idx 1},
+               :tmp-attr-28298 {:idx 1},
+               :zip            "00666"}]))
 
          (let [results-3 (td/query-triples [(search-triple eid-pers :name name)
                                             (search-triple eid-pers :id id)
