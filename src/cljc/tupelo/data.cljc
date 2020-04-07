@@ -16,6 +16,7 @@
             [tupelo.data.index :as index]
             [tupelo.schema :as tsk]
             [tupelo.vec :as vec]
+            [tupelo.tag :as tv]
 
             [clojure.set :as set]
             [schema.core :as s]
@@ -133,15 +134,22 @@
      ;-----------------------------------------------------------------------------
      (def WrappedParam {:param s/Any})
      (def WrappedEid {:eid s/Int})
+     (def WrappedIdx {:idx s/Int})
      (def WrappedAttr {:attr s/Any})
      (def WrappedLeaf {:leaf s/Any})
 
+     ; #todo inline all of these?
      (s/defn wrap-eid :- WrappedEid
-       [arg :- s/Int] {:eid arg})
+       [arg :- s/Int]
+       (tv/new :eid (t/validate int? arg)))
+     (s/defn wrap-idx :- WrappedIdx
+       [arg :- s/Int]
+       (tv/new :idx (t/validate int? arg)))
+
      (s/defn wrap-attr :- WrappedAttr
-       [arg] {:attr arg})
+       [arg] (tv/new :attr arg))
      (s/defn wrap-leaf :- WrappedLeaf
-       [arg] {:leaf arg})
+       [arg] (tv/new :leaf arg))
 
      (defn pair-map? [arg] (and (map? arg) (= 1 (count arg))))
      (defn wrapped-param? [x] (and (pair-map? x) (= :param (key (t/only x)))))

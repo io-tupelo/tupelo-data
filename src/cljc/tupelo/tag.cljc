@@ -5,26 +5,21 @@
 ;   bound by the terms of this license.  You must not remove this notice, or any other, from this
 ;   software.
 (ns tupelo.tag
-  (:refer-clojure :exclude [load ->VecNode val ])
+  (:refer-clojure :exclude [load ->VecNode val])
   #?(:clj (:require
             [tupelo.core :as t :refer [spy spyx spyxx spyx-pretty with-spy-indent
                                        grab glue map-entry indexed
                                        forv vals->map fetch-in let-spy xfirst xsecond xthird xlast xrest
                                        keep-if drop-if append prepend
                                        ]]
-            [tupelo.data.index :as index]
             [tupelo.schema :as tsk]
-            [tupelo.vec :as vec]
 
-            [clojure.set :as set]
             [schema.core :as s]
             [tupelo.lexical :as lex]))
   #?(:cljs (:require
              [tupelo.core :as t :refer [spy spyx spyxx spyx-pretty grab]] ; #todo :include-macros true
              [tupelo.schema :as tsk]
-             [tupelo.data.index :as index]
 
-             [clojure.set :as set]
              [schema.core :as s]
              ))
   )
@@ -35,13 +30,29 @@
 #?(:clj
    (do
 
-     (defprotocol ITag (tag [tag]))
-     (defprotocol IVal (val [this]))
+     (def TaggedValue {s/Any s/Any}) ; a map with a SINGLE entry
 
-     (defrecord TaggedValue [tag value]
-       ITag (tag [this] tag)
-       IVal (val [this] value))
+     (s/defn tagged-value? :- s/Bool
+       "Returns true iff arg is a TaggedValue"
+       [arg] (and (map? arg)
+               (= 1 (count arg))))
 
+     (s/defn tag :- s/Any
+       [tv :- TaggedValue]
+       (clojure.core/key
+         (t/only
+           (t/validate tagged-value? tv))))
+
+     (s/defn val :- s/Any
+       [tv :- TaggedValue]
+       (clojure.core/val
+         (t/only
+           (t/validate tagged-value? tv))))
+
+     (defn new
+       "Create a new TaggedValue"
+       [tag val]
+       {tag val})
 
 ))
 

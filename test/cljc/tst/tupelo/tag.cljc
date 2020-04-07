@@ -34,14 +34,14 @@
 #?(:clj
  (do
 
-   (dotest-focus
-     (let [x (tv/->TaggedValue :stuff 5)]
-       (spyxx x)
+   (dotest
+     (let [x (tv/new :stuff 5)]
+       (is (tv/tagged-value? x))
+       (isnt (tv/tagged-value? {:a 1 :b 2}))
+       (isnt (tv/tagged-value? [:a 1] ))
+       (is= x {:stuff 5})
        (is= :stuff (tv/tag x))
-       (is= 5 (tv/val x))
-       ))
-
-
+       (is= 5 (tv/val x))))
 
    ))
 
