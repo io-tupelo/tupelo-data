@@ -429,6 +429,7 @@
      (is (td/param-tmp-eid? {:param :tmp-eid-99999}))
      (is (td/tmp-attr-kw? :tmp-attr-99999)))
 
+   ;---------------------------------------------------------------------------------------------------
    (def edn-val  (glue (sorted-map)
                    {:num     5
                     :map     {:a 1 :b 2}
@@ -438,272 +439,294 @@
                     :str     "hello"
                     :kw      :nothing}) )
 
+   (dotest
+     (td/with-tdb (td/new-tdb)
+       (td/eid-count-reset)
+       (let [root-hid (td/add-edn edn-val)]
+         ; (spyx-pretty (grab :idx-eav (deref *tdb*)))
+         (comment ; result
+           #{[{:eid 1001} :hashmap {:eid 1002}]
+             [{:eid 1001} :kw :nothing]
+             [{:eid 1001} :map {:eid 1003}]
+             [{:eid 1001} :num 5]
+             [{:eid 1001} :str "hello"]
+             [{:eid 1001} :vec {:eid 1004}]
+             [{:eid 1002} :a 21]
+             [{:eid 1002} :b 22]
+             [{:eid 1003} :a 1]
+             [{:eid 1003} :b 2]
+             [{:eid 1004} {:idx 0} 5]
+             [{:eid 1004} {:idx 1} 6]
+             [{:eid 1004} {:idx 2} 7]})
+         (is= edn-val (td/eid->edn root-hid))
 
-   ;(dotest
-   ;  (td/with-tdb (td/new-tdb)
-   ;    (td/eid-count-reset)
-   ;    (let [ root-hid (td/add-edn edn-val)]
-   ;      ; (spyx-pretty (grab :idx-eav (deref *tdb*)))
-   ;      (is= edn-val (td/eid->edn root-hid))
-   ;
-   ;      (when true
-   ;        (let [eids-match (td/index-find-leaf 1) ; only 1 match
-   ;              entity-edn (td/eid->edn (only eids-match))]
-   ;          (is= entity-edn {:a 1, :b 2}))
-   ;        (is= (query-triples [(search-triple e :num v)])
-   ;          [{{:param :e} {:eid 1001},
-   ;            {:param :v} {:leaf 5}}])
-   ;        (is= (query-triples [(search-triple e a "hello")])
-   ;          [{{:param :e} {:eid 1001},
-   ;            {:param :a} {:attr :str}}])
-   ;        (is= (query-triples [(search-triple e a 7)])
-   ;          [{{:param :e} {:eid 1004},
-   ;            {:param :a} {:attr 2}}]))
-   ;
-   ;      (is= {:param :x}
-   ;        (td/->SearchParam-fn (quote x))
-   ;        (td/->SearchParam-fn :x))
-   ;
-   ;      (is= (td/query-maps->wrapped-impl (quote [{:eid x :map y}
-   ;                                                {:eid y :a a}]))
-   ;        '(tupelo.data/query-maps->wrapped-fn (quote [{:eid x, :map y}
-   ;                                                     {:eid y, :a a}])))
-   ;      ))
-   ;
-   ;  (dotest
-   ;    (td/with-tdb (td/new-tdb)
-   ;      (td/eid-count-reset)
-   ;
-   ;      (is= (td/query-maps->wrapped [{:eid x :map y}
-   ;                                    {:eid y :a a}])
-   ;        [{{:param :x} {:eid 1001},
-   ;          {:param :y} {:eid 1003},
-   ;          {:param :a} {:leaf 1}}])
-   ;      (is= edn-val (td/eid->edn {:eid 1001}))
-   ;      (is= (td/eid->edn {:eid 1003}) {:a 1 :b 2})
-   ;      (comment ; #todo API:  output should look like
-   ;        {:x 1001 :y 1002 :a 1})
-   ;
-   ;      (let [r1 (only (td/query-triples [(search-triple e i 7)]))
-   ;            r2 (only (td/index-find-leaf 7))]
-   ;        (is= r1 {{:param :e} {:eid 1004}
-   ;                 {:param :i} {:attr 2}})
-   ;        (is= (td/eid->edn {:eid 1004}) [5 6 7])
-   ;        (is= r2 {:eid 1004})
-   ;        (is= (td/eid->edn r2) [5 6 7]))
-   ;
-   ;      ))
-   ;  (dotest
-   ;    (td/with-tdb (td/new-tdb)
-   ;      (td/eid-count-reset)
-   ;      (when false
-   ;        (nl)
-   ;        (spyx-pretty
-   ;          (td/query-maps->wrapped-impl (quote [{:eid x :map {:a a}}]))))
-   ;
-   ;      (is= (td/query-maps->wrapped [{:eid x :map {:a a}}])
-   ;        [{{:param :x} {:eid 1001},
-   ;          {:param :a} {:leaf 1}}])
-   ;      (is= :x (td/unwrap-param {:param :x}))
-   ;      (is= 1234 (td/unwrap-eid {:eid 1234}))
-   ;      (is= :color (td/unwrap-attr {:attr :color}))
-   ;      (is= 42 (td/unwrap-leaf {:leaf 42}))
-   ;
-   ;      (is= (td/query-maps->wrapped [{:map {:a a}}])
-   ;        [{{:param :a} {:leaf 1}}])
-   ;      (is= (td/query-maps->wrapped [{:hashmap {:a a}}])
-   ;        [{{:param :a} {:leaf 21}}])
-   ;
-   ;      ))
-   ;  (dotest
-   ;    (td/with-tdb (td/new-tdb)
-   ;      (td/eid-count-reset)
-   ;
-   ;      (binding [td/*autosyms-seen* (atom #{})]
-   ;        (is= (symbol "a") (td/autosym-resolve :a (quote ?)))
-   ;        (throws? (td/autosym-resolve :a (quote ?)))) ;attempted duplicate throws
-   ;
-   ;      (throws? (td/exclude-reserved-identifiers {:a {:tmp-eid-123 :x}}))
-   ;      (throws? (td/exclude-reserved-identifiers (quote {:a {:x [1 2 3 tmp-eid-123 4 5 6]}})))
-   ;      (throws? (td/query-maps->wrapped-impl (quote [{:map {:a tmp-eid-123}}])))
-   ;
-   ;      (is= (td/query-maps->wrapped [{:map {:a ?}}])
-   ;        [{{:param :a} {:leaf 1}}])
-   ;
-   ;      (is= (td/unwrap-query-results [{{:param :a} {:leaf 1}}])
-   ;        [{:a 1}])
-   ;      (is= (td/unwrap-query-results [{{:param :x} {:eid 1001},
-   ;                                      {:param :y} {:eid 1002},
-   ;                                      {:param :a} {:leaf 1}}])
-   ;        [{:x 1001, :y 1002, :a 1}])
-   ;      (is= (td/unwrap-query-results [{{:param :e} {:eid 1003}
-   ;                                      {:param :i} {:attr 2}}])
-   ;        [{:e 1003, :i 2}])
-   ;
-   ;      (is= (td/query-maps [{:map     {:a a1}
-   ;                            :hashmap {:a a2}}])
-   ;        [{:a1 1
-   ;          :a2 21}])
-   ;
-   ;      (is-set= (td/query-maps [{kk {:a ?}}]) ; Awesome!  Found both solutions!
-   ;        [{:kk :map, :a 1}
-   ;         {:kk :hashmap, :a 21}])
-   ;
-   ;      (is= (only (td/query-maps [{:num ?}])) {:num 5})
-   ;      (is= (only (td/query-maps [{:eid ? :num ?}])) {:eid 1001, :num 5})
-   ;      (is= (only (td/query-maps [{:eid ? :num num}])) {:eid 1001, :num 5})
-   ;
-   ;      )))
-   ;
-   ;; #todo need to convert all from compile-time macros to runtime functions
-   ;(dotest
-   ;  (td/eid-count-reset)
-   ;  (td/with-tdb (td/new-tdb)
-   ;    ; (td/eid-count-reset)
-   ;    (let [hospital             {:hospital "Hans Jopkins"
-   ;                                :staff    {
-   ;                                           10 {:first-name "John"
-   ;                                               :last-name  "Doe"
-   ;                                               :salary     40000
-   ;                                               :position   :resident}
-   ;                                           11 {:first-name "Joey"
-   ;                                               :last-name  "Buttafucco"
-   ;                                               :salary     42000
-   ;                                               :position   :resident}
-   ;                                           20 {:first-name "Jane"
-   ;                                               :last-name  "Deer"
-   ;                                               :salary     100000
-   ;                                               :position   :attending}
-   ;                                           21 {:first-name "Dear"
-   ;                                               :last-name  "Jane"
-   ;                                               :salary     102000
-   ;                                               :position   :attending}
-   ;                                           30 {:first-name "Sam"
-   ;                                               :last-name  "Waterman"
-   ;                                               :salary     0
-   ;                                               :position   :volunteer}
-   ;                                           31 {:first-name "Sammy"
-   ;                                               :last-name  "Davis"
-   ;                                               :salary     0
-   ;                                               :position   :volunteer}
-   ;                                           }}
-   ;          root-hid             (td/add-edn hospital)
-   ;          nm-sal-all           (td/query-maps [{:first-name ? :salary ?}])
-   ;          nm-sal-attending     (td/query-maps [{:first-name ? :salary ? :position :attending}])
-   ;          nm-sal-resident      (td/query-maps [{:first-name ? :salary ? :position :resident}])
-   ;          nm-sal-volunteer     (td/query-maps [{:first-name ? :salary ? :position :volunteer}])
-   ;          avg-fn               (fn [vals]
-   ;                                 (let [n      (count vals)
-   ;                                       total  (reduce + 0 vals)
-   ;                                       result (/ total n)]
-   ;                                   result))
-   ;          salary-avg-attending (avg-fn (mapv :salary nm-sal-attending))
-   ;          salary-avg-resident  (avg-fn (mapv :salary nm-sal-resident))
-   ;          salary-avg-volunteer (avg-fn (mapv :salary nm-sal-volunteer))
-   ;          ]
-   ;      (is= nm-sal-all [{:first-name "Joey", :salary 42000}
-   ;                       {:first-name "Dear", :salary 102000}
-   ;                       {:first-name "Jane", :salary 100000}
-   ;                       {:first-name "John", :salary 40000}
-   ;                       {:first-name "Sam", :salary 0}
-   ;                       {:first-name "Sammy", :salary 0}])
-   ;      (is= nm-sal-attending
-   ;        [{:first-name "Dear", :salary 102000}
-   ;         {:first-name "Jane", :salary 100000}])
-   ;
-   ;      (is= salary-avg-attending 101000)
-   ;      (is= salary-avg-resident 41000)
-   ;      (is= salary-avg-volunteer 0))))
-   ;
-   ;(dotest
-   ;  (td/with-tdb (td/new-tdb)
-   ;    (td/eid-count-reset)
-   ;    (let [edn-val  {:aa [1 2 3]
-   ;                    :bb [2 3 4]
-   ;                    :cc [3 4 5 6]}
-   ;          root-eid (td/add-edn edn-val)]
-   ;      (comment
-   ;        (spyx-pretty (unlazy (deref td/*tdb*)))
-   ;        {:eid-type
-   ;         {{:eid 1009} :map,
-   ;          {:eid 1010} :array,
-   ;          {:eid 1011} :array,
-   ;          {:eid 1012} :array},
-   ;         :idx-ave
-   ;         #{[{:attr :aa} {:eid 1010} {:eid 1009}]
-   ;           [{:attr :bb} {:eid 1011} {:eid 1009}]
-   ;           [{:attr :cc} {:eid 1012} {:eid 1009}]
-   ;           [{:attr 0} {:leaf 1} {:eid 1010}] [{:attr 0} {:leaf 2} {:eid 1011}]
-   ;           [{:attr 0} {:leaf 3} {:eid 1012}] [{:attr 1} {:leaf 2} {:eid 1010}]
-   ;           [{:attr 1} {:leaf 3} {:eid 1011}] [{:attr 1} {:leaf 4} {:eid 1012}]
-   ;           [{:attr 2} {:leaf 3} {:eid 1010}] [{:attr 2} {:leaf 4} {:eid 1011}]
-   ;           [{:attr 2} {:leaf 5} {:eid 1012}]
-   ;           [{:attr 3} {:leaf 6} {:eid 1012}]},
-   ;         :idx-eav
-   ;         #{[{:eid 1009} {:attr :aa} {:eid 1010}]
-   ;           [{:eid 1009} {:attr :bb} {:eid 1011}]
-   ;           [{:eid 1009} {:attr :cc} {:eid 1012}]
-   ;           [{:eid 1010} {:attr 0} {:leaf 1}] [{:eid 1010} {:attr 1} {:leaf 2}]
-   ;           [{:eid 1010} {:attr 2} {:leaf 3}] [{:eid 1011} {:attr 0} {:leaf 2}]
-   ;           [{:eid 1011} {:attr 1} {:leaf 3}] [{:eid 1011} {:attr 2} {:leaf 4}]
-   ;           [{:eid 1012} {:attr 0} {:leaf 3}] [{:eid 1012} {:attr 1} {:leaf 4}]
-   ;           [{:eid 1012} {:attr 2} {:leaf 5}]
-   ;           [{:eid 1012} {:attr 3} {:leaf 6}]},
-   ;         :idx-vae
-   ;         #{[{:eid 1010} {:attr :aa} {:eid 1009}]
-   ;           [{:eid 1011} {:attr :bb} {:eid 1009}]
-   ;           [{:eid 1012} {:attr :cc} {:eid 1009}]
-   ;           [{:leaf 1} {:attr 0} {:eid 1010}] [{:leaf 2} {:attr 0} {:eid 1011}]
-   ;           [{:leaf 2} {:attr 1} {:eid 1010}] [{:leaf 3} {:attr 0} {:eid 1012}]
-   ;           [{:leaf 3} {:attr 1} {:eid 1011}] [{:leaf 3} {:attr 2} {:eid 1010}]
-   ;           [{:leaf 4} {:attr 1} {:eid 1012}] [{:leaf 4} {:attr 2} {:eid 1011}]
-   ;           [{:leaf 5} {:attr 2} {:eid 1012}] [{:leaf 6} {:attr 3} {:eid 1012}]}})
-   ;      (let [found (td/query-triples [(td/search-triple ? 1 2)])]
-   ;        (is= (td/eid->edn root-eid) {:aa [1 2 3], :bb [2 3 4], :cc [3 4 5 6]})
-   ;        (is= (td/eid->edn (val (t/only2 found))) [1 2 3]))
-   ;      (let [found    (td/query-triples [(td/search-triple eid idx 3)])
-   ;            entities (t/it-> found
-   ;                       (mapv #(grab {:param :eid} %) it)
-   ;                       (mapv td/eid->edn it))]
-   ;        (is-set= found
-   ;          [{{:param :eid} {:eid 1004}, {:param :idx} {:attr 0}}
-   ;           {{:param :eid} {:eid 1003}, {:param :idx} {:attr 1}}
-   ;           {{:param :eid} {:eid 1002}, {:param :idx} {:attr 2}}])
-   ;        (is-set= entities [[1 2 3] [2 3 4] [3 4 5 6]]))
-   ;
-   ;      (is= (td/eid->edn (val (t/only2 (td/query-triples [(td/search-triple eid 2 3)])))) [1 2 3])
-   ;      (is= (td/eid->edn (val (t/only2 (td/query-triples [(td/search-triple eid 1 3)])))) [2 3 4])
-   ;      (is= (td/eid->edn (val (t/only2 (td/query-triples [(td/search-triple eid 0 3)])))) [3 4 5 6])
-   ;      )))
-   ;
-   ;
-   ;(dotest
-   ;  (td/with-tdb (td/new-tdb)
-   ;    (let [edn-val  {:a 1 :b 2}
-   ;          root-eid (td/add-edn edn-val)]
-   ;      (is= edn-val (td/eid->edn root-eid))))
-   ;
-   ;  (td/with-tdb (td/new-tdb)
-   ;    (let [edn-val  [1 2 3]
-   ;          root-eid (td/add-edn edn-val)]
-   ;      (is= edn-val (td/eid->edn root-eid))))
-   ;
-   ;  (td/with-tdb (td/new-tdb)
-   ;    (let [edn-val  {:val "hello"}
-   ;          root-eid (td/add-edn edn-val)]
-   ;      (is= edn-val (td/eid->edn root-eid))))
-   ;
-   ;  (td/with-tdb (td/new-tdb)
-   ;    (let [data-val {:a [{:b 2}
-   ;                        {:c 3}
-   ;                        {:d 4}]
-   ;                    :e {:f 6}
-   ;                    :g :green
-   ;                    :h "hotel"
-   ;                    :i 1}
-   ;          root-eid (td/add-edn data-val)]
-   ;      (is= data-val (td/eid->edn root-eid)))))
-   ;
+         (when true
+           (let-spy
+             [eids-match (td/index-find-leaf 1) ; only 1 match
+              entity-edn (td/eid->edn (only eids-match))]
+             (is= entity-edn {:a 1, :b 2}))
+           (is= (spyx-pretty (query-triples [(search-triple e :num v)]))
+             [{{:param :e} {:eid 1001},
+               {:param :v} 5}])
+           (is= (spyx-pretty (query-triples [(search-triple e a "hello")]))
+             [{{:param :e} {:eid 1001},
+               {:param :a} :str}])
+           (is= (spyx-pretty (query-triples [(search-triple e a 7)]))
+             [{{:param :e} {:eid 1004},
+               {:param :a} {:idx 2}}]))
+
+         (is= {:param :x}
+           (td/->SearchParam-fn (quote x))
+           (td/->SearchParam-fn :x))
+
+         (is= (td/query-maps->wrapped-impl (quote [{:eid x :map y}
+                                                   {:eid y :a a}]))
+           '(tupelo.data/query-maps->wrapped-fn (quote [{:eid x, :map y}
+                                                        {:eid y, :a a}])))
+         )))
+
+     (dotest
+       (td/with-tdb (td/new-tdb)
+         (td/eid-count-reset)
+         (let [root-hid (td/add-edn edn-val)]
+           ; (spyx-pretty (grab :idx-eav (deref *tdb*)))
+           (is= edn-val (td/eid->edn root-hid))
+
+           (is= (td/query-maps->wrapped [{:eid x :map y}
+                                         {:eid y :a a}])
+             [{{:param :x} {:eid 1001},
+               {:param :y} {:eid 1003},
+               {:param :a} 1}])
+           (is= edn-val (td/eid->edn {:eid 1001}))
+           (is= (td/eid->edn {:eid 1003}) {:a 1 :b 2})
+           (comment ; #todo API:  output should look like
+             {:x 1001 :y 1002 :a 1})
+
+           (let [r1 (only (td/query-triples [(search-triple e i 7)]))
+                 r2 (only (td/index-find-leaf 7))]
+             (is= r1 {{:param :e} {:eid 1004}
+                      {:param :i} {:idx 2}})
+             (is= (td/eid->edn {:eid 1004}) [5 6 7])
+             (is= r2 {:eid 1004})
+             (is= (td/eid->edn r2) [5 6 7])))))
+
+   (dotest
+     (td/with-tdb (td/new-tdb)
+       (td/eid-count-reset)
+       (let [root-hid (td/add-edn edn-val)]
+         ; (spyx-pretty (grab :idx-eav (deref *tdb*)))
+         (is= edn-val (td/eid->edn root-hid))
+         (when false
+           (nl)
+           (spyx-pretty
+             (td/query-maps->wrapped-impl (quote [{:eid x :map {:a a}}]))))
+
+         (is= (td/query-maps->wrapped [{:eid x :map {:a a}}])
+           [{{:param :x} {:eid 1001},
+             {:param :a} 1}])
+         (is= :x (td/unwrap-param {:param :x}))
+         (is= 1234 (td/unwrap-eid {:eid 1234}))
+
+         (is= (td/query-maps->wrapped [{:map {:a a}}])
+           [{{:param :a} 1}])
+         (is= (td/query-maps->wrapped [{:hashmap {:a a}}])
+           [{{:param :a} 21}]) )))
+
+   (dotest
+     (td/with-tdb (td/new-tdb)
+       (td/eid-count-reset)
+       (let [root-hid (td/add-edn edn-val)]
+         ; (spyx-pretty (grab :idx-eav (deref *tdb*)))
+         (is= edn-val (td/eid->edn root-hid))
+
+         (binding [td/*autosyms-seen* (atom #{})]
+           (is= (symbol "a") (td/autosym-resolve :a (quote ?)))
+           (throws? (td/autosym-resolve :a (quote ?)))) ;attempted duplicate throws
+
+         (throws? (td/exclude-reserved-identifiers {:a {:tmp-eid-123 :x}}))
+         (throws? (td/exclude-reserved-identifiers (quote {:a {:x [1 2 3 tmp-eid-123 4 5 6]}})))
+         (throws? (td/query-maps->wrapped-fn (quote [{:map {:a tmp-eid-123}}])))
+
+         (is= (td/query-maps->wrapped [{:map {:a ?}}])
+           [{{:param :a} 1}])
+
+         (is= (td/unwrap-query-results [{{:param :a} 1}])
+           [{:a 1}])
+         (is= (td/unwrap-query-results [{{:param :x} {:eid 1001},
+                                         {:param :y} {:eid 1002},
+                                         {:param :a} 1}])
+           [{:x 1001, :y 1002, :a 1}])
+         (is= (td/unwrap-query-results [{{:param :e} {:eid 1003}
+                                         {:param :i} 2}])
+           [{:e 1003, :i 2}])
+
+         (is= (td/query-maps [{:map     {:a a1}
+                               :hashmap {:a a2}}])
+           [{:a1 1
+             :a2 21}])
+
+         (is-set= (td/query-maps [{kk {:a ?}}]) ; Awesome!  Found both solutions!
+           [{:kk :map, :a 1}
+            {:kk :hashmap, :a 21}])
+
+         (is= (only (td/query-maps [{:num ?}])) {:num 5})
+         (is= (only (td/query-maps [{:eid ? :num ?}])) {:eid 1001, :num 5})
+         (is= (only (td/query-maps [{:eid ? :num num}])) {:eid 1001, :num 5}))))
+
+   ; #todo need to convert all from compile-time macros to runtime functions
+   (dotest
+     (td/eid-count-reset)
+     (td/with-tdb (td/new-tdb)
+       ; (td/eid-count-reset)
+       (let [hospital             {:hospital "Hans Jopkins"
+                                   :staff    {
+                                              10 {:first-name "John"
+                                                  :last-name  "Doe"
+                                                  :salary     40000
+                                                  :position   :resident}
+                                              11 {:first-name "Joey"
+                                                  :last-name  "Buttafucco"
+                                                  :salary     42000
+                                                  :position   :resident}
+                                              20 {:first-name "Jane"
+                                                  :last-name  "Deer"
+                                                  :salary     100000
+                                                  :position   :attending}
+                                              21 {:first-name "Dear"
+                                                  :last-name  "Jane"
+                                                  :salary     102000
+                                                  :position   :attending}
+                                              30 {:first-name "Sam"
+                                                  :last-name  "Waterman"
+                                                  :salary     0
+                                                  :position   :volunteer}
+                                              31 {:first-name "Sammy"
+                                                  :last-name  "Davis"
+                                                  :salary     0
+                                                  :position   :volunteer}
+                                              }}
+             root-hid             (td/add-edn hospital)
+             nm-sal-all           (td/query-maps [{:first-name ? :salary ?}])
+             nm-sal-attending     (td/query-maps [{:first-name ? :salary ? :position :attending}])
+             nm-sal-resident      (td/query-maps [{:first-name ? :salary ? :position :resident}])
+             nm-sal-volunteer     (td/query-maps [{:first-name ? :salary ? :position :volunteer}])
+             avg-fn               (fn [vals]
+                                    (let [n      (count vals)
+                                          total  (reduce + 0 vals)
+                                          result (/ total n)]
+                                      result))
+             salary-avg-attending (avg-fn (mapv :salary nm-sal-attending))
+             salary-avg-resident  (avg-fn (mapv :salary nm-sal-resident))
+             salary-avg-volunteer (avg-fn (mapv :salary nm-sal-volunteer))
+             ]
+         (is-set= (spyx-pretty nm-sal-all)
+           [{:first-name "Joey", :salary 42000}
+            {:first-name "Dear", :salary 102000}
+            {:first-name "Jane", :salary 100000}
+            {:first-name "John", :salary 40000}
+            {:first-name "Sam", :salary 0}
+            {:first-name "Sammy", :salary 0}])
+         (is-set= nm-sal-attending
+           [{:first-name "Dear", :salary 102000}
+            {:first-name "Jane", :salary 100000}])
+
+         (is= salary-avg-attending 101000)
+         (is= salary-avg-resident 41000)
+         (is= salary-avg-volunteer 0))))
+
+   (dotest
+     (td/with-tdb (td/new-tdb)
+       (td/eid-count-reset)
+       (let [edn-val  {:aa [1 2 3]
+                       :bb [2 3 4]
+                       :cc [3 4 5 6]}
+             root-eid (td/add-edn edn-val)]
+         (comment
+           (spyx-pretty (unlazy (deref td/*tdb*)))
+           {:eid-type
+                     {{:eid 1001} :map,
+                      {:eid 1002} :array,
+                      {:eid 1003} :array,
+                      {:eid 1004} :array},
+            :idx-ave #{[{:idx 0} 1 {:eid 1002}] [{:idx 0} 2 {:eid 1003}]
+                       [{:idx 0} 3 {:eid 1004}] [{:idx 1} 2 {:eid 1002}]
+                       [{:idx 1} 3 {:eid 1003}] [{:idx 1} 4 {:eid 1004}]
+                       [{:idx 2} 3 {:eid 1002}] [{:idx 2} 4 {:eid 1003}]
+                       [{:idx 2} 5 {:eid 1004}] [{:idx 3} 6 {:eid 1004}]
+                       [:aa {:eid 1002} {:eid 1001}] [:bb {:eid 1003} {:eid 1001}]
+                       [:cc {:eid 1004} {:eid 1001}]},
+            :idx-eav #{[{:eid 1001} :aa {:eid 1002}]
+                       [{:eid 1001} :bb {:eid 1003}]
+                       [{:eid 1001} :cc {:eid 1004}]
+                       [{:eid 1002} {:idx 0} 1]
+                       [{:eid 1002} {:idx 1} 2]
+                       [{:eid 1002} {:idx 2} 3]
+                       [{:eid 1003} {:idx 0} 2]
+                       [{:eid 1003} {:idx 1} 3]
+                       [{:eid 1003} {:idx 2} 4]
+                       [{:eid 1004} {:idx 0} 3]
+                       [{:eid 1004} {:idx 1} 4]
+                       [{:eid 1004} {:idx 2} 5]
+                       [{:eid 1004} {:idx 3} 6]},
+            :idx-vae #{[{:eid 1002} :aa {:eid 1001}] [{:eid 1003} :bb {:eid 1001}]
+                       [{:eid 1004} :cc {:eid 1001}] [1 {:idx 0} {:eid 1002}]
+                       [2 {:idx 0} {:eid 1003}] [2 {:idx 1} {:eid 1002}]
+                       [3 {:idx 0} {:eid 1004}] [3 {:idx 1} {:eid 1003}]
+                       [3 {:idx 2} {:eid 1002}] [4 {:idx 1} {:eid 1004}]
+                       [4 {:idx 2} {:eid 1003}] [5 {:idx 2} {:eid 1004}]
+                       [6 {:idx 3} {:eid 1004}]}})
+
+         (let [found (td/query-triples [(td/search-triple ? {:idx 1} 2)])]
+           (spyx-pretty found)
+           (is= (td/eid->edn root-eid) {:aa [1 2 3], :bb [2 3 4], :cc [3 4 5 6]})
+           (is= (td/eid->edn (val (t/only2 found))) [1 2 3]))
+
+         (let [found    (td/query-triples [(td/search-triple eid idx 3)])
+               entities (t/it-> found
+                          (mapv #(grab {:param :eid} %) it)
+                          (mapv td/eid->edn it))]
+           (is-set= found
+             [{{:param :eid} {:eid 1004}, {:param :idx} {:idx 0}}
+              {{:param :eid} {:eid 1003}, {:param :idx} {:idx 1}}
+              {{:param :eid} {:eid 1002}, {:param :idx} {:idx 2}}])
+           (is-set= entities [[1 2 3] [2 3 4] [3 4 5 6]]))
+
+         (is= (td/eid->edn (val (t/only2 (td/query-triples [(td/search-triple eid {:idx 2} 3)])))) [1 2 3])
+         (is= (td/eid->edn (val (t/only2 (td/query-triples [(td/search-triple eid {:idx 1} 3)])))) [2 3 4])
+         (is= (td/eid->edn (val (t/only2 (td/query-triples [(td/search-triple eid {:idx 0} 3)])))) [3 4 5 6]))))
+
+   (dotest-focus
+     (td/with-tdb (td/new-tdb)
+       (let [edn-val  {:a 1 :b 2}
+             root-eid (td/add-edn edn-val)]
+         (is= edn-val (td/eid->edn root-eid))))
+
+     (td/with-tdb (td/new-tdb)
+       (let [edn-val  [1 2 3]
+             root-eid (td/add-edn edn-val)]
+         (is= edn-val (td/eid->edn root-eid))))
+
+     (td/with-tdb (td/new-tdb)
+       (let [edn-val  #{1 2 3}
+             root-eid (td/add-edn edn-val)]
+         (is= edn-val (td/eid->edn root-eid))))
+
+     (td/with-tdb (td/new-tdb)
+       (let [edn-val  {:val "hello"}
+             root-eid (td/add-edn edn-val)]
+         (is= edn-val (td/eid->edn root-eid))))
+
+     (td/with-tdb (td/new-tdb)
+       (let [data-val {:a [{:b 2}
+                           {:c 3}
+                           {:d 4}]
+                       :e {:f 6}
+                       :g :green
+                       :h "hotel"
+                       :i 1}
+             root-eid (td/add-edn data-val)]
+         (is= data-val (td/eid->edn root-eid)))))
+
    ;(dotest
    ;  (td/with-tdb (td/new-tdb)
    ;    (let [edn-val    #{1 2 3}

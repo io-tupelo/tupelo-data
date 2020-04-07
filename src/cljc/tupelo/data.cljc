@@ -467,7 +467,8 @@
 
      (s/defn index-find-leaf :- [{:eid EidType}]
        [target :- LeafType]
-       (let [results (query-triples [[{:param :e} {:param :a} {:leaf target}]])
+       ; (println :index-find-leaf )
+       (let [results (query-triples [[{:param :e} {:param :a}  target]])
              eids    (mapv #(t/fetch % {:param :e}) results)]
          eids))
 
@@ -566,6 +567,7 @@
 
      (defn ^:no-doc query-maps->wrapped-fn
        [maps]
+       (exclude-reserved-identifiers maps)
        (binding [*all-triples*   (atom [])
                  *autosyms-seen* (atom #{})]
          (query-maps->triples maps) ; returns result in *all-triples*
@@ -579,7 +581,6 @@
 
      (defn ^:no-doc query-maps->wrapped-impl
        [maps]
-       (exclude-reserved-identifiers maps)
        `(query-maps->wrapped-fn (quote ~maps)))
 
      (defmacro query-maps->wrapped
