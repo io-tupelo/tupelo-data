@@ -4,7 +4,8 @@
 ;   the root of this distribution.  By using this software in any fashion, you are agreeing to be
 ;   bound by the terms of this license.  You must not remove this notice, or any other, from this
 ;   software.
-(ns tst.tupelo.data
+(ns       ; ^:test-refresh/focus
+  tst.tupelo.data
   #?(:clj (:refer-clojure :exclude [load ->VecNode]))
   #?(:clj (:require
             [tupelo.test :refer [define-fixture deftest dotest dotest-focus is isnt is= isnt= is-set= is-nonblank= testing throws?]]
@@ -57,213 +58,195 @@
      (is= (td/wrap-idx 5) {:idx 5})
      (throws?  (td/wrap-idx "hello"))
 
-     ;(let [idx      (-> (index/empty-index)
-     ;
-     ;                 (index/add-entry [1 (td/wrap-leaf 3)])
-     ;                 (index/add-entry [1 (td/wrap-eid 3)])
-     ;                 (index/add-entry [1 (td/wrap-leaf 1)])
-     ;                 (index/add-entry [1 (td/wrap-eid 1)])
-     ;                 (index/add-entry [1 (td/wrap-leaf 2)])
-     ;                 (index/add-entry [1 (td/wrap-eid 2)])
-     ;
-     ;                 (index/add-entry [0 (td/wrap-leaf 3)])
-     ;                 (index/add-entry [0 (td/wrap-eid 3)])
-     ;                 (index/add-entry [0 (td/wrap-leaf 1)])
-     ;                 (index/add-entry [0 (td/wrap-eid 1)])
-     ;                 (index/add-entry [0 (td/wrap-leaf 2)])
-     ;                 (index/add-entry [0 (td/wrap-eid 2)]))
-     ;
-     ;      expected [[0 {:eid 1}]
-     ;                [0 {:eid 2}]
-     ;                [0 {:eid 3}]
-     ;                [0 {:leaf 1}]
-     ;                [0 {:leaf 2}]
-     ;                [0 {:leaf 3}]
-     ;                [1 {:eid 1}]
-     ;                [1 {:eid 2}]
-     ;                [1 {:eid 3}]
-     ;                [1 {:leaf 1}]
-     ;                [1 {:leaf 2}]
-     ;                [1 {:leaf 3}]]]
-     ;  (is= (vec idx) expected))
+     (let [idx      (-> (index/empty-index)
+
+                      (index/add-entry [1 3])
+                      (index/add-entry [1 (td/wrap-eid 3)])
+                      (index/add-entry [1 1])
+                      (index/add-entry [1 (td/wrap-eid 1)])
+                      (index/add-entry [1 2])
+                      (index/add-entry [1 (td/wrap-eid 2)])
+
+                      (index/add-entry [0 3])
+                      (index/add-entry [0 (td/wrap-eid 3)])
+                      (index/add-entry [0 1])
+                      (index/add-entry [0 (td/wrap-eid 1)])
+                      (index/add-entry [0 2])
+                      (index/add-entry [0 (td/wrap-eid 2)]))
+
+           expected [[0 {:eid 1}]
+                     [0 {:eid 2}]
+                     [0 {:eid 3}]
+                     [0  1]
+                     [0  2]
+                     [0  3]
+                     [1 {:eid 1}]
+                     [1 {:eid 2}]
+                     [1 {:eid 3}]
+                     [1 1]
+                     [1 2]
+                     [1 3]]]
+       (is= (vec idx) expected))
      )
 
-   ;(dotest
-   ;  (td/with-tdb (td/new-tdb)
-   ;    (td/eid-count-reset)
-   ;    (is= (deref *tdb*)
-   ;      {:eid-type {} :idx-eav #{} :idx-vae #{} :idx-ave #{}})
-   ;    (let [edn-val  {:a 1}
-   ;          root-eid (td/add-edn edn-val)]
-   ;      (is= (td/wrap-eid 1001) root-eid)
-   ;      (is= (unlazy (deref *tdb*))
-   ;        {:eid-type {{:eid 1001} :map},
-   ;         :idx-ave  #{[{:attr :a} {:leaf 1} {:eid 1001}]},
-   ;         :idx-eav  #{[{:eid 1001} {:attr :a} {:leaf 1}]},
-   ;         :idx-vae  #{[{:leaf 1} {:attr :a} {:eid 1001}]}})
-   ;      (is= edn-val (td/eid->edn root-eid))))
-   ;
-   ;    )
-   ;(dotest
-   ;
-   ;  (with-tdb (new-tdb)
-   ;    (eid-count-reset)
-   ;    (let [edn-val  {:a 1 :b 2}
-   ;          root-eid (td/add-edn edn-val)]
-   ;      (is= (td/wrap-eid 1001) root-eid)
-   ;      (is= (unlazy (deref *tdb*))
-   ;        {:eid-type {{:eid 1001} :map},
-   ;         :idx-ave  #{[{:attr :a} {:leaf 1} {:eid 1001}]
-   ;                     [{:attr :b} {:leaf 2} {:eid 1001}]},
-   ;         :idx-eav  #{[{:eid 1001} {:attr :a} {:leaf 1}]
-   ;                     [{:eid 1001} {:attr :b} {:leaf 2}]},
-   ;         :idx-vae  #{[{:leaf 1} {:attr :a} {:eid 1001}]
-   ;                     [{:leaf 2} {:attr :b} {:eid 1001}]}})
-   ;      (is= edn-val (td/eid->edn root-eid))))
-   ;
-   ;  )
-   ;(dotest
-   ;  (with-tdb (new-tdb)
-   ;    (eid-count-reset)
-   ;    (let [edn-val  {:a 1 :b 2 :c {:d 4}}
-   ;          root-eid (td/add-edn edn-val)]
-   ;      (is= (td/wrap-eid 1001) root-eid)
-   ;      (is= (unlazy (deref *tdb*))
-   ;        {:eid-type {{:eid 1001} :map,
-   ;                    {:eid 1002} :map},
-   ;         :idx-ave  #{[{:attr :a} {:leaf 1} {:eid 1001}]
-   ;                     [{:attr :b} {:leaf 2} {:eid 1001}]
-   ;                     [{:attr :c} {:eid 1002} {:eid 1001}]
-   ;                     [{:attr :d} {:leaf 4} {:eid 1002}]},
-   ;         :idx-eav  #{[{:eid 1001} {:attr :a} {:leaf 1}]
-   ;                     [{:eid 1001} {:attr :b} {:leaf 2}]
-   ;                     [{:eid 1001} {:attr :c} {:eid 1002}]
-   ;                     [{:eid 1002} {:attr :d} {:leaf 4}]},
-   ;         :idx-vae  #{[{:eid 1002} {:attr :c} {:eid 1001}]
-   ;                     [{:leaf 1} {:attr :a} {:eid 1001}]
-   ;                     [{:leaf 2} {:attr :b} {:eid 1001}]
-   ;                     [{:leaf 4} {:attr :d} {:eid 1002}]}})
-   ;      (is= edn-val (td/eid->edn root-eid))))
-   ;
-   ;  )
-   ;(dotest
-   ;  (with-tdb (new-tdb)
-   ;    (eid-count-reset)
-   ;    (let [edn-val  [1 2 3]
-   ;          root-eid (td/add-edn edn-val)]
-   ;      (is= (unlazy (deref *tdb*))
-   ;        {:eid-type {{:eid 1001} :array},
-   ;         :idx-ave  #{[{:attr 0} {:leaf 1} {:eid 1001}]
-   ;                     [{:attr 1} {:leaf 2} {:eid 1001}]
-   ;                     [{:attr 2} {:leaf 3} {:eid 1001}]},
-   ;         :idx-eav  #{[{:eid 1001} {:attr 0} {:leaf 1}]
-   ;                     [{:eid 1001} {:attr 1} {:leaf 2}]
-   ;                     [{:eid 1001} {:attr 2} {:leaf 3}]},
-   ;         :idx-vae  #{[{:leaf 1} {:attr 0} {:eid 1001}]
-   ;                     [{:leaf 2} {:attr 1} {:eid 1001}]
-   ;                     [{:leaf 3} {:attr 2} {:eid 1001}]}})
-   ;      (is= edn-val (td/eid->edn root-eid))))
-   ;
-   ;  )
-   ;(dotest
-   ;  (with-tdb (new-tdb)
-   ;    (eid-count-reset)
-   ;    (let [edn-val  {:a 1 :b 2 :c [10 11 12]}
-   ;          root-eid (td/add-edn edn-val)]
-   ;      (is= (unlazy (deref *tdb*))
-   ;        {:eid-type {{:eid 1001} :map
-   ;                    {:eid 1002} :array},
-   ;         :idx-ave  #{[{:attr :a} {:leaf 1} {:eid 1001}]
-   ;                     [{:attr :b} {:leaf 2} {:eid 1001}]
-   ;                     [{:attr :c} {:eid 1002} {:eid 1001}]
-   ;                     [{:attr 0} {:leaf 10} {:eid 1002}]
-   ;                     [{:attr 1} {:leaf 11} {:eid 1002}]
-   ;                     [{:attr 2} {:leaf 12} {:eid 1002}]},
-   ;         :idx-eav  #{[{:eid 1001} {:attr :a} {:leaf 1}]
-   ;                     [{:eid 1001} {:attr :b} {:leaf 2}]
-   ;                     [{:eid 1001} {:attr :c} {:eid 1002}]
-   ;                     [{:eid 1002} {:attr 0} {:leaf 10}]
-   ;                     [{:eid 1002} {:attr 1} {:leaf 11}]
-   ;                     [{:eid 1002} {:attr 2} {:leaf 12}]},
-   ;         :idx-vae  #{[{:eid 1002} {:attr :c} {:eid 1001}]
-   ;                     [{:leaf 1} {:attr :a} {:eid 1001}]
-   ;                     [{:leaf 2} {:attr :b} {:eid 1001}]
-   ;                     [{:leaf 10} {:attr 0} {:eid 1002}]
-   ;                     [{:leaf 11} {:attr 1} {:eid 1002}]
-   ;                     [{:leaf 12} {:attr 2} {:eid 1002}]}})
-   ;      (is= edn-val (td/eid->edn root-eid))
-   ;      (is= (td/eid->edn (td/wrap-eid 1002)) [10 11 12]))))
-   ;
-   ;(dotest
-   ;  (with-tdb (new-tdb)
-   ;    (eid-count-reset)
-   ;    (let [data [{:a 1}
-   ;                {:a 2}
-   ;                {:a 3}
-   ;                {:b 1}
-   ;                {:b 2}
-   ;                {:b 3}
-   ;                {:c 1}
-   ;                {:c 2}
-   ;                {:c 3}]]
-   ;      (doseq [m data]
-   ;        (td/add-edn m))
-   ;      (is= (unlazy @*tdb*)
-   ;        {:eid-type {{:eid 1001} :map, ; #todo error: missing :array
-   ;                    {:eid 1002} :map,
-   ;                    {:eid 1003} :map,
-   ;                    {:eid 1004} :map,
-   ;                    {:eid 1005} :map,
-   ;                    {:eid 1006} :map,
-   ;                    {:eid 1007} :map,
-   ;                    {:eid 1008} :map,
-   ;                    {:eid 1009} :map},
-   ;         :idx-ave  #{[{:attr :a} {:leaf 1} {:eid 1001}]
-   ;                     [{:attr :a} {:leaf 2} {:eid 1002}]
-   ;                     [{:attr :a} {:leaf 3} {:eid 1003}]
-   ;                     [{:attr :b} {:leaf 1} {:eid 1004}]
-   ;                     [{:attr :b} {:leaf 2} {:eid 1005}]
-   ;                     [{:attr :b} {:leaf 3} {:eid 1006}]
-   ;                     [{:attr :c} {:leaf 1} {:eid 1007}]
-   ;                     [{:attr :c} {:leaf 2} {:eid 1008}]
-   ;                     [{:attr :c} {:leaf 3} {:eid 1009}]},
-   ;         :idx-eav  #{[{:eid 1001} {:attr :a} {:leaf 1}]
-   ;                     [{:eid 1002} {:attr :a} {:leaf 2}]
-   ;                     [{:eid 1003} {:attr :a} {:leaf 3}]
-   ;                     [{:eid 1004} {:attr :b} {:leaf 1}]
-   ;                     [{:eid 1005} {:attr :b} {:leaf 2}]
-   ;                     [{:eid 1006} {:attr :b} {:leaf 3}]
-   ;                     [{:eid 1007} {:attr :c} {:leaf 1}]
-   ;                     [{:eid 1008} {:attr :c} {:leaf 2}]
-   ;                     [{:eid 1009} {:attr :c} {:leaf 3}]},
-   ;         :idx-vae  #{[{:leaf 1} {:attr :a} {:eid 1001}]
-   ;                     [{:leaf 1} {:attr :b} {:eid 1004}]
-   ;                     [{:leaf 1} {:attr :c} {:eid 1007}]
-   ;                     [{:leaf 2} {:attr :a} {:eid 1002}]
-   ;                     [{:leaf 2} {:attr :b} {:eid 1005}]
-   ;                     [{:leaf 2} {:attr :c} {:eid 1008}]
-   ;                     [{:leaf 3} {:attr :a} {:eid 1003}]
-   ;                     [{:leaf 3} {:attr :b} {:eid 1006}]
-   ;                     [{:leaf 3} {:attr :c} {:eid 1009}]}})
-   ;      ;---------------------------------------------------------------------------------------------------
-   ;      (is= (lookup [(td/wrap-eid 1003) nil nil])
-   ;        #{[{:eid 1003} {:attr :a} {:leaf 3}]})
-   ;      (is= (lookup [nil (td/wrap-attr :b) nil])
-   ;        #{[{:eid 1004} {:attr :b} {:leaf 1}]
-   ;          [{:eid 1005} {:attr :b} {:leaf 2}]
-   ;          [{:eid 1006} {:attr :b} {:leaf 3}]})
-   ;      (is= (lookup [nil nil (td/wrap-leaf 3)])
-   ;        #{[{:eid 1003} {:attr :a} {:leaf 3}]
-   ;          [{:eid 1006} {:attr :b} {:leaf 3}]
-   ;          [{:eid 1009} {:attr :c} {:leaf 3}]})
-   ;      ;---------------------------------------------------------------------------------------------------
-   ;      (is= (lookup [nil (td/wrap-attr :a) (td/wrap-leaf 3)])
-   ;        #{[{:eid 1003} {:attr :a} {:leaf 3}]})
-   ;      (is= (lookup [(td/wrap-eid 1009) nil (td/wrap-leaf 3)])
-   ;        #{[{:eid 1009} {:attr :c} {:leaf 3}]})
-   ;      (is= (lookup [(td/wrap-eid 1005) (td/wrap-attr :b) nil])
-   ;        #{[{:eid 1005} {:attr :b} {:leaf 2}]}))))
-   ;
+   (dotest
+     (td/with-tdb (td/new-tdb)
+       (td/eid-count-reset)
+       (is= (deref *tdb*)
+         {:eid-type {} :idx-eav #{} :idx-vae #{} :idx-ave #{}})
+       (let [edn-val  {:a 1}
+             root-eid (td/add-edn edn-val)]
+         (is= root-eid
+           (td/wrap-eid 1001)
+           (tv/new :eid 1001))
+         (is= (unlazy (deref *tdb*))
+           {:eid-type {{:eid 1001} :map},
+            :idx-ave  #{[:a 1 {:eid 1001}]},
+            :idx-eav  #{[{:eid 1001} :a 1]},
+            :idx-vae  #{[1 :a {:eid 1001}]}})
+         (is= edn-val (td/eid->edn root-eid)) )))
+
+   (dotest
+     (with-tdb (new-tdb)
+       (eid-count-reset)
+       (let [edn-val  {:a 1 :b 2}
+             root-eid (td/add-edn edn-val)]
+         (is= (td/wrap-eid 1001) root-eid)
+         (is= (unlazy (deref *tdb*))
+           {:eid-type {{:eid 1001} :map},
+            :idx-ave  #{[:a 1 {:eid 1001}]
+                        [:b 2 {:eid 1001}]},
+            :idx-eav  #{[{:eid 1001} :a 1]
+                        [{:eid 1001} :b 2]},
+            :idx-vae  #{[1 :a {:eid 1001}]
+                        [2 :b {:eid 1001}]}} )
+         (is= edn-val (td/eid->edn root-eid)) )))
+
+   (dotest
+     (with-tdb (new-tdb)
+       (eid-count-reset)
+       (let [edn-val  {:a 1 :b 2 :c {:d 4}}
+             root-eid (td/add-edn edn-val)]
+         (is= (td/wrap-eid 1001) root-eid)
+         (is= (unlazy (deref *tdb*))
+           {:eid-type {{:eid 1001} :map, {:eid 1002} :map},
+            :idx-ave  #{[:a 1 {:eid 1001}]
+                        [:b 2 {:eid 1001}]
+                        [:c {:eid 1002} {:eid 1001}]
+                        [:d 4 {:eid 1002}]},
+            :idx-eav  #{[{:eid 1001} :a 1]
+                        [{:eid 1001} :b 2]
+                        [{:eid 1001} :c {:eid 1002}]
+                        [{:eid 1002} :d 4]},
+            :idx-vae  #{[{:eid 1002} :c {:eid 1001}]
+                        [1 :a {:eid 1001}]
+                        [2 :b {:eid 1001}]
+                        [4 :d {:eid 1002}]}})
+         (is= edn-val (td/eid->edn root-eid)))) )
+
+   (dotest
+     (with-tdb (new-tdb)
+       (eid-count-reset)
+       (let [edn-val  [1 2 3]
+             root-eid (td/add-edn edn-val)]
+         (is= (unlazy (deref *tdb*))
+           {:eid-type {{:eid 1001} :array},
+            :idx-ave  #{[{:idx 0} 1 {:eid 1001}]
+                        [{:idx 1} 2 {:eid 1001}]
+                        [{:idx 2} 3 {:eid 1001}]},
+            :idx-eav  #{[{:eid 1001} {:idx 0} 1]
+                        [{:eid 1001} {:idx 1} 2]
+                        [{:eid 1001} {:idx 2} 3]},
+            :idx-vae  #{[1 {:idx 0} {:eid 1001}]
+                        [2 {:idx 1} {:eid 1001}]
+                        [3 {:idx 2} {:eid 1001}]}})
+         (is= edn-val (td/eid->edn root-eid)))))
+
+   (dotest
+     (with-tdb (new-tdb)
+       (eid-count-reset)
+       (let [edn-val  {:a 1 :b 2 :c [10 11 12]}
+             root-eid (td/add-edn edn-val)]
+         (is= (unlazy (deref *tdb*))
+           {:eid-type {{:eid 1001} :map, {:eid 1002} :array},
+            :idx-ave #{[{:idx 0} 10 {:eid 1002}]
+                       [{:idx 1} 11 {:eid 1002}]
+                        [{:idx 2} 12 {:eid 1002}]
+                       [:a 1 {:eid 1001}]
+                       [:b 2 {:eid 1001}]
+                        [:c {:eid 1002} {:eid 1001}]},
+            :idx-eav #{[{:eid 1001} :a 1]
+                       [{:eid 1001} :b 2]
+                       [{:eid 1001} :c {:eid 1002}]
+                        [{:eid 1002} {:idx 0} 10]
+                       [{:eid 1002} {:idx 1} 11]
+                        [{:eid 1002} {:idx 2} 12]},
+            :idx-vae #{[{:eid 1002} :c {:eid 1001}]
+                       [1 :a {:eid 1001}]
+                       [2 :b {:eid 1001}]
+                        [10 {:idx 0} {:eid 1002}]
+                       [11 {:idx 1} {:eid 1002}]
+                        [12 {:idx 2} {:eid 1002}]}} )
+         (is= edn-val (td/eid->edn root-eid))
+         (is= (td/eid->edn (td/wrap-eid 1002)) [10 11 12]))))
+
+   (dotest-focus
+     (with-tdb (new-tdb)
+       (eid-count-reset)
+       (let [data [{:a 1}
+                   {:a 2}
+                   {:a 3}
+                   {:b 1}
+                   {:b 2}
+                   {:b 3}
+                   {:c 1}
+                   {:c 2}
+                   {:c 3}]]
+         (doseq [m data]
+           (td/add-edn m))
+         (is= (unlazy @*tdb*) ; #todo error: missing :array
+           {:eid-type
+            {{:eid 1001} :map,
+             {:eid 1002} :map,
+             {:eid 1003} :map,
+             {:eid 1004} :map,
+             {:eid 1005} :map,
+             {:eid 1006} :map,
+             {:eid 1007} :map,
+             {:eid 1008} :map,
+             {:eid 1009} :map},
+            :idx-ave
+            #{[:a 1 {:eid 1001}] [:a 2 {:eid 1002}] [:a 3 {:eid 1003}]
+              [:b 1 {:eid 1004}] [:b 2 {:eid 1005}] [:b 3 {:eid 1006}]
+              [:c 1 {:eid 1007}] [:c 2 {:eid 1008}] [:c 3 {:eid 1009}]},
+            :idx-eav
+            #{[{:eid 1001} :a 1] [{:eid 1002} :a 2] [{:eid 1003} :a 3]
+              [{:eid 1004} :b 1] [{:eid 1005} :b 2] [{:eid 1006} :b 3]
+              [{:eid 1007} :c 1] [{:eid 1008} :c 2] [{:eid 1009} :c 3]},
+            :idx-vae
+            #{[1 :a {:eid 1001}] [1 :b {:eid 1004}] [1 :c {:eid 1007}]
+              [2 :a {:eid 1002}] [2 :b {:eid 1005}] [2 :c {:eid 1008}]
+              [3 :a {:eid 1003}] [3 :b {:eid 1006}] [3 :c {:eid 1009}]}})
+         ;---------------------------------------------------------------------------------------------------
+         (is= (lookup [(td/wrap-eid 1003) nil nil])
+           #{[{:eid 1003} :a 3]})
+         (is= (lookup [nil :b nil])
+           #{[{:eid 1004} :b 1]
+             [{:eid 1005} :b 2]
+             [{:eid 1006} :b 3]})
+         (is= (lookup [nil nil 3])
+           #{[{:eid 1003} :a 3]
+             [{:eid 1006} :b 3]
+             [{:eid 1009} :c 3]}))
+       ;---------------------------------------------------------------------------------------------------
+       (is= (lookup [nil :a 3])
+         #{[{:eid 1003} :a 3]})
+       (is= (lookup [(td/wrap-eid 1009) nil 3])
+         #{[{:eid 1009} :c 3]})
+       (is= (lookup [(td/wrap-eid 1005) :b nil])
+         #{[{:eid 1005} :b 2]})
+       ))
+
    ;(dotest
    ;  (is= (td/->SearchParam-impl (quote :a))
    ;    '(tupelo.data/->SearchParam-fn (quote :a)))

@@ -265,7 +265,10 @@
                ctx      (cond ; #todo add set
                           (map? edn-in) {:entity-type :map :edn-use edn-in}
                           (set? edn-in) {:entity-type :set :edn-use (zipmap edn-in edn-in)}
-                          (array-like? edn-in) {:entity-type :array :edn-use (indexed edn-in)}
+                          (array-like? edn-in) {:entity-type :array
+                                                :edn-use ;  (indexed edn-in)
+                                                             (forv [[idx val] (indexed edn-in)]
+                                                               [(wrap-idx idx) val])}
                           :else (throw (ex-info "unknown value found" (vals->map edn-in))))]
            (t/with-map-vals ctx [entity-type edn-use]
              ;(newline)
@@ -290,21 +293,22 @@
        [eid-in :- WrappedEid]
        (let [eav-matches (index/prefix-matches [eid-in] (grab :idx-eav @*tdb*))
              result-map  (apply glue
-                           (forv [[eid-row attr-row val-row] eav-matches]
-                             ; (spyx [eid-row attr-row val-row])
-                             (assert (= eid-in eid-row)) ; verify is a prefix match
-                             (let [attr-edn (grab :attr attr-row) ; (if (instance? Attr attr-row)
-                                   val-edn  (if (wrapped-eid? val-row)
-                                              (eid->edn val-row) ; Eid rec
-                                               val-row)] ; Leaf rec
+                           (forv [[match-eid match-attr match-val] eav-matches]
+                             (spyx [match-eid match-attr match-val])
+                             (assert (= eid-in match-eid)) ; verify is a prefix match
+                             (let [attr-edn  match-attr
+                                   val-edn  (if (wrapped-eid? match-val)
+                                              (eid->edn match-val) ; Eid rec
+                                               match-val)] ; Leaf rec
                                (t/map-entry attr-edn val-edn))))
+             >> (spyx-pretty result-map)
              result-out  (let [entity-type (fetch-in @*tdb* [:eid-type eid-in])]
                            (cond
                              (= entity-type :map) result-map
                              (= entity-type :set) (into #{} (keys result-map))
-                             (= entity-type :array) (let [result-keys (keys result-map)
+                             (= entity-type :array) (let [result-keys (mapv tv/val (keys result-map))
                                                           result-vals (vec (vals result-map))]
-                                                      ; if array entity, keys should be in 0..N-1
+                                                      ; if array entity, keys should be in 0..N-1 (already sorted by eav index)
                                                       (assert (= result-keys (range (count result-keys))))
                                                       result-vals)
                              :else (throw (ex-info "invalid entity type found" (vals->map entity-type)))))]
