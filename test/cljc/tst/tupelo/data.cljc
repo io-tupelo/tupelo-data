@@ -36,6 +36,18 @@
 #?(:clj
  (do
 
+   (dotest ; #todo => tupelo.core
+     (is= (td/with-cum-result
+         (dotimes [ii 5]
+           (td/accum-result ii)))
+       [0 1 2 3 4])
+     (let [ff (fn ff-fn [n]
+                (when (t/nonneg? n)
+                  (td/accum-result n)
+                  (ff-fn (dec n))))]
+       (is= (td/with-cum-result (ff 5))
+         [5 4 3 2 1 0])))
+
    (dotest
      (let [ss123 (t/it-> (index/empty-index)
                    (conj it [1 :a])
@@ -396,31 +408,31 @@
          (is= [] (query-triples search-spec)))))
 
    (dotest
-     (binding [td/*all-triples*   (atom []) ; receives output!
-               td/*autosyms-seen* (atom #{})]
+     (binding [td/*map-triples-cum* (atom []) ; receives output!
+               td/*autosyms-seen*   (atom #{})]
        (td/query-maps->triples (quote
                                  [{:eid x :map y}
                                   {:eid y :a a}]))
-       (is= (deref td/*all-triples*)
+       (is= (deref td/*map-triples-cum*)
          [[{:param :x} :map {:param :y}]
           [{:param :y} :a {:param :a}]]))
 
-     (binding [td/*all-triples*   (atom []) ; receives output!
-               td/*autosyms-seen* (atom #{})]
+     (binding [td/*map-triples-cum* (atom []) ; receives output!
+               td/*autosyms-seen*   (atom #{})]
        (td/query-maps->triples (quote [{:eid ? :map y}]))
-       (is= (deref td/*all-triples*)
+       (is= (deref td/*map-triples-cum*)
          [[{:param :eid}  :map {:param :y}]]))
 
-     (binding [td/*all-triples*   (atom []) ; receives output!
-               td/*autosyms-seen* (atom #{})]
+     (binding [td/*map-triples-cum* (atom []) ; receives output!
+               td/*autosyms-seen*   (atom #{})]
        (td/query-maps->triples (quote [{:eid ? :map y}
                                        {:eid y :a a}]))
-       (is= (deref td/*all-triples*)
+       (is= (deref td/*map-triples-cum*)
          [[{:param :eid} :map {:param :y}]
           [{:param :y} :a {:param :a}]]))
 
-     (binding [td/*all-triples*   (atom []) ; receives output!
-               td/*autosyms-seen* (atom #{})]
+     (binding [td/*map-triples-cum* (atom []) ; receives output!
+               td/*autosyms-seen*   (atom #{})]
        (throws? (td/query-maps->triples
                   (quote [{:eid ? :map y}
                           {:eid ? :a a}])))))
