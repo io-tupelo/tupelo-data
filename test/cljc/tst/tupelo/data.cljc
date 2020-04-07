@@ -290,7 +290,7 @@
                        :b 1}
              root-eid (td/add-edn edn-val)]
          (is= edn-val (td/eid->edn root-eid))
-         (is= (spyx-pretty (deref *tdb*))
+         (is=  (deref *tdb*)
            {:eid-type {{:eid 1001} :map},
             :idx-ave  #{[:a 1 {:eid 1001}] [:b 1 {:eid 1001}]},
             :idx-eav  #{[{:eid 1001} :a 1]
@@ -315,7 +315,7 @@
        (eid-count-reset)
        (let [edn-val  {:a {:b 2}}
              root-eid (td/add-edn edn-val)]
-         (is= (spyx-pretty (deref *tdb*))
+         (is=  (deref *tdb*)
            {:eid-type {{:eid 1001} :map, {:eid 1002} :map},
             :idx-ave  #{[:a {:eid 1002} {:eid 1001}] [:b 2 {:eid 1002}]},
             :idx-eav  #{[{:eid 1001} :a {:eid 1002}]
@@ -333,7 +333,7 @@
                                  [{:param :y} :b 99]]))
          ; (prn :-----------------------------------------------------------------------------)
          ; wildcard search - match all
-         (is= (spyx-pretty (query-triples [[{:param :x} {:param :y} {:param :z}]]))
+         (is=  (query-triples [[{:param :x} {:param :y} {:param :z}]])
            [{{:param :x} {:eid 1001}
              {:param :y} :a
              {:param :z} {:eid 1002}}
@@ -461,17 +461,16 @@
          (is= edn-val (td/eid->edn root-hid))
 
          (when true
-           (let-spy
-             [eids-match (td/index-find-leaf 1) ; only 1 match
-              entity-edn (td/eid->edn (only eids-match))]
+           (let [eids-match (td/index-find-leaf 1) ; only 1 match
+                 entity-edn (td/eid->edn (only eids-match))]
              (is= entity-edn {:a 1, :b 2}))
-           (is= (spyx-pretty (query-triples [(search-triple e :num v)]))
+           (is= (query-triples [(search-triple e :num v)])
              [{{:param :e} {:eid 1001},
                {:param :v} 5}])
-           (is= (spyx-pretty (query-triples [(search-triple e a "hello")]))
+           (is= (query-triples [(search-triple e a "hello")])
              [{{:param :e} {:eid 1001},
                {:param :a} :str}])
-           (is= (spyx-pretty (query-triples [(search-triple e a 7)]))
+           (is= (query-triples [(search-triple e a 7)])
              [{{:param :e} {:eid 1004},
                {:param :a} {:idx 2}}]))
 
@@ -619,7 +618,7 @@
              salary-avg-resident  (avg-fn (mapv :salary nm-sal-resident))
              salary-avg-volunteer (avg-fn (mapv :salary nm-sal-volunteer))
              ]
-         (is-set= (spyx-pretty nm-sal-all)
+         (is-set=  nm-sal-all
            [{:first-name "Joey", :salary 42000}
             {:first-name "Dear", :salary 102000}
             {:first-name "Jane", :salary 100000}
@@ -677,7 +676,7 @@
                        [6 {:idx 3} {:eid 1004}]}})
 
          (let [found (td/query-triples [(td/search-triple ? {:idx 1} 2)])]
-           (spyx-pretty found)
+           found
            (is= (td/eid->edn root-eid) {:aa [1 2 3], :bb [2 3 4], :cc [3 4 5 6]})
            (is= (td/eid->edn (val (t/only2 found))) [1 2 3]))
 
@@ -1069,7 +1068,7 @@
            [{:name "jimmy", :address1 "543 Other St"}
             {:name "joel", :address1 "2026 park ave"}]))))
 
-   (dotest-focus
+   (dotest
      (td/eid-count-reset)
      (td/with-tdb (td/new-tdb)
        (let [data      {:people
