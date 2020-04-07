@@ -190,7 +190,7 @@
          (is= edn-val (td/eid->edn root-eid))
          (is= (td/eid->edn (td/wrap-eid 1002)) [10 11 12]))))
 
-   (dotest-focus
+   (dotest
      (with-tdb (new-tdb)
        (eid-count-reset)
        (let [data [{:a 1}
@@ -244,49 +244,45 @@
        (is= (lookup [(td/wrap-eid 1009) nil 3])
          #{[{:eid 1009} :c 3]})
        (is= (lookup [(td/wrap-eid 1005) :b nil])
-         #{[{:eid 1005} :b 2]})
-       ))
+         #{[{:eid 1005} :b 2]}) ))
 
-   ;(dotest
-   ;  (is= (td/->SearchParam-impl (quote :a))
-   ;    '(tupelo.data/->SearchParam-fn (quote :a)))
-   ;  (is= (td/->SearchParam-impl (quote b))
-   ;    '(tupelo.data/->SearchParam-fn (quote b)))
-   ;
-   ;  (let [spa (td/->SearchParam :a)
-   ;        spb (td/->SearchParam b)]
-   ;    (is (td/wrapped-param? spa))
-   ;    (is (td/wrapped-param? spb))
-   ;    (is= spa {:param :a})
-   ;    (is= spb {:param :b}))
-   ;
-   ;  (with-tdb (new-tdb)
-   ;    (eid-count-reset)
-   ;    (let [edn-val  {:a 1
-   ;                    :b 2}
-   ;          root-eid (td/add-edn edn-val)]
-   ;      (is= edn-val (td/eid->edn root-eid))
-   ;      (is= (unlazy (deref *tdb*))
-   ;        {:eid-type {{:eid 1001} :map},
-   ;         :idx-ave  #{[{:attr :a} {:leaf 1} {:eid 1001}]
-   ;                     [{:attr :b} {:leaf 2} {:eid 1001}]},
-   ;         :idx-eav  #{[{:eid 1001} {:attr :a} {:leaf 1}]
-   ;                     [{:eid 1001} {:attr :b} {:leaf 2}]},
-   ;         :idx-vae  #{[{:leaf 1} {:attr :a} {:eid 1001}]
-   ;                     [{:leaf 2} {:attr :b} {:eid 1001}]}}))
-   ;
-   ;    (let [search-spec [[{:param :x} {:attr :a} {:leaf 1}]]]
-   ;      (is= (query-triples search-spec)
-   ;        [{{:param :x} {:eid 1001}}]))
-   ;
-   ;    (let [search-spec [[{:param :x} {:attr :a} {:param :y}]]]
-   ;      (is= (query-triples search-spec) [{{:param :x} {:eid 1001},
-   ;                                         {:param :y} {:leaf 1}}]))
-   ;
-   ;    (let [search-spec [[(td/->SearchParam :x) (td/->SearchParam :y) {:leaf 1}]]]
-   ;      (is= (query-triples search-spec) [{{:param :x} {:eid 1001},
-   ;                                         {:param :y} {:attr :a}}]))))
-   ;
+   (dotest
+     (is= (td/->SearchParam-impl (quote :a))
+       '(tupelo.data/->SearchParam-fn (quote :a)))
+     (is= (td/->SearchParam-impl (quote b))
+       '(tupelo.data/->SearchParam-fn (quote b)))
+
+     (let [spa (td/->SearchParam :a)
+           spb (td/->SearchParam b)]
+       (is (td/wrapped-param? spa))
+       (is (td/wrapped-param? spb))
+       (is= spa {:param :a})
+       (is= spb {:param :b}))
+
+     (with-tdb (new-tdb)
+       (eid-count-reset)
+       (let [edn-val  {:a 1 :b 2}
+             root-eid (td/add-edn edn-val)]
+         (is= edn-val (td/eid->edn root-eid))
+         (is= (unlazy (deref *tdb*))
+           {:eid-type {{:eid 1001} :map},
+            :idx-ave  #{[:a 1 {:eid 1001}] [:b 2 {:eid 1001}]},
+            :idx-eav  #{[{:eid 1001} :a 1]
+                        [{:eid 1001} :b 2]},
+            :idx-vae  #{[1 :a {:eid 1001}] [2 :b {:eid 1001}]}} ))
+
+       (let [search-spec [[{:param :x} :a 1]]]
+         (is= (query-triples search-spec)
+           [{{:param :x} {:eid 1001}}]))
+
+       (let [search-spec [[{:param :x}  :a {:param :y}]]]
+         (is= (query-triples search-spec) [{{:param :x} {:eid 1001},
+                                            {:param :y}  1}]))
+
+       (let [search-spec [[(td/->SearchParam :x) (td/->SearchParam :y) 1]]]
+         (is= (query-triples search-spec) [{{:param :x} {:eid 1001},
+                                            {:param :y} :a}])) ))
+
    ;(dotest
    ;  (with-tdb (new-tdb)
    ;    (eid-count-reset)

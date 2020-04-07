@@ -294,14 +294,14 @@
        (let [eav-matches (index/prefix-matches [eid-in] (grab :idx-eav @*tdb*))
              result-map  (apply glue
                            (forv [[match-eid match-attr match-val] eav-matches]
-                             (spyx [match-eid match-attr match-val])
+                             ; (spyx [match-eid match-attr match-val])
                              (assert (= eid-in match-eid)) ; verify is a prefix match
                              (let [attr-edn  match-attr
                                    val-edn  (if (wrapped-eid? match-val)
                                               (eid->edn match-val) ; Eid rec
                                                match-val)] ; Leaf rec
                                (t/map-entry attr-edn val-edn))))
-             >> (spyx-pretty result-map)
+             ; >> (spyx-pretty result-map)
              result-out  (let [entity-type (fetch-in @*tdb* [:eid-type eid-in])]
                            (cond
                              (= entity-type :map) result-map
