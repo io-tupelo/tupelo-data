@@ -135,8 +135,8 @@
      (def WrappedParam {:param s/Any})
      (def WrappedEid {:eid s/Int})
      (def WrappedIdx {:idx s/Int})
-     (def WrappedAttr {:attr s/Any})
-     (def WrappedLeaf {:leaf s/Any})
+     ; (def WrappedAttr {:attr s/Any})
+     ; (def WrappedLeaf {:leaf s/Any})
 
      ; #todo inline all of these?
      (s/defn wrap-eid :- WrappedEid
@@ -146,16 +146,16 @@
        [arg :- s/Int]
        (tv/new :idx (t/validate int? arg)))
 
-     (s/defn wrap-attr :- WrappedAttr
-       [arg] (tv/new :attr arg))
-     (s/defn wrap-leaf :- WrappedLeaf
-       [arg] (tv/new :leaf arg))
+     ;(s/defn wrap-attr :- WrappedAttr
+     ;  [arg] (tv/new :attr arg))
+     ;(s/defn wrap-leaf :- WrappedLeaf
+     ;  [arg] (tv/new :leaf arg))
 
      (defn pair-map? [arg] (and (map? arg) (= 1 (count arg))))
      (defn wrapped-param? [x] (and (pair-map? x) (= :param (key (t/only x)))))
      (defn wrapped-eid? [x] (and (pair-map? x) (= :eid (key (t/only x)))))
-     (defn wrapped-attr? [x] (and (pair-map? x) (= :attr (key (t/only x)))))
-     (defn wrapped-leaf? [x] (and (pair-map? x) (= :leaf (key (t/only x)))))
+     ;(defn wrapped-attr? [x] (and (pair-map? x) (= :attr (key (t/only x)))))
+     ;(defn wrapped-leaf? [x] (and (pair-map? x) (= :leaf (key (t/only x)))))
 
      (s/defn unwrap-param :- s/Keyword
        "Unwraps a ParamMap to return the param name as a keyword
@@ -169,18 +169,18 @@
        [arg :- WrappedEid]
        (t/validate wrapped-eid? arg)
        (val (t/only arg)))
-     (s/defn unwrap-attr :- s/Any
-       "Unwraps an AttrMap to return the attr value
-         (unwrap-param {:attr :color} )  =>  :color "
-       [arg :- WrappedAttr]
-       (t/validate wrapped-attr? arg)
-       (val (t/only arg)))
-     (s/defn unwrap-leaf :- s/Any
-       "Unwraps an LeafMap to return the leaf value
-         (unwrap-param {:leaf :color} )  =>  :color "
-       [arg :- WrappedLeaf]
-       (t/validate wrapped-leaf? arg)
-       (val (t/only arg)))
+     ;(s/defn unwrap-attr :- s/Any
+     ;  "Unwraps an AttrMap to return the attr value
+     ;    (unwrap-param {:attr :color} )  =>  :color "
+     ;  [arg :- WrappedAttr]
+     ;  (t/validate wrapped-attr? arg)
+     ;  (val (t/only arg)))
+     ;(s/defn unwrap-leaf :- s/Any
+     ;  "Unwraps an LeafMap to return the leaf value
+     ;    (unwrap-param {:leaf :color} )  =>  :color "
+     ;  [arg :- WrappedLeaf]
+     ;  (t/validate wrapped-leaf? arg)
+     ;  (val (t/only arg)))
 
      ;-----------------------------------------------------------------------------
      (s/defn tmp-eid-prefix-str? :- s/Bool
@@ -275,9 +275,9 @@
              (swap! *tdb* update :eid-type assoc eid-this entity-type)
              (doseq [[attr-edn val-edn] edn-use]
                ;(spyx [attr-edn val-edn])
-               (let [attr-rec (wrap-attr attr-edn)
+               (let [attr-rec attr-edn
                      val-rec  (if (leaf-val? val-edn)
-                                (wrap-leaf val-edn)
+                                val-edn
                                 (add-edn val-edn))]
                  (swap! *tdb* update :idx-eav index/add-entry [eid-this attr-rec val-rec])
                  (swap! *tdb* update :idx-vae index/add-entry [val-rec attr-rec eid-this])
@@ -294,9 +294,9 @@
                              ; (spyx [eid-row attr-row val-row])
                              (assert (= eid-in eid-row)) ; verify is a prefix match
                              (let [attr-edn (grab :attr attr-row) ; (if (instance? Attr attr-row)
-                                   val-edn  (if (wrapped-leaf? val-row)
-                                              (grab :leaf val-row) ; Leaf rec
-                                              (eid->edn val-row))] ; Eid rec
+                                   val-edn  (if (wrapped-eid? val-row)
+                                              (eid->edn val-row) ; Eid rec
+                                               val-row)] ; Leaf rec
                                (t/map-entry attr-edn val-edn))))
              result-out  (let [entity-type (fetch-in @*tdb* [:eid-type eid-in])]
                            (cond
@@ -447,10 +447,10 @@
                        (wrap-eid e))
                a-out (if (symbol? a)
                        (->SearchParam-fn a)
-                       (wrap-attr a))
+                       a)
                v-out (if (symbol? v)
                        (->SearchParam-fn v)
-                       (wrap-leaf v))]
+                       v)]
            [e-out a-out v-out])))
 
      (defn ^:no-doc search-triple-impl
@@ -591,9 +591,8 @@
                    param-raw (unwrap-param kk)
                    val-raw   (cond
                                (wrapped-eid? vv) (unwrap-eid vv)
-                               (wrapped-attr? vv) (unwrap-attr vv)
-                               (wrapped-leaf? vv) (unwrap-leaf vv)
-                               :else (throw (ex-info "Unrecognized query result value" (vals->map vv))))]
+                               :else vv    ;   :else (throw (ex-info "Unrecognized query result value" (vals->map vv)))
+                               )]
                {param-raw val-raw})))))
 
      (defn query-maps-impl

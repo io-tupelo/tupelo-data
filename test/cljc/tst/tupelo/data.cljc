@@ -45,14 +45,13 @@
        (is= (vec ss123) [[1 :a] [2 :a] [3 :a]])
        (is= ss13 #{[1 :a] [3 :a]}))
 
-     (is (map? (td/wrap-leaf 3)))
+     (is (map? (td/wrap-eid 3)))
      (is (map? {:a 1}))
-     (isnt (record? (td/wrap-leaf 3)))
+     (isnt (record? (td/wrap-idx 3)))
      (isnt (record? {:a 1}))
 
      ; Leaf and entity-id records sort separately in the index. Eid sorts first since the type name
      ; `tupelo.data.Eid` sorts before `tupelo.data.Leaf`
-     (is= (td/wrap-leaf "hello") {:leaf "hello"})
      (is= (td/wrap-eid 5) {:eid 5})
      (throws?  (td/wrap-eid "hello"))
      (is= (td/wrap-idx 5) {:idx 5})
