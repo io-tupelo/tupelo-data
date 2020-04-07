@@ -387,34 +387,34 @@
      (s/defn ^:no-doc query-impl :- s/Any
        [query-result env qspec-list]
        (t/with-spy-indent
-         (println :---------------------------------------------------------------------------------------------------)
-         (spyx-pretty env)
-         (spyx-pretty qspec-list)
-         (spyx-pretty @query-result)
-         (newline)
+         ;(println :---------------------------------------------------------------------------------------------------)
+         ;(spyx-pretty env)
+         ;(spyx-pretty qspec-list)
+         ;(spyx-pretty @query-result)
+         ;(newline)
          (if (empty? qspec-list)
            (swap! query-result t/append env)
            (let [qspec-curr         (xfirst qspec-list)
                  qspec-rest         (xrest qspec-list)
                  qspec-curr-env     (apply-env env qspec-curr)
-                 >>                 (spyx qspec-curr)
-                 >>                 (spyx qspec-curr-env)
+                 ;>>                 (spyx qspec-curr)
+                 ;>>                 (spyx qspec-curr-env)
 
                  {idxs-param :idxs-true
                   idxs-other :idxs-false} (vec/pred-index wrapped-param? qspec-curr-env)
                  qspec-lookup       (vec/set-lax qspec-curr-env idxs-param nil)
-                 >>                 (spyx idxs-param)
-                 >>                 (spyx idxs-other)
-                 >>                 (spyx qspec-lookup)
+                 ;>>                 (spyx idxs-param)
+                 ;>>                 (spyx idxs-other)
+                 ;>>                 (spyx qspec-lookup)
 
                  params             (vec/get qspec-curr idxs-param)
                  found-triples      (lookup qspec-lookup)
                  param-frames-found (mapv #(vec/get % idxs-param) found-triples)
                  env-frames-found   (mapv #(zipmap params %) param-frames-found)]
-             (spyx params)
-             (spyx-pretty found-triples)
-             (spyx-pretty param-frames-found)
-             (spyx-pretty env-frames-found)
+             ;(spyx params)
+             ;(spyx-pretty found-triples)
+             ;(spyx-pretty param-frames-found)
+             ;(spyx-pretty env-frames-found)
 
              (forv [env-frame env-frames-found]
                (let [env-next (glue env env-frame)]

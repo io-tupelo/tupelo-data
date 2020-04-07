@@ -905,237 +905,294 @@
             {:eid 1008, :tmp-attr-40045 {:idx 1}, :ident 3}])
          )))
 
-   ;(dotest
-   ;  (td/with-tdb (td/new-tdb)
-   ;    (td/eid-count-reset)
-   ;    (let [data     {:a [{:id 2 :color :red}
-   ;                        {:id 3 :color :yellow}
-   ;                        {:id 4 :color :blue}]}
-   ;          root-hid (td/add-edn data)]
-   ;      (is= (td/eid->edn (only (td/query-maps [{:eid ? :color :red}])))
-   ;        {:color :red, :id 2})
-   ;      (is= (td/eid->edn (only (td/query-maps [{:eid ? :id 4}])))
-   ;        {:color :blue, :id 4}))))
-   ;
-   ;(dotest
-   ;  (td/with-tdb (td/new-tdb)
-   ;    (td/eid-count-reset)
-   ;    (let [data     {:a [{:id 2 :color :red}
-   ;                        {:id 3 :color :yellow}
-   ;                        {:id 4 :color :blue}
-   ;                        {:id 5 :color :pink}
-   ;                        {:id 6 :color :white}]
-   ;                    :b {:c [{:ident 2 :flower :rose}
-   ;                            {:ident 3 :flower :daisy}
-   ;                            {:ident 4 :flower :tulip}
-   ;                            ]}}
-   ;          root-hid (td/add-edn data)]
-   ;      (is= (td/eid->edn (only (td/query-maps [{:eid ?, :id 2}])))
-   ;        {:color :red, :id 2})
-   ;      (is= (td/eid->edn (only (td/query-maps [{:eid ?, :ident 2}])))
-   ;        {:flower :rose, :ident 2})
-   ;      (is= (td/eid->edn (only (td/query-maps [{:eid ?, :flower :rose}])))
-   ;        {:flower :rose, :ident 2})
-   ;      (is= (td/eid->edn (only (td/query-maps [{:eid ?, :color :pink}])))
-   ;        {:color :pink, :id 5}))))
-   ;
-   ;(dotest
-   ;  (td/with-tdb (td/new-tdb)
-   ;    (let [skynet-widgets   [{:basic-info   {:producer-code "Cyberdyne"}
-   ;                             :widgets      [{:widget-code      "Model-101"
-   ;                                             :widget-type-code "t800"}
-   ;                                            {:widget-code      "Model-102"
-   ;                                             :widget-type-code "t800"}
-   ;                                            {:widget-code      "Model-201"
-   ;                                             :widget-type-code "t1000"}]
-   ;                             :widget-types [{:widget-type-code "t800"
-   ;                                             :description      "Resistance Infiltrator"}
-   ;                                            {:widget-type-code "t1000"
-   ;                                             :description      "Mimetic polyalloy"}]}
-   ;                            {:basic-info   {:producer-code "ACME"}
-   ;                             :widgets      [{:widget-code      "Dynamite"
-   ;                                             :widget-type-code "c40"}]
-   ;                             :widget-types [{:widget-type-code "c40"
-   ;                                             :description      "Boom!"}]}]
-   ;          root-eid         (td/add-edn skynet-widgets)
-   ;          search-results   (td/query-maps [{:basic-info   {:producer-code ?}
-   ;                                            :widgets      [{:widget-code      ?
-   ;                                                            :widget-type-code wtc}]
-   ;                                            :widget-types [{:widget-type-code wtc
-   ;                                                            :description      ?}]}])
-   ;          results-filtered (t/walk-with-parents search-results
-   ;                             {:enter (fn [parents item]
-   ;                                       (t/cond-it-> item
-   ;                                         (map? item) (t/drop-if (fn [k v] (td/tmp-attr-kw? k))
-   ;                                                       item)))})]
-   ;      (is-set= results-filtered
-   ;        [{:producer-code "ACME",
-   ;          :widget-code   "Dynamite",
-   ;          :description   "Boom!",
-   ;          :wtc           "c40"}
-   ;         {:producer-code "Cyberdyne",
-   ;          :widget-code   "Model-101",
-   ;          :description   "Resistance Infiltrator",
-   ;          :wtc           "t800"}
-   ;         {:producer-code "Cyberdyne",
-   ;          :widget-code   "Model-201",
-   ;          :description   "Mimetic polyalloy",
-   ;          :wtc           "t1000"}
-   ;         {:producer-code "Cyberdyne",
-   ;          :widget-code   "Model-102",
-   ;          :description   "Resistance Infiltrator",
-   ;          :wtc           "t800"}])
-   ;      (let [results-normalized (mapv (fn [result-map]
-   ;                                       [(grab :producer-code result-map)
-   ;                                        (grab :widget-code result-map)
-   ;                                        (grab :description result-map)])
-   ;                                 results-filtered)
-   ;            normalized-desired [["Cyberdyne" "Model-101" "Resistance Infiltrator"]
-   ;                                ["Cyberdyne" "Model-102" "Resistance Infiltrator"]
-   ;                                ["Cyberdyne" "Model-201" "Mimetic polyalloy"]
-   ;                                ["ACME" "Dynamite" "Boom!"]]]
-   ;        (is-set= results-normalized normalized-desired)))))
-   ;
-   ;(dotest
-   ;  (td/with-tdb (td/new-tdb)
-   ;    (let [person   {:name "jimmy"
-   ;                    :preferred-address
-   ;                          {:address1 "123 street ave"
-   ;                           :address2 "apt 2"
-   ;                           :city     "Townville"
-   ;                           :state    "IN"
-   ;                           :zip      "46203"}
-   ;                    :other-addresses
-   ;                          [{:address1 "432 street ave"
-   ;                            :address2 "apt 7"
-   ;                            :city     "Cityvillage"
-   ;                            :state    "New York"
-   ;                            :zip      "12345"}
-   ;                           {:address1 "534 street ave"
-   ;                            :address2 "apt 5"
-   ;                            :city     "Township"
-   ;                            :state    "IN"
-   ;                            :zip      "46203"}]}
-   ;
-   ;          root-eid (td/add-edn person)
-   ;          ]
-   ;      (is-set= (distinct (td/query-maps [{:zip ?}]))
-   ;        [{:zip "12345"}
-   ;         {:zip "46203"}])
-   ;
-   ;      (is-set= (distinct (td/query-maps [{:zip ? :city ?}]))
-   ;        [{:zip "46203", :city "Township"}
-   ;         {:zip "46203", :city "Townville"}
-   ;         {:zip "12345", :city "Cityvillage"}]))))
-   ;
-   ;(dotest
-   ;  (td/with-tdb (td/new-tdb)
-   ;    (let [people           [{:name      "jimmy"
-   ;                             :addresses [{:address1  "123 street ave"
-   ;                                          :address2  "apt 2"
-   ;                                          :city      "Townville"
-   ;                                          :state     "IN"
-   ;                                          :zip       "46203"
-   ;                                          :preferred true}
-   ;                                         {:address1  "534 street ave",
-   ;                                          :address2  "apt 5",
-   ;                                          :city      "Township",
-   ;                                          :state     "IN",
-   ;                                          :zip       "46203"
-   ;                                          :preferred false}
-   ;                                         {:address1  "543 Other St",
-   ;                                          :address2  "apt 50",
-   ;                                          :city      "Town",
-   ;                                          :state     "CA",
-   ;                                          :zip       "86753"
-   ;                                          :preferred false}]}
-   ;                            {:name      "joel"
-   ;                             :addresses [{:address1  "2026 park ave"
-   ;                                          :address2  "apt 200"
-   ;                                          :city      "Town"
-   ;                                          :state     "CA"
-   ;                                          :zip       "86753"
-   ;                                          :preferred true}]}]
-   ;
-   ;          root-eid         (td/add-edn people)
-   ;          results          (td/query-maps [{:name ? :addresses [{:address1 ? :zip "86753"}]}])
-   ;          results-filtered (t/walk-with-parents results
-   ;                             {:enter (fn [parents item]
-   ;                                       (t/cond-it-> item
-   ;                                         (map? item) (t/drop-if (fn [k v] (td/tmp-attr-kw? k))
-   ;                                                       item)))}) ]
-   ;      (is-set= results-filtered
-   ;        [{:name "jimmy", :address1 "543 Other St"}
-   ;         {:name "joel", :address1 "2026 park ave"}]) )))
-   ;
-   ;(dotest ; -focus
-   ;  (td/eid-count-reset)
-   ;  (td/with-tdb (td/new-tdb)
-   ;    (let [data      {:people
-   ;                             [{:name "jimmy" :id 1}
-   ;                              ;{:name "joel" :id 2}
-   ;                              ;{:name "tim" :id 3}
-   ;                              ]
-   ;                     :addrs
-   ;                             {1 [{; :addr  "123 street ave"
-   ;                                  ; :address2  "apt 2"
-   ;                                  ;:city      "Townville"
-   ;                                  ;:state     "IN"
-   ;                                  :zip  "46203"
-   ;                                  :pref true}
-   ;                                 {; :addr  "534 street ave",
-   ;                                  ; :address2  "apt 5",
-   ;                                  ;:city      "Township",
-   ;                                  ;:state     "IN",
-   ;                                  :zip  "46203"
-   ;                                  :pref false}]
-   ;                              ;2 [{; :addr  "2026 park ave"
-   ;                              ;    ; :address2  "apt 200"
-   ;                              ;    ;:city      "Town"
-   ;                              ;    ;:state     "CA"
-   ;                              ;    :zip  "86753"
-   ;                              ;    :pref true}]
-   ;                              ;3 [{; :addr  "1448 street st"
-   ;                              ;    ; :address2  "apt 1"
-   ;                              ;    ;:city      "City"
-   ;                              ;    ;:state     "WA"
-   ;                              ;    :zip  "92456"
-   ;                              ;    :pref true}]
-   ;                              }
-   ;                     :visits {1 [{:date "12-31-1900" :geo-loc {:zip "46203"}}]
-   ;                              ;2 [{:date "1-1-1970" :geo-loc {:zip "12345"}}
-   ;                              ;   {:date "1-1-1970" :geo-loc {:zip "86753"}}]
-   ;                              ;3 [{:date "4-4-4444" :geo-loc {:zip "54221"}}
-   ;                              ;   {:date "4-4-4444" :geo-loc {:zip "92456"}}]
-   ;                              }}
-   ;
-   ;          root-eid  (td/add-edn data)
-   ;          >>        (spyx-pretty td/*tdb*)
-   ;          ;results-1 (td/query-maps [{:people [{:name ? :id id}]}])
-   ;
-   ;          ;>> (do (newline) (spyx-pretty results-1))
-   ;          ;results-2 (td/query-maps [{:addrs {id [{:zip ? :pref true}]}}])
-   ;
-   ;          results-3 (td/query-triples [; #todo debug this
-   ;                                       ;(search-triple eid-pers :name name)
-   ;                                       (search-triple eid-pers :id id)
-   ;
-   ;                                       (search-triple eid-addrs id eid-addr-deets)
-   ;                                       (search-triple eid-addr-deets idx-deet eid-addr-deet)
-   ;                                       (search-triple eid-addr-deet :zip zip)
-   ;                                       (search-triple eid-addr-deet :pref true)
-   ;                                       ])
-   ;          >> (do (newline) (spyx-pretty results-3))
-   ;
-   ;          ;results-filtered (t/walk-with-parents results
-   ;          ;                   {:enter (fn [parents item]
-   ;          ;                             (t/cond-it-> item
-   ;          ;                               (map? item) (t/drop-if (fn [k v] (td/tmp-attr-kw? k))
-   ;          ;                                             item)))})
-   ;          ]
-   ;      )))
+   (dotest
+     (td/with-tdb (td/new-tdb)
+       (td/eid-count-reset)
+       (let [data     {:a [{:id 2 :color :red}
+                           {:id 3 :color :yellow}
+                           {:id 4 :color :blue}]}
+             root-hid (td/add-edn data)]
+         (is= (td/eid->edn (only (td/query-maps [{:eid ? :color :red}])))
+           {:color :red, :id 2})
+         (is= (td/eid->edn (only (td/query-maps [{:eid ? :id 4}])))
+           {:color :blue, :id 4}))))
+
+   (dotest
+     (td/with-tdb (td/new-tdb)
+       (td/eid-count-reset)
+       (let [data     {:a [{:id 2 :color :red}
+                           {:id 3 :color :yellow}
+                           {:id 4 :color :blue}
+                           {:id 5 :color :pink}
+                           {:id 6 :color :white}]
+                       :b {:c [{:ident 2 :flower :rose}
+                               {:ident 3 :flower :daisy}
+                               {:ident 4 :flower :tulip}
+                               ]}}
+             root-hid (td/add-edn data)]
+         (is= (td/eid->edn (only (td/query-maps [{:eid ?, :id 2}])))
+           {:color :red, :id 2})
+         (is= (td/eid->edn (only (td/query-maps [{:eid ?, :ident 2}])))
+           {:flower :rose, :ident 2})
+         (is= (td/eid->edn (only (td/query-maps [{:eid ?, :flower :rose}])))
+           {:flower :rose, :ident 2})
+         (is= (td/eid->edn (only (td/query-maps [{:eid ?, :color :pink}])))
+           {:color :pink, :id 5}))))
+
+   (dotest
+     (td/with-tdb (td/new-tdb)
+       (let [skynet-widgets   [{:basic-info   {:producer-code "Cyberdyne"}
+                                :widgets      [{:widget-code      "Model-101"
+                                                :widget-type-code "t800"}
+                                               {:widget-code      "Model-102"
+                                                :widget-type-code "t800"}
+                                               {:widget-code      "Model-201"
+                                                :widget-type-code "t1000"}]
+                                :widget-types [{:widget-type-code "t800"
+                                                :description      "Resistance Infiltrator"}
+                                               {:widget-type-code "t1000"
+                                                :description      "Mimetic polyalloy"}]}
+                               {:basic-info   {:producer-code "ACME"}
+                                :widgets      [{:widget-code      "Dynamite"
+                                                :widget-type-code "c40"}]
+                                :widget-types [{:widget-type-code "c40"
+                                                :description      "Boom!"}]}]
+             root-eid         (td/add-edn skynet-widgets)
+             search-results   (td/query-maps [{:basic-info   {:producer-code ?}
+                                               :widgets      [{:widget-code      ?
+                                                               :widget-type-code wtc}]
+                                               :widget-types [{:widget-type-code wtc
+                                                               :description      ?}]}])
+             results-filtered (t/walk-with-parents search-results
+                                {:enter (fn [parents item]
+                                          (t/cond-it-> item
+                                            (map? item) (t/drop-if (fn [k v] (td/tmp-attr-kw? k))
+                                                          item)))})]
+         (is-set= results-filtered
+           [{:producer-code "ACME",
+             :widget-code   "Dynamite",
+             :description   "Boom!",
+             :wtc           "c40"}
+            {:producer-code "Cyberdyne",
+             :widget-code   "Model-101",
+             :description   "Resistance Infiltrator",
+             :wtc           "t800"}
+            {:producer-code "Cyberdyne",
+             :widget-code   "Model-201",
+             :description   "Mimetic polyalloy",
+             :wtc           "t1000"}
+            {:producer-code "Cyberdyne",
+             :widget-code   "Model-102",
+             :description   "Resistance Infiltrator",
+             :wtc           "t800"}])
+
+         (let [results-normalized (mapv (fn [result-map]
+                                          [(grab :producer-code result-map)
+                                           (grab :widget-code result-map)
+                                           (grab :description result-map)])
+                                    results-filtered)
+               normalized-desired [["Cyberdyne" "Model-101" "Resistance Infiltrator"]
+                                   ["Cyberdyne" "Model-102" "Resistance Infiltrator"]
+                                   ["Cyberdyne" "Model-201" "Mimetic polyalloy"]
+                                   ["ACME" "Dynamite" "Boom!"]]]
+           (is-set= results-normalized normalized-desired)))))
+
+   (dotest
+     (td/with-tdb (td/new-tdb)
+       (let [person   {:name "jimmy"
+                       :preferred-address
+                             {:address1 "123 street ave"
+                              :address2 "apt 2"
+                              :city     "Townville"
+                              :state    "IN"
+                              :zip      "46203"}
+                       :other-addresses
+                             [{:address1 "432 street ave"
+                               :address2 "apt 7"
+                               :city     "Cityvillage"
+                               :state    "New York"
+                               :zip      "12345"}
+                              {:address1 "534 street ave"
+                               :address2 "apt 5"
+                               :city     "Township"
+                               :state    "IN"
+                               :zip      "46203"}]}
+
+             root-eid (td/add-edn person)
+             ]
+         (is-set= (distinct (td/query-maps [{:zip ?}]))
+           [{:zip "12345"}
+            {:zip "46203"}])
+
+         (is-set= (distinct (td/query-maps [{:zip ? :city ?}]))
+           [{:zip "46203", :city "Township"}
+            {:zip "46203", :city "Townville"}
+            {:zip "12345", :city "Cityvillage"}]))))
+
+   (dotest
+     (td/with-tdb (td/new-tdb)
+       (let [people           [{:name      "jimmy"
+                                :addresses [{:address1  "123 street ave"
+                                             :address2  "apt 2"
+                                             :city      "Townville"
+                                             :state     "IN"
+                                             :zip       "46203"
+                                             :preferred true}
+                                            {:address1  "534 street ave",
+                                             :address2  "apt 5",
+                                             :city      "Township",
+                                             :state     "IN",
+                                             :zip       "46203"
+                                             :preferred false}
+                                            {:address1  "543 Other St",
+                                             :address2  "apt 50",
+                                             :city      "Town",
+                                             :state     "CA",
+                                             :zip       "86753"
+                                             :preferred false}]}
+                               {:name      "joel"
+                                :addresses [{:address1  "2026 park ave"
+                                             :address2  "apt 200"
+                                             :city      "Town"
+                                             :state     "CA"
+                                             :zip       "86753"
+                                             :preferred true}]}]
+
+             root-eid         (td/add-edn people)
+             results          (td/query-maps [{:name ? :addresses [{:address1 ? :zip "86753"}]}])
+             results-filtered (t/walk-with-parents results
+                                {:enter (fn [parents item]
+                                          (t/cond-it-> item
+                                            (map? item) (t/drop-if (fn [k v] (td/tmp-attr-kw? k))
+                                                          item)))})]
+         (is-set= results-filtered
+           [{:name "jimmy", :address1 "543 Other St"}
+            {:name "joel", :address1 "2026 park ave"}]))))
+
+   (dotest-focus
+     (td/eid-count-reset)
+     (td/with-tdb (td/new-tdb)
+       (let [data      {:people
+                                [{:name "jimmy" :id 1}
+                                 {:name "joel" :id 2}
+                                 {:name "tim" :id 3}
+                                 ]
+                        :addrs
+                                {1 [{ :addr  "123 street ave"
+                                      :address2  "apt 2"
+                                     :city      "Townville"
+                                     :state     "IN"
+                                     :zip  "46201"
+                                     :pref true}
+                                    { :addr  "534 street ave",
+                                      :address2  "apt 5",
+                                     :city      "Township",
+                                     :state     "IN",
+                                     :zip  "46203"
+                                     :pref false}]
+                                 2 [{ :addr  "2026 park ave"
+                                      :address2  "apt 200"
+                                     :city      "Town"
+                                     :state     "CA"
+                                     :zip  "86753"
+                                     :pref true}]
+                                 3 [{ :addr  "1448 street st"
+                                      :address2  "apt 1"
+                                     :city      "City"
+                                     :state     "WA"
+                                     :zip  "92456"
+                                     :pref true}]
+                                 }
+                        :visits {1 [{:date "12-31-1900" :geo-loc {:zip "46203"}}]
+                                 2 [{:date "1-1-1970" :geo-loc {:zip "12345"}}
+                                    {:date "2-1-1970" :geo-loc {:zip "86753"}}]
+                                 3 [{:date "4-4-4444" :geo-loc {:zip "54221"}}
+                                    {:date "5-4-4444" :geo-loc {:zip "92456"}}]
+                                 }}
+
+             root-eid  (td/add-edn data)
+
+
+
+             ;results-filtered (t/walk-with-parents results
+             ;                   {:enter (fn [parents item]
+             ;                             (t/cond-it-> item
+             ;                               (map? item) (t/drop-if (fn [k v] (td/tmp-attr-kw? k))
+             ;                                             item)))})
+             ]
+         ; (spyx-pretty td/*tdb*)
+         (let [results (td/query-maps [{:people [{:name ? :id id}]}])]
+           (comment
+             (spyx-pretty results) ;  =>
+             [{:tmp-attr-57457 {:idx 0}, :name "jimmy", :id 1}
+              {:tmp-attr-57457 {:idx 1}, :name "joel", :id 2}
+              {:tmp-attr-57457 {:idx 2}, :name "tim", :id 3}]))
+         (let [ results-2 (td/query-maps [{:addrs {id [{:zip ? :pref true}]}}]) ]
+           (comment
+             (spyx-pretty results-2)
+             [{:id 1, :tmp-attr-35191 {:idx 0}, :zip "46203"}]))
+         (let [results (td/query-maps
+                         [{:people [{:name ? :id id}]}
+                          {:addrs {id [{:zip ? :pref false}]}}
+                          {:visits {id [{:date ? :geo-loc {:zip zip}}]}}])]
+           (comment
+             (spyx-pretty (unlazy results)) ;  =>
+             [{:date           "12-31-1900",
+               :id             1,
+               :name           "jimmy",
+               :tmp-attr-50923 {:idx 0},
+               :tmp-attr-50928 {:idx 1},
+               :tmp-attr-50933 {:idx 0},
+               :zip            "46203"}]))
+
+         (let [results-3 (td/query-triples [(search-triple eid-pers :name name)
+                                            (search-triple eid-pers :id id)
+                                            (search-triple eid-addrs id eid-addr-deets)
+                                            (search-triple eid-addr-deets idx-deet eid-addr-deet)
+                                            (search-triple eid-addr-deet :zip zip)
+                                            (search-triple eid-addr-deet :pref true)])]
+           (is=  results-3
+             [{{:param :eid-pers}       {:eid 1005},
+               {:param :name}           "tim",
+               {:param :id}             3,
+               {:param :eid-addrs}      {:eid 1006},
+               {:param :eid-addr-deets} {:eid 1012},
+               {:param :idx-deet}       {:idx 0},
+               {:param :eid-addr-deet}  {:eid 1013},
+               {:param :zip}            "92456"}
+              {{:param :eid-pers}       {:eid 1004},
+               {:param :name}           "joel",
+               {:param :id}             2,
+               {:param :eid-addrs}      {:eid 1006},
+               {:param :eid-addr-deets} {:eid 1010},
+               {:param :idx-deet}       {:idx 0},
+               {:param :eid-addr-deet}  {:eid 1011},
+               {:param :zip}            "86753"}
+              {{:param :eid-pers}       {:eid 1003},
+               {:param :name}           "jimmy",
+               {:param :id}             1,
+               {:param :eid-addrs}      {:eid 1006},
+               {:param :eid-addr-deets} {:eid 1007},
+               {:param :idx-deet}       {:idx 0},
+               {:param :eid-addr-deet}  {:eid 1008},
+               {:param :zip}            "46201"}]
+             ))
+
+         )))
 
 
 
  ))
+
+
+
+
+
+
+
+
+
+
+
+
 
