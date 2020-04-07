@@ -283,75 +283,70 @@
          (is= (query-triples search-spec) [{{:param :x} {:eid 1001},
                                             {:param :y} :a}])) ))
 
-   ;(dotest
-   ;  (with-tdb (new-tdb)
-   ;    (eid-count-reset)
-   ;    (let [edn-val  {:a 1
-   ;                    :b 1}
-   ;          root-eid (td/add-edn edn-val)]
-   ;      (is= edn-val (td/eid->edn root-eid))
-   ;      (is= (deref *tdb*)
-   ;        {:eid-type {{:eid 1001} :map},
-   ;         :idx-ave  #{[{:attr :a} {:leaf 1} {:eid 1001}]
-   ;                     [{:attr :b} {:leaf 1} {:eid 1001}]},
-   ;         :idx-eav  #{[{:eid 1001} {:attr :a} {:leaf 1}]
-   ;                     [{:eid 1001} {:attr :b} {:leaf 1}]},
-   ;         :idx-vae  #{[{:leaf 1} {:attr :a} {:eid 1001}]
-   ;                     [{:leaf 1} {:attr :b} {:eid 1001}]}}))
-   ;
-   ;    (let [search-spec [[(td/->SearchParam :x) (td/wrap-attr :a) (td/wrap-leaf 1)]]]
-   ;      (is= (query-triples search-spec) [{{:param :x} {:eid 1001}}]))
-   ;
-   ;    (let [search-spec [[(td/->SearchParam :x) (td/wrap-attr :b) (td/wrap-leaf 1)]]]
-   ;      (is= (query-triples search-spec) [{{:param :x} {:eid 1001}}]))
-   ;
-   ;    (let [search-spec [[(td/->SearchParam :x) (td/->SearchParam :y) (td/wrap-leaf 1)]]]
-   ;      (is= (query-triples search-spec)
-   ;        [{{:param :x} {:eid 1001},
-   ;          {:param :y} {:attr :a}}
-   ;
-   ;         {{:param :x} {:eid 1001},
-   ;          {:param :y} {:attr :b}}]))))
-   ;
-   ;(dotest
-   ;  (with-tdb (new-tdb)
-   ;    (eid-count-reset)
-   ;    (let [edn-val  {:a {:b 2}}
-   ;          root-eid (td/add-edn edn-val)]
-   ;      (is= (deref *tdb*)
-   ;        {:eid-type {{:eid 1001} :map, {:eid 1002} :map},
-   ;         :idx-ave  #{[{:attr :a} {:eid 1002} {:eid 1001}]
-   ;                     [{:attr :b} {:leaf 2} {:eid 1002}]},
-   ;         :idx-eav  #{[{:eid 1001} {:attr :a} {:eid 1002}]
-   ;                     [{:eid 1002} {:attr :b} {:leaf 2}]},
-   ;         :idx-vae  #{[{:eid 1002} {:attr :a} {:eid 1001}]
-   ;                     [{:leaf 2} {:attr :b} {:eid 1002}]}})
-   ;      ; (prn :-----------------------------------------------------------------------------)
-   ;      ; compound search
-   ;      (is= (query-triples [[{:param :x} {:attr :a} {:param :y}]
-   ;                           [{:param :y} {:attr :b} (td/wrap-leaf 2)]])
-   ;        [{{:param :x} {:eid 1001},
-   ;          {:param :y} {:eid 1002}}])
-   ;      ; (prn :-----------------------------------------------------------------------------)
-   ;      ; failing search
-   ;      (is= [] (query-triples [[{:param :x} {:attr :a} {:param :y}]
-   ;                              [{:param :y} {:attr :b} (td/wrap-leaf 99)]]))
-   ;      ; (prn :-----------------------------------------------------------------------------)
-   ;      ; wildcard search - match all
-   ;      (is= (query-triples [[{:param :x} {:param :y} {:param :z}]])
-   ;        [{{:param :x} {:eid 1001},
-   ;          {:param :y} {:attr :a},
-   ;          {:param :z} {:eid 1002}}
-   ;         {{:param :x} {:eid 1002},
-   ;          {:param :y} {:attr :b},
-   ;          {:param :z} {:leaf 2}}]))))
-   ;
-   ;(dotest
-   ;  (is= 1 (boolean->binary true))
-   ;  (is= 0 (boolean->binary false))
-   ;  (throws? (boolean->binary))
-   ;  (throws? (boolean->binary 234)))
-   ;
+   (dotest
+     (with-tdb (new-tdb)
+       (eid-count-reset)
+       (let [edn-val  {:a 1
+                       :b 1}
+             root-eid (td/add-edn edn-val)]
+         (is= edn-val (td/eid->edn root-eid))
+         (is= (spyx-pretty (deref *tdb*))
+           {:eid-type {{:eid 1001} :map},
+            :idx-ave  #{[:a 1 {:eid 1001}] [:b 1 {:eid 1001}]},
+            :idx-eav  #{[{:eid 1001} :a 1]
+                        [{:eid 1001} :b 1]},
+            :idx-vae  #{[1 :a {:eid 1001}] [1 :b {:eid 1001}]}} ))
+
+       (let [search-spec [[(td/->SearchParam :x) :a  1]]]
+         (is= (query-triples search-spec) [{{:param :x} {:eid 1001}}]))
+
+       (let [search-spec [[(td/->SearchParam :x)  :b  1]]]
+         (is= (query-triples search-spec) [{{:param :x} {:eid 1001}}]))
+
+       (let [search-spec [[(td/->SearchParam :x) (td/->SearchParam :y)  1]]]
+         (is= (query-triples search-spec)
+           [{{:param :x} {:eid 1001},
+             {:param :y}  :a}
+            {{:param :x} {:eid 1001},
+             {:param :y}  :b}]))))
+
+   (dotest
+     (with-tdb (new-tdb)
+       (eid-count-reset)
+       (let [edn-val  {:a {:b 2}}
+             root-eid (td/add-edn edn-val)]
+         (is= (spyx-pretty (deref *tdb*))
+           {:eid-type {{:eid 1001} :map, {:eid 1002} :map},
+            :idx-ave  #{[:a {:eid 1002} {:eid 1001}] [:b 2 {:eid 1002}]},
+            :idx-eav  #{[{:eid 1001} :a {:eid 1002}]
+                        [{:eid 1002} :b 2]},
+            :idx-vae  #{[{:eid 1002} :a {:eid 1001}] [2 :b {:eid 1002}]}})
+         ; (prn :-----------------------------------------------------------------------------)
+         ; compound search
+         (is= (query-triples [[{:param :x} :a {:param :y}]
+                              [{:param :y} :b 2]])
+           [{{:param :x} {:eid 1001},
+             {:param :y} {:eid 1002}}])
+         ; (prn :-----------------------------------------------------------------------------)
+         ; failing search
+         (is= [] (query-triples [[{:param :x} :a {:param :y}]
+                                 [{:param :y} :b 99]]))
+         ; (prn :-----------------------------------------------------------------------------)
+         ; wildcard search - match all
+         (is= (spyx-pretty (query-triples [[{:param :x} {:param :y} {:param :z}]]))
+           [{{:param :x} {:eid 1001}
+             {:param :y} :a
+             {:param :z} {:eid 1002}}
+            {{:param :x} {:eid 1002}
+             {:param :y} :b
+             {:param :z} 2}]))))
+
+   (dotest
+     (is= 1 (boolean->binary true))
+     (is= 0 (boolean->binary false))
+     (throws? (boolean->binary))
+     (throws? (boolean->binary 234)))
+
    ;(dotest
    ;  (is= (td/search-triple-impl (quote [:a :b :c]))
    ;    '(tupelo.data/search-triple-fn (quote [:a :b :c])))
