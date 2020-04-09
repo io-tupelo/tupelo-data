@@ -50,7 +50,7 @@
      (isnt (td/only2? [{:a 1 :b 2}]))
      (isnt (td/only2? [#{:stuff :more}])))
 
-   (dotest ; #todo => tupelo.core
+   (dotest  ; #todo => tupelo.core
      (is= (td/with-cum-result
          (dotimes [ii 5]
            (td/accum-result ii)))
@@ -60,7 +60,21 @@
                   (td/accum-result n)
                   (ff-fn (dec n))))]
        (is= (td/with-cum-result (ff 5))
-         [5 4 3 2 1 0])))
+         [5 4 3 2 1 0]))
+     ; It will even work across multiple futures:  https://clojure.org/reference/vars#conveyance
+     (let [N  10
+           rand100 (fn [] (int (+ 100 (* 50 (Math/random)))))
+           ff      (fn ff-fn [n]
+                     (Thread/sleep (rand100))
+                     (td/accum-result n)
+                     n)
+           nums    (td/with-cum-result
+                     (let [futures     (forv [ii (range N)]
+                                         (future (ff ii)))
+                           future-vals (forv [future futures] @future)] ; wait for all futures to finish
+                       (is= future-vals (range N))))] ; in order of creation
+       (is-set= nums (range N)))) ; nums is in random order
+
 
    (dotest
      (let [ss123 (t/it-> (index/empty-index)
