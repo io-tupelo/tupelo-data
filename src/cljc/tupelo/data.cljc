@@ -89,18 +89,18 @@
 
      ;-----------------------------------------------------------------------------
      ; #todo => tupelo.core
-     (def ^:dynamic ^:no-doc cum-result nil)
+     (def ^:dynamic ^:no-doc *cumulative-result* nil)
      (s/defn accum-result :- s/Any
        "Works inside of a `with-cum-result` block to append a new result value."
        [value :- s/Any]
-       (swap! cum-result append value)
+       (swap! *cumulative-result* append value)
        value)
      (defmacro with-cum-result
        "Wraps forms containing `accum-result` calls to accumulate values into a vector."
        [& forms]
-       `(binding [cum-result (atom [])]
+       `(binding [*cumulative-result* (atom [])]
           (do ~@forms)
-          @cum-result))
+          @*cumulative-result*))
 
      (defn only?
        "Returns true iff collection has length=1"
@@ -495,7 +495,7 @@
              eids    (mapv #(t/fetch % {:param :e}) results)]
          eids))
 
-     (def ^:no-doc ^:dynamic *map-triples-cum* nil)
+     ; (def ^:no-doc ^:dynamic *cumulative-result* nil)
      (def ^:no-doc ^:dynamic *autosyms-seen* nil)
 
      (s/defn ^:no-doc autosym-resolve :- s/Symbol
@@ -518,12 +518,12 @@
        [seq-entity :- tsk/List]
        (into {} (indexed seq-entity)))
 
-     (defn ^:no-doc query-maps->triples
+     (defn ^:no-doc query-maps->triples-impl
        [qmaps]
        (with-spy-indent
          ;(newline)
          ;(spyq :query-maps->triples)
-         ;(spyx-pretty (deref *map-triples-cum*))
+         ;(spyx-pretty (deref *cumulative-result*))
          ;(spyx qmaps)
          (doseq [qmap qmaps]
            ;(spyx-pretty qmap)
@@ -544,32 +544,45 @@
                        qmaps-modified  (forv [elem array-val]
                                          {:eid tmp-eid (gensym "tmp-attr-") elem})]
                    ;(spyx qmaps-modified)
-                   (swap! *map-triples-cum* append triple-modified)
-                   ;(spyx-pretty *map-triples-cum*)
-                   (query-maps->triples qmaps-modified))
+                   ; (swap! *cumulative-result* append triple-modified)
+                   (accum-result triple-modified)
+                   ;(spyx-pretty *cumulative-result*)
+                   (query-maps->triples-impl qmaps-modified))
 
                  (map? vv) (let [tmp-eid         (gensym "tmp-eid-")
                                  triple-modified (search-triple-fn [eid-val kk tmp-eid])
                                  ;>>              (spyx triple-modified)
                                  qmaps-modified  [(glue {:eid tmp-eid} vv)]]
                              ;(spyx qmaps-modified)
-                             (swap! *map-triples-cum* append triple-modified)
-                             ;(spyx-pretty *map-triples-cum**)
-                             (query-maps->triples qmaps-modified))
+                             ; (swap! *cumulative-result* append triple-modified)
+                             (accum-result triple-modified)
+
+                             ;(spyx-pretty *cumulative-result*)
+                             (query-maps->triples-impl qmaps-modified))
                  (leaf-val? vv) (let [triple (search-triple-fn [eid-val kk vv])]
                                   ;(spyx triple)
-                                  (swap! *map-triples-cum* append triple)
-                                  ; (spyx-pretty *map-triples-cum**)
+                                  ; (swap! *cumulative-result* append triple)
+                                  (accum-result triple)
+
+                                  ; (spyx-pretty *cumulative-result*)
                                   )
                  (symbol? vv) (do
                                 (let [sym-to-use (autosym-resolve kk vv)
                                       triple     (search-triple-fn [eid-val kk sym-to-use])]
                                   ;(spyx triple)
-                                  (swap! *map-triples-cum* append triple)
-                                  ; (spyx-pretty *map-triples-cum**)
+                                  ; (swap! *cumulative-result* append triple)
+                                  (accum-result triple)
+
+                                  ; (spyx-pretty *cumulative-result*)
                                   ))
                  :else (throw (ex-info "unrecognized value" (vals->map kk vv map-remaining)))
                  ))))))
+
+     (defn ^:no-doc query-maps->triples
+       [qmaps]
+       (binding [*autosyms-seen* (atom #{})]
+         (with-cum-result
+           (query-maps->triples-impl qmaps))))
 
      (defn ^:no-doc query-results-filter-tmp-attr-mapentry ; #todo make public & optional
        [query-results]
@@ -602,18 +615,16 @@
          [maps-in    (keep-if map? srch-specs)
           triples-in (keep-if t/triple? srch-specs)]
          (exclude-reserved-identifiers srch-specs)
-         (binding [*map-triples-cum* (atom [])
-                   *autosyms-seen*   (atom #{})]
-           (query-maps->triples maps-in) ; returns result in *map-triples-cum** ; #todo cleanup
-           (let [map-triples    (deref *map-triples-cum*)
-                 search-triples (glue map-triples triples-in)]
-             ; (spyx *map-triples-cum**)
-             ; (spyx-pretty (deref *map-triples-cum**))
-             (let [unfiltered-results# (query-triples search-triples)]
-               ; (spyx unfiltered-results#)
-               (query-results-filter-tmp-attr-mapentry
-                 (query-results-filter-tmp-eid-mapentry
-                   unfiltered-results#)))))))
+         ; returns result in *cumulative-result* ; #todo cleanup
+         (let [map-triples    (query-maps->triples maps-in)
+               search-triples (glue map-triples triples-in)]
+           ; (spyx *cumulative-result*)
+           ; (spyx-pretty (deref *cumulative-result*))
+           (let [unfiltered-results# (query-triples search-triples)]
+             ; (spyx unfiltered-results#)
+             (query-results-filter-tmp-attr-mapentry
+               (query-results-filter-tmp-eid-mapentry
+                 unfiltered-results#))))))
 
      (defn ^:no-doc query-maps->wrapped-impl
        [maps]

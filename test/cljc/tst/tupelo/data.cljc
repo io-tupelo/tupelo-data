@@ -63,7 +63,7 @@
          [5 4 3 2 1 0]))
      ; It will even work across multiple futures:  https://clojure.org/reference/vars#conveyance
      (let [N  10
-           rand100 (fn [] (int (+ 100 (* 50 (Math/random)))))
+           rand100 (fn [] (int (+ 50 (* 50 (Math/random)))))
            ff      (fn ff-fn [n]
                      (Thread/sleep (rand100))
                      (td/accum-result n)
@@ -436,34 +436,24 @@
          (is= [] (query-triples search-spec)))))
 
    (dotest
-     (binding [td/*map-triples-cum* (atom []) ; receives output!
-               td/*autosyms-seen*   (atom #{})]
-       (td/query-maps->triples (quote
-                                 [{:eid x :map y}
-                                  {:eid y :a a}]))
-       (is= (deref td/*map-triples-cum*)
+     (let [map-triples (td/query-maps->triples (quote [{:eid x :map y}
+                                                       {:eid y :a a}]))]
+       (is= map-triples
          [[{:param :x} :map {:param :y}]
           [{:param :y} :a {:param :a}]]))
 
-     (binding [td/*map-triples-cum* (atom []) ; receives output!
-               td/*autosyms-seen*   (atom #{})]
-       (td/query-maps->triples (quote [{:eid ? :map y}]))
-       (is= (deref td/*map-triples-cum*)
-         [[{:param :eid}  :map {:param :y}]]))
+     (let [map-triples (td/query-maps->triples (quote [{:eid ? :map y}]))]
+       (is= map-triples
+         [[{:param :eid} :map {:param :y}]]))
 
-     (binding [td/*map-triples-cum* (atom []) ; receives output!
-               td/*autosyms-seen*   (atom #{})]
-       (td/query-maps->triples (quote [{:eid ? :map y}
-                                       {:eid y :a a}]))
-       (is= (deref td/*map-triples-cum*)
+     (let [map-triples (td/query-maps->triples (quote [{:eid ? :map y}
+                                                       {:eid y :a a}]))]
+       (is= map-triples
          [[{:param :eid} :map {:param :y}]
           [{:param :y} :a {:param :a}]]))
 
-     (binding [td/*map-triples-cum* (atom []) ; receives output!
-               td/*autosyms-seen*   (atom #{})]
-       (throws? (td/query-maps->triples
-                  (quote [{:eid ? :map y}
-                          {:eid ? :a a}])))))
+     (throws? (td/query-maps->triples (quote [{:eid ? :map y}
+                                              {:eid ? :a a}]))))
 
    (dotest
      (is (td/param-tmp-eid? {:param :tmp-eid-99999}))
