@@ -35,6 +35,20 @@
 
 #?(:clj
  (do
+   (dotest
+     (is (td/only? [1]))
+     (is (td/only? {:a 1}))
+     (is (td/only? #{:stuff}))
+     (isnt (td/only? [1 2]))
+     (isnt (td/only? {:a 1 :b 2}))
+     (isnt (td/only? #{:stuff :more}))
+
+     (is (td/only2? [[1]]))
+     (is (td/only2? #{{:a 1}}))
+     (is (td/only2? #{#{:stuff}}))
+     (isnt (td/only2? [[1 2]]))
+     (isnt (td/only2? [{:a 1 :b 2}]))
+     (isnt (td/only2? [#{:stuff :more}])))
 
    (dotest ; #todo => tupelo.core
      (is= (td/with-cum-result

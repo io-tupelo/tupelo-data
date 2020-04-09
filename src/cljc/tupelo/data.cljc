@@ -102,6 +102,14 @@
           (do ~@forms)
           @cum-result))
 
+     (defn only?
+       "Returns true iff collection has length=1"
+       [coll] (and (t/has-length? coll 1)))
+     (defn only2?
+       "Returns true iff arg is two nested collections of length=1"
+       [coll] (and (t/has-length? coll 1)
+                (t/has-length? (first coll) 1)))
+
      ;---------------------------------------------------------------------------------------------------
      (do  ; keep these in sync
        (def EidType
