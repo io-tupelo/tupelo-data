@@ -21,7 +21,7 @@
             [tupelo.data.index :as index]
             [tupelo.string :as ts]
             [tupelo.tag :as tv]
-            ))
+            [clojure.walk :as walk]))
   #?(:cljs (:require
              [tupelo.test-cljs :refer [define-fixture deftest dotest is isnt is= isnt= is-set= is-nonblank= testing throws?]
               :include-macros true]
@@ -35,7 +35,8 @@
 
 #?(:clj
  (do
-   (dotest ;
+
+   (dotest ; #todo => tupelo.core
      (is (td/only? [1]))
      (is (td/only? {:a 1}))
      (is (td/only? #{:stuff}))
