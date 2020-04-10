@@ -542,7 +542,7 @@
        (with-spy-indent
          ;(newline)
          ;(spyq :query-maps->triples)
-         ;(spyx-pretty (deref *cumulative-result*))
+         ;(spyx-pretty (deref *cumulative-val*))
          ;(spyx qmaps)
          (doseq [qmap qmaps]
            ;(spyx-pretty qmap)
@@ -563,9 +563,9 @@
                        qmaps-modified  (forv [elem array-val]
                                          {:eid tmp-eid (gensym "tmp-attr-") elem})]
                    ;(spyx qmaps-modified)
-                   ; (swap! *cumulative-result* append triple-modified)
+                   ; (swap! *cumulative-val* append triple-modified)
                    (cum-vector-append triple-modified)
-                   ;(spyx-pretty *cumulative-result*)
+                   ;(spyx-pretty *cumulative-val*)
                    (query-maps->triples-impl qmaps-modified))
 
                  (map? vv) (let [tmp-eid         (gensym "tmp-eid-")
@@ -573,26 +573,26 @@
                                  ;>>              (spyx triple-modified)
                                  qmaps-modified  [(glue {:eid tmp-eid} vv)]]
                              ;(spyx qmaps-modified)
-                             ; (swap! *cumulative-result* append triple-modified)
+                             ; (swap! *cumulative-val* append triple-modified)
                              (cum-vector-append triple-modified)
 
-                             ;(spyx-pretty *cumulative-result*)
+                             ;(spyx-pretty *cumulative-val*)
                              (query-maps->triples-impl qmaps-modified))
                  (leaf-val? vv) (let [triple (search-triple-fn [eid-val kk vv])]
                                   ;(spyx triple)
-                                  ; (swap! *cumulative-result* append triple)
+                                  ; (swap! *cumulative-val* append triple)
                                   (cum-vector-append triple)
 
-                                  ; (spyx-pretty *cumulative-result*)
+                                  ; (spyx-pretty *cumulative-val*)
                                   )
                  (symbol? vv) (do
                                 (let [sym-to-use (autosym-resolve kk vv)
                                       triple     (search-triple-fn [eid-val kk sym-to-use])]
                                   ;(spyx triple)
-                                  ; (swap! *cumulative-result* append triple)
+                                  ; (swap! *cumulative-val* append triple)
                                   (cum-vector-append triple)
 
-                                  ; (spyx-pretty *cumulative-result*)
+                                  ; (spyx-pretty *cumulative-val*)
                                   ))
                  :else (throw (ex-info "unrecognized value" (vals->map kk vv map-remaining)))
                  ))))))
@@ -628,17 +628,16 @@
                      (throw (ex-info "Error: detected reserved tmp-eid-xxxx value" (vals->map item)))))}))
 
      (defn ^:no-doc query-maps->wrapped-fn
-       [srch-specs]
-       ; (spyx-pretty srch-specs)
+       [query-specs]
+       ; (spyx-pretty query-specs)
+       (exclude-reserved-identifiers query-specs)
        (let ; -spy
-         [maps-in    (keep-if map? srch-specs)
-          triples-in (keep-if t/triple? srch-specs)]
-         (exclude-reserved-identifiers srch-specs)
-         ; returns result in *cumulative-result* ; #todo cleanup
+         [maps-in    (keep-if map? query-specs)
+          triples-in (keep-if t/triple? query-specs)]
+         ; returns result in *cumulative-val* ; #todo cleanup
          (let [map-triples    (query-maps->triples maps-in)
                search-triples (glue map-triples triples-in)]
-           ; (spyx *cumulative-result*)
-           ; (spyx-pretty (deref *cumulative-result*))
+           ; (spyx-pretty *cumulative-val*)
            (let [unfiltered-results# (query-triples search-triples)]
              ; (spyx unfiltered-results#)
              (query-results-filter-tmp-attr-mapentry
@@ -646,34 +645,33 @@
                  unfiltered-results#))))))
 
      (defn ^:no-doc query-maps->wrapped-impl
-       [maps]
-       `(query-maps->wrapped-fn (quote ~maps)))
+       [qspecs]
+       `(query-maps->wrapped-fn (quote ~qspecs)))
 
      (defmacro query-maps->wrapped
-       [maps]
-       (query-maps->wrapped-impl maps))
+       [qspecs]
+       (query-maps->wrapped-impl qspecs))
 
      (s/defn unwrap-query-results
-       [query-results]
-       (forv [qres query-results]
+       [query-result-maps]
+       (forv [result-map query-result-maps]
          (apply glue
-           (for [mapentry qres]
-             (let [[kk vv] mapentry
-                   param-raw (unwrap-param kk)
+           (forv [mapentry result-map]
+             (let [[me-key me-val] mapentry
+                   param-raw (unwrap-param me-key)
                    val-raw   (cond
-                               (wrapped-eid? vv) (unwrap-eid vv)
-                               :else vv    ;   :else (throw (ex-info "Unrecognized query result value" (vals->map vv)))
-                               )]
+                               (wrapped-eid? me-val) (unwrap-eid me-val)
+                               :else me-val)]
                {param-raw val-raw})))))
 
      (defn query-maps-impl
-       [maps]
-       ; #todo need a linter to catch nonsensical maps (attr <> keyword for example)
-       `(unwrap-query-results (query-maps->wrapped ~maps)))
+       [qspecs]
+       ; #todo need a linter to catch nonsensical qspecs (attr <> keyword for example)
+       `(unwrap-query-results (query-maps->wrapped ~qspecs)))
 
      (defmacro query-maps
-       [maps]
-       (query-maps-impl maps))
+       [qspecs]
+       (query-maps-impl qspecs))
 
 
 

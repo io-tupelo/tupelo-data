@@ -660,14 +660,11 @@
              nm-sal-attending     (td/query-maps [{:first-name ? :salary ? :position :attending}])
              nm-sal-resident      (td/query-maps [{:first-name ? :salary ? :position :resident}])
              nm-sal-volunteer     (td/query-maps [{:first-name ? :salary ? :position :volunteer}])
-             avg-fn               (fn [vals]
-                                    (let [n      (count vals)
-                                          total  (reduce + 0 vals)
-                                          result (/ total n)]
-                                      result))
-             salary-avg-attending (avg-fn (mapv :salary nm-sal-attending))
-             salary-avg-resident  (avg-fn (mapv :salary nm-sal-resident))
-             salary-avg-volunteer (avg-fn (mapv :salary nm-sal-volunteer))
+             average               (fn [vals] (/ (reduce + 0 vals)
+                                               (count vals)))
+             salary-avg-attending (average (mapv :salary nm-sal-attending))
+             salary-avg-resident  (average (mapv :salary nm-sal-resident))
+             salary-avg-volunteer (average (mapv :salary nm-sal-volunteer))
              ]
          (is-set=  nm-sal-all
            [{:first-name "Joey", :salary 42000}
