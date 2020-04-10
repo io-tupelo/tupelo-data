@@ -35,7 +35,7 @@
 
 #?(:clj
  (do
-   (dotest
+   (dotest ;
      (is (td/only? [1]))
      (is (td/only? {:a 1}))
      (is (td/only? #{:stuff}))
@@ -51,24 +51,39 @@
      (isnt (td/only2? [#{:stuff :more}])))
 
    (dotest  ; #todo => tupelo.core
-     (is= (td/with-cum-result
+     (is= 5 (td/with-cum-val 0
+              (doseq [ii (t/thru 5)]
+                (td/cum-val-set-it ii))))
+     (is= 15 (td/with-cum-val 0
+               (doseq [ii (t/thru 5)]
+                 (td/cum-val-set-it (+ it ii)))))
+     (is= (td/with-cum-val {}
+            (doseq [ii (t/thru 3)]
+              (td/cum-val-set-it (glue it {ii (+ 10 ii)}))))
+       {0 10
+        1 11
+        2 12
+        3 13}) )
+
+   (dotest  ; #todo => tupelo.core
+     (is= (td/with-cum-vector
          (dotimes [ii 5]
-           (td/accum-result ii)))
+           (td/cum-vector-append ii)))
        [0 1 2 3 4])
      (let [ff (fn ff-fn [n]
                 (when (t/nonneg? n)
-                  (td/accum-result n)
+                  (td/cum-vector-append n)
                   (ff-fn (dec n))))]
-       (is= (td/with-cum-result (ff 5))
+       (is= (td/with-cum-vector (ff 5))
          [5 4 3 2 1 0]))
      ; It will even work across multiple futures:  https://clojure.org/reference/vars#conveyance
      (let [N  10
            rand100 (fn [] (int (+ 50 (* 50 (Math/random)))))
            ff      (fn ff-fn [n]
                      (Thread/sleep (rand100))
-                     (td/accum-result n)
+                     (td/cum-vector-append n)
                      n)
-           nums    (td/with-cum-result
+           nums    (td/with-cum-vector
                      (let [futures     (forv [ii (range N)]
                                          (future (ff ii)))
                            future-vals (forv [future futures] @future)] ; wait for all futures to finish

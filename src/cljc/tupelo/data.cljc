@@ -89,19 +89,34 @@
 
      ;-----------------------------------------------------------------------------
      ; #todo => tupelo.core
-     (def ^:dynamic ^:no-doc *cumulative-result* nil)
-     (s/defn accum-result :- s/Any
-       "Works inside of a `with-cum-result` block to append a new result value."
-       [value :- s/Any]
-       (swap! *cumulative-result* append value)
-       value)
-     (defmacro with-cum-result
-       "Wraps forms containing `accum-result` calls to accumulate values into a vector."
+     (def ^:dynamic ^:no-doc *cumulative-val* nil)
+     (defmacro cum-val-set-it
+       "Works inside of a `with-cum-val` block to append a new val value."
        [& forms]
-       `(binding [*cumulative-result* (atom [])]
-          (do ~@forms)
-          @*cumulative-result*))
+       `(swap! *cumulative-val*
+          (fn [~'it]
+            ~@forms)))
 
+     (defmacro with-cum-val
+       "Wraps forms containing `accum-val` calls to accumulate values into a vector."
+       [init-val & forms]
+       `(binding [*cumulative-val* (atom ~init-val)]
+          (do ~@forms)
+          (deref *cumulative-val*)))
+
+     ;-----------------------------------------------------------------------------
+     ; #todo => tupelo.core
+     (s/defn cum-vector-append :- s/Any
+       "Works inside of a `with-cum-vector` block to append a new vector value."
+       [value :- s/Any] (cum-val-set-it (append it value)))
+     (defmacro with-cum-vector
+       "Wraps forms containing `accum-vector` calls to accumulate values into a vector."
+       [& forms]
+       `(with-cum-val []
+          ~@forms))
+
+     ;-----------------------------------------------------------------------------
+     ; #todo => tupelo.core
      (defn only?
        "Returns true iff collection has length=1"
        [coll] (and (t/has-length? coll 1)))
@@ -545,7 +560,7 @@
                                          {:eid tmp-eid (gensym "tmp-attr-") elem})]
                    ;(spyx qmaps-modified)
                    ; (swap! *cumulative-result* append triple-modified)
-                   (accum-result triple-modified)
+                   (cum-vector-append triple-modified)
                    ;(spyx-pretty *cumulative-result*)
                    (query-maps->triples-impl qmaps-modified))
 
@@ -555,14 +570,14 @@
                                  qmaps-modified  [(glue {:eid tmp-eid} vv)]]
                              ;(spyx qmaps-modified)
                              ; (swap! *cumulative-result* append triple-modified)
-                             (accum-result triple-modified)
+                             (cum-vector-append triple-modified)
 
                              ;(spyx-pretty *cumulative-result*)
                              (query-maps->triples-impl qmaps-modified))
                  (leaf-val? vv) (let [triple (search-triple-fn [eid-val kk vv])]
                                   ;(spyx triple)
                                   ; (swap! *cumulative-result* append triple)
-                                  (accum-result triple)
+                                  (cum-vector-append triple)
 
                                   ; (spyx-pretty *cumulative-result*)
                                   )
@@ -571,7 +586,7 @@
                                       triple     (search-triple-fn [eid-val kk sym-to-use])]
                                   ;(spyx triple)
                                   ; (swap! *cumulative-result* append triple)
-                                  (accum-result triple)
+                                  (cum-vector-append triple)
 
                                   ; (spyx-pretty *cumulative-result*)
                                   ))
@@ -581,7 +596,7 @@
      (defn ^:no-doc query-maps->triples
        [qmaps]
        (binding [*autosyms-seen* (atom #{})]
-         (with-cum-result
+         (with-cum-vector
            (query-maps->triples-impl qmaps))))
 
      (defn ^:no-doc query-results-filter-tmp-attr-mapentry ; #todo make public & optional
