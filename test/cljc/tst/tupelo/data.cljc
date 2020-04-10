@@ -629,8 +629,7 @@
      (td/with-tdb (td/new-tdb)
        ; (td/eid-count-reset)
        (let [hospital             {:hospital "Hans Jopkins"
-                                   :staff    {
-                                              10 {:first-name "John"
+                                   :staff    {10 {:first-name "John"
                                                   :last-name  "Doe"
                                                   :salary     40000
                                                   :position   :resident}
@@ -653,20 +652,19 @@
                                               31 {:first-name "Sammy"
                                                   :last-name  "Davis"
                                                   :salary     0
-                                                  :position   :volunteer}
-                                              }}
+                                                  :position   :volunteer}}}
              root-hid             (td/add-edn hospital)
              nm-sal-all           (td/query-maps [{:first-name ? :salary ?}])
              nm-sal-attending     (td/query-maps [{:first-name ? :salary ? :position :attending}])
              nm-sal-resident      (td/query-maps [{:first-name ? :salary ? :position :resident}])
              nm-sal-volunteer     (td/query-maps [{:first-name ? :salary ? :position :volunteer}])
-             average               (fn [vals] (/ (reduce + 0 vals)
+             average              (fn [vals] (/ (reduce + 0 vals)
                                                (count vals)))
              salary-avg-attending (average (mapv :salary nm-sal-attending))
              salary-avg-resident  (average (mapv :salary nm-sal-resident))
              salary-avg-volunteer (average (mapv :salary nm-sal-volunteer))
              ]
-         (is-set=  nm-sal-all
+         (is-set= nm-sal-all
            [{:first-name "Joey", :salary 42000}
             {:first-name "Dear", :salary 102000}
             {:first-name "Jane", :salary 100000}
