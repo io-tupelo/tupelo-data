@@ -50,7 +50,7 @@
      (isnt (td/only2? [{:a 1 :b 2}]))
      (isnt (td/only2? [#{:stuff :more}])))
 
-   (dotest  ; #todo => tupelo.core
+   (dotest ; #todo => tupelo.core
      (is= 5 (td/with-cum-val 0
               (doseq [ii (t/thru 5)]
                 (td/cum-val-set-it ii))))
@@ -63,12 +63,19 @@
        {0 10
         1 11
         2 12
-        3 13}) )
+        3 13})
+     (is= (td/with-cum-val {}
+            (doseq [ii (t/thru 3)]
+              (swap! td/*cumulative-val* assoc ii (+ 10 ii)))) ; can do it "manually" if desired
+       {0 10
+        1 11
+        2 12
+        3 13}))
 
-   (dotest  ; #todo => tupelo.core
+   (dotest ; #todo => tupelo.core
      (is= (td/with-cum-vector
-         (dotimes [ii 5]
-           (td/cum-vector-append ii)))
+            (dotimes [ii 5]
+              (td/cum-vector-append ii)))
        [0 1 2 3 4])
      (let [ff (fn ff-fn [n]
                 (when (t/nonneg? n)
@@ -77,17 +84,16 @@
        (is= (td/with-cum-vector (ff 5))
          [5 4 3 2 1 0]))
      ; It will even work across multiple futures:  https://clojure.org/reference/vars#conveyance
-     (let [N  10
-           rand100 (fn [] (int (+ 50 (* 50 (Math/random)))))
-           ff      (fn ff-fn [n]
-                     (Thread/sleep (rand100))
-                     (td/cum-vector-append n)
-                     n)
-           nums    (td/with-cum-vector
-                     (let [futures     (forv [ii (range N)]
-                                         (future (ff ii)))
-                           future-vals (forv [future futures] @future)] ; wait for all futures to finish
-                       (is= future-vals (range N))))] ; in order of creation
+     (let [N     10
+           randy (fn [n]
+                   (Thread/sleep (int (+ 50 (* 50 (Math/random)))))
+                   (td/cum-vector-append n)
+                   n)
+           nums  (td/with-cum-vector
+                   (let [futures     (forv [ii (range N)]
+                                       (future (randy ii)))
+                         future-vals (forv [future futures] @future)] ; wait for all futures to finish
+                     (is= future-vals (range N))))] ; in order of creation
        (is-set= nums (range N)))) ; nums is in random order
 
 
