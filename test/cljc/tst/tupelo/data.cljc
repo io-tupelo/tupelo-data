@@ -1213,7 +1213,8 @@
                {:param :zip}            "46201"}]
              )))))
 
-   (dotest-focus
+   (dotest
+     (td/eid-count-reset)
      (td/with-tdb (td/new-tdb)
        (let [data     [{:a 1 :b 1 :c 1}
                        {:a 1 :b 2 :c 2}
@@ -1222,15 +1223,17 @@
                        {:a 2 :b 1 :c 5}
                        {:a 2 :b 2 :c 6}]
              root-hid (td/add-edn data)]
-
-         (let [found (td/query-maps [{:eid ? :a 1}])]
+         (let [found (td/query-maps [{:eid eid :a 1}
+                                     (search-triple eid :b 2)])]
            (is-set= (mapv td/eid->edn found)
-             [{:a 1, :b 1, :c 1}
-              {:a 1, :b 2, :c 2}
-              {:a 1, :b 1, :c 3}]))
-
-
-         )))
+             [{:a 1, :b 2, :c 2}]))
+         (let [found (td/query-maps [{:eid eid :a 1}
+                                     (search-triple eid :b b)
+                                     (search-triple eid :c c)])]
+           (is-set= found
+             [{:eid 1002, :b 1, :c 1}
+              {:eid 1004, :b 1, :c 3}
+              {:eid 1003, :b 2, :c 2}])))))
 
    ))
 

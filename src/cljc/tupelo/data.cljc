@@ -508,6 +508,11 @@
        [& args]
        (search-triple-impl args))
 
+     (defn search-triple-form?
+       [form]
+       (and (list? form)
+         (= (quote search-triple) (xfirst form))))
+
      (s/defn index-find-leaf :- [{:eid EidType}]
        [target :- LeafType]
        ; (println :index-find-leaf )
@@ -631,15 +636,21 @@
        [query-specs]
        ; (spyx-pretty query-specs)
        (exclude-reserved-identifiers query-specs)
-       (let-spy
-         [maps-in    (keep-if map? query-specs)
-          triples-in (keep-if t/triple? query-specs)]
+       (let [maps-in      (keep-if map? query-specs)
+             triple-forms (keep-if search-triple-form? query-specs)
+             triples-proc (forv [triple-form triple-forms]
+                            ; (spyx triple-form)
+                            (let [form-eval   (cons (quote tupelo.data/search-triple)
+                                                (rest triple-form))
+                                  form-result (eval form-eval)]
+                              ; (spyx form-result)
+                              form-result))]
          ; returns result in *cumulative-val* ; #todo cleanup
          (let [map-triples    (query-maps->triples maps-in)
-               search-triples (glue map-triples triples-in)]
-           (spyx-pretty *cumulative-val*)
+               search-triples (glue map-triples triples-proc)]
+           ; (spyx-pretty *cumulative-val*)
            (let [unfiltered-results# (query-triples search-triples)]
-             (spyx unfiltered-results#)
+             ; (spyx unfiltered-results#)
              (query-results-filter-tmp-attr-mapentry
                (query-results-filter-tmp-eid-mapentry
                  unfiltered-results#))))))
@@ -670,6 +681,7 @@
        `(unwrap-query-results (query-maps->wrapped ~qspecs)))
 
      (defmacro query-maps
+       "Will evaluate embedded calls to `(search-triple ...)` "
        [qspecs]
        (query-maps-impl qspecs))
 
