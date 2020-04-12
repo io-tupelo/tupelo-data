@@ -631,15 +631,15 @@
        [query-specs]
        ; (spyx-pretty query-specs)
        (exclude-reserved-identifiers query-specs)
-       (let ; -spy
+       (let-spy
          [maps-in    (keep-if map? query-specs)
           triples-in (keep-if t/triple? query-specs)]
          ; returns result in *cumulative-val* ; #todo cleanup
          (let [map-triples    (query-maps->triples maps-in)
                search-triples (glue map-triples triples-in)]
-           ; (spyx-pretty *cumulative-val*)
+           (spyx-pretty *cumulative-val*)
            (let [unfiltered-results# (query-triples search-triples)]
-             ; (spyx unfiltered-results#)
+             (spyx unfiltered-results#)
              (query-results-filter-tmp-attr-mapentry
                (query-results-filter-tmp-eid-mapentry
                  unfiltered-results#))))))

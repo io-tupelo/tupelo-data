@@ -21,6 +21,7 @@
             [tupelo.data.index :as index]
             [tupelo.string :as ts]
             [tupelo.tag :as tv]
+            [tupelo.profile :as prof]
             [clojure.walk :as walk]))
   #?(:cljs (:require
              [tupelo.test-cljs :refer [define-fixture deftest dotest is isnt is= isnt= is-set= is-nonblank= testing throws?]
@@ -35,6 +36,10 @@
 
 #?(:clj
  (do
+
+   (dotest
+     (is= 3 (eval (quote (+ 1 2))))
+     )
 
    (dotest ; #todo => tupelo.core
      (is (td/only? [1]))
@@ -1208,9 +1213,26 @@
                {:param :zip}            "46201"}]
              )))))
 
+   (dotest-focus
+     (td/with-tdb (td/new-tdb)
+       (let [data     [{:a 1 :b 1 :c 1}
+                       {:a 1 :b 2 :c 2}
+                       {:a 1 :b 1 :c 3}
+                       {:a 2 :b 2 :c 4}
+                       {:a 2 :b 1 :c 5}
+                       {:a 2 :b 2 :c 6}]
+             root-hid (td/add-edn data)]
+
+         (let [found (td/query-maps [{:eid ? :a 1}])]
+           (is-set= (mapv td/eid->edn found)
+             [{:a 1, :b 1, :c 1}
+              {:a 1, :b 2, :c 2}
+              {:a 1, :b 1, :c 3}]))
 
 
- ))
+         )))
+
+   ))
 
 
 
