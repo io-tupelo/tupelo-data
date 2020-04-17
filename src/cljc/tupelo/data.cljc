@@ -443,18 +443,6 @@
          ; (spyx :unwrap-query-result-leave result)
          result))
 
-     (s/defn unwrap-query-results
-       [query-result-maps]
-       (forv [result-map query-result-maps]
-         (apply glue
-           (forv [mapentry result-map]
-             (let [[me-key me-val] mapentry
-                   param-raw (unwrap-param me-key)
-                   val-raw   (cond
-                               (wrapped-eid? me-val) (unwrap-eid me-val)
-                               :else me-val)]
-               {param-raw val-raw})))))
-
      (s/defn ^:no-doc query-triples-impl :- s/Any
        [query-result env qspec-list]
        (t/with-spy-indent
@@ -692,9 +680,10 @@
              triple-forms (keep-if search-triple-form? query-specs)
              triples-proc (forv [triple-form triple-forms]
                             ; (spyx triple-form)
-                            (let [form-eval   (cons (quote tupelo.data/search-triple)
+                            (let [form-to-eval   (cons
+                                                (quote tupelo.data/search-triple)
                                                 (rest triple-form))
-                                  form-result (eval form-eval)]
+                                  form-result (eval form-to-eval)]
                               ; (spyx form-result)
                               form-result))]
          ; returns result in *cumulative-val* ; #todo cleanup
@@ -712,18 +701,30 @@
              (spyx-pretty :query-maps->wrapped-fn-leave filtered-results#)
              filtered-results#))))
 
-     (defn ^:no-doc query-maps->wrapped-impl
-       [qspecs]
-       `(query-maps->wrapped-fn (quote ~qspecs)))
-
-     (defmacro query-maps->wrapped
-       [qspecs]
-       (query-maps->wrapped-impl qspecs))
+     ;(defn ^:no-doc query-maps->wrapped-impl
+     ;  [qspecs]
+     ;  `(query-maps->wrapped-fn (quote ~qspecs)))
+     ;
+     ;(defmacro query-maps->wrapped
+     ;  [qspecs]
+     ;  (query-maps->wrapped-impl qspecs))
+     ;
+     (s/defn unwrap-query-results
+       [query-result-maps]
+       (forv [result-map query-result-maps]
+         (apply glue
+           (forv [mapentry result-map]
+             (let [[me-key me-val] mapentry
+                   param-raw (unwrap-param me-key)
+                   val-raw   (cond
+                               (wrapped-eid? me-val) (unwrap-eid me-val)
+                               :else me-val)]
+               {param-raw val-raw})))))
 
      (defn query-maps-impl
        [qspecs]
        ; #todo need a linter to catch nonsensical qspecs (attr <> keyword for example)
-       `(let [unwrapped-query-results# (unwrap-query-results (query-maps->wrapped ~qspecs))]
+       `(let [unwrapped-query-results# (unwrap-query-results (query-maps->wrapped-fn (quote ~qspecs)))]
           (spyx unwrapped-query-results#)
           unwrapped-query-results#))
 

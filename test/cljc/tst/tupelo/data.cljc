@@ -536,11 +536,6 @@
          (is= {:param :x}
            (td/->SearchParam-fn (quote x))
            (td/->SearchParam-fn :x))
-
-         (is= (td/query-maps->wrapped-impl (quote [{:eid x :map y}
-                                                   {:eid y :a a}]))
-           '(tupelo.data/query-maps->wrapped-fn (quote [{:eid x, :map y}
-                                                        {:eid y, :a a}])))
          )))
 
      (dotest
@@ -549,12 +544,6 @@
          (let [root-hid (td/add-edn edn-val)]
            ; (spyx-pretty (grab :idx-eav (deref *tdb*)))
            (is= edn-val (td/eid->edn root-hid))
-
-           (is= (td/query-maps->wrapped [{:eid x :map y}
-                                         {:eid y :a a}])
-             [{{:param :x} {:eid 1001},
-               {:param :y} {:eid 1003},
-               {:param :a} 1}])
            (is= edn-val (td/eid->edn {:eid 1001}))
            (is= (td/eid->edn {:eid 1003}) {:a 1 :b 2})
            (comment ; #todo API:  output should look like
@@ -574,21 +563,8 @@
        (let [root-hid (td/add-edn edn-val)]
          ; (spyx-pretty (grab :idx-eav (deref *tdb*)))
          (is= edn-val (td/eid->edn root-hid))
-         (when false
-           (nl)
-           (spyx-pretty
-             (td/query-maps->wrapped-impl (quote [{:eid x :map {:a a}}]))))
-
-         (is= (td/query-maps->wrapped [{:eid x :map {:a a}}])
-           [{{:param :x} {:eid 1001},
-             {:param :a} 1}])
          (is= :x (td/unwrap-param {:param :x}))
-         (is= 1234 (td/unwrap-eid {:eid 1234}))
-
-         (is= (td/query-maps->wrapped [{:map {:a a}}])
-           [{{:param :a} 1}])
-         (is= (td/query-maps->wrapped [{:hashmap {:a a}}])
-           [{{:param :a} 21}]) )))
+         (is= 1234 (td/unwrap-eid {:eid 1234})) )))
 
    (dotest
      (td/with-tdb (td/new-tdb)
@@ -603,10 +579,6 @@
 
          (throws? (td/exclude-reserved-identifiers {:a {:tmp-eid-123 :x}}))
          (throws? (td/exclude-reserved-identifiers (quote {:a {:x [1 2 3 tmp-eid-123 4 5 6]}})))
-         (throws? (td/query-maps->wrapped-fn (quote [{:map {:a tmp-eid-123}}])))
-
-         (is= (td/query-maps->wrapped [{:map {:a ?}}])
-           [{{:param :a} 1}])
 
          (is= (td/unwrap-query-results [{{:param :a} 1}])
            [{:a 1}])
