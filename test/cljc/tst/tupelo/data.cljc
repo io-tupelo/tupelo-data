@@ -336,19 +336,21 @@
             :idx-ave  #{[:a 1 {:eid 1001}] [:b 2 {:eid 1001}]},
             :idx-eav  #{[{:eid 1001} :a 1]
                         [{:eid 1001} :b 2]},
-            :idx-vae  #{[1 :a {:eid 1001}] [2 :b {:eid 1001}]}} ))
+            :idx-vae  #{[1 :a {:eid 1001}] [2 :b {:eid 1001}]}}))
 
-       (let [search-spec [[{:param :x} :a 1]]]
-         (is= (query-triples search-spec)
+       (let [triple-specs [[{:param :x} :a 1]]]
+         (let [pred1 (fn [query-result]
+                       (t/with-map-vals query-result [x]
+                         (pos? x)))
+               pred2 (fn [query-result]
+                       (t/with-map-vals query-result [x]
+                         (int? x)))]
+           (spyx-pretty (td/query-triples+preds
+                          triple-specs
+                          [pred1 pred2])))
+         (is= (query-triples triple-specs)
            [{{:param :x} {:eid 1001}}]))
-
-       (let [search-spec [[{:param :x}  :a {:param :y}]]]
-         (is= (query-triples search-spec) [{{:param :x} {:eid 1001},
-                                            {:param :y}  1}]))
-
-       (let [search-spec [[(td/->SearchParam :x) (td/->SearchParam :y) 1]]]
-         (is= (query-triples search-spec) [{{:param :x} {:eid 1001},
-                                            {:param :y} :a}])) ))
+       ))
 
    (dotest
      (with-tdb (new-tdb)
@@ -616,18 +618,24 @@
                                          {:param :i} 2}])
            [{:e 1003, :i 2}])
 
+         (newline)
          (is= (td/query-maps [{:map     {:a a1}
                                :hashmap {:a a2}}])
            [{:a1 1
              :a2 21}])
 
+         (newline)
          (is-set= (td/query-maps [{kk {:a ?}}]) ; Awesome!  Found both solutions!
            [{:kk :map, :a 1}
             {:kk :hashmap, :a 21}])
 
+         (newline)
          (is= (only (td/query-maps [{:num ?}])) {:num 5})
+         (newline)
          (is= (only (td/query-maps [{:eid ? :num ?}])) {:eid 1001, :num 5})
-         (is= (only (td/query-maps [{:eid ? :num num}])) {:eid 1001, :num 5}))))
+         (newline)
+         (is= (only (td/query-maps [{:eid ? :num num}])) {:eid 1001, :num 5})
+         )))
 
    ; #todo need to convert all from compile-time macros to runtime functions
    (dotest
@@ -1181,15 +1189,15 @@
 
          ; can break it down into low level, including array index values
          (let [results-3 (td/query-triples [(search-triple eid-pers :name name)
-                                            (search-triple eid-pers :id id)
-                                            (search-triple eid-addrs id eid-addr-deets)
+                                            (search-triple eid-pers :id person-id)
+                                            (search-triple eid-addrs person-id eid-addr-deets)
                                             (search-triple eid-addr-deets idx-deet eid-addr-deet)
                                             (search-triple eid-addr-deet :zip zip)
                                             (search-triple eid-addr-deet :pref true)])]
            (is= results-3
              [{{:param :eid-pers}       {:eid 1005},
                {:param :name}           "tim",
-               {:param :id}             3,
+               {:param :person-id}      3,
                {:param :eid-addrs}      {:eid 1006},
                {:param :eid-addr-deets} {:eid 1012},
                {:param :idx-deet}       {:idx 0},
@@ -1197,7 +1205,7 @@
                {:param :zip}            "92456"}
               {{:param :eid-pers}       {:eid 1004},
                {:param :name}           "joel",
-               {:param :id}             2,
+               {:param :person-id}      2,
                {:param :eid-addrs}      {:eid 1006},
                {:param :eid-addr-deets} {:eid 1010},
                {:param :idx-deet}       {:idx 0},
@@ -1205,13 +1213,23 @@
                {:param :zip}            "86753"}
               {{:param :eid-pers}       {:eid 1003},
                {:param :name}           "jimmy",
-               {:param :id}             1,
+               {:param :person-id}      1,
                {:param :eid-addrs}      {:eid 1006},
                {:param :eid-addr-deets} {:eid 1007},
                {:param :idx-deet}       {:idx 0},
                {:param :eid-addr-deet}  {:eid 1008},
-               {:param :zip}            "46201"}]
-             )))))
+               {:param :zip}            "46201"}]))
+
+         (let [results-4 (td/query-maps [{:people {:eid eid-pers :name ? :id ?}
+                                          :addrs {:eid eid-addrs }
+                                          :visits {:eid eid-visits}
+                                          }
+                                         (search-triple eid-addrs id eid-addr-deets)
+                                         (search-triple eid-addr-deets idx-deet eid-addr-deet)
+                                         {:eid eid-addr-deet :zip zip :pref true}])]
+           (spyx-pretty results-4)
+           )
+         )))
 
    (dotest
      (td/eid-count-reset)

@@ -427,7 +427,35 @@
            (get env elem)
            elem)))
 
-     (s/defn ^:no-doc query-impl :- s/Any
+     (s/defn unwrap-query-result :- tsk/KeyMap
+       [resmap :- tsk/Map]
+       ; (spyx :unwrap-query-result-enter resmap)
+       (let [result (apply glue
+                      (for [me resmap]
+                        (let [[kk vv] me
+                              kk-out (if (wrapped-param? kk)
+                                       (unwrap-param kk)
+                                       kk)
+                              vv-out (if (wrapped-eid? vv)
+                                       (unwrap-eid vv)
+                                       vv)]
+                          {kk-out vv-out})))]
+         ; (spyx :unwrap-query-result-leave result)
+         result))
+
+     (s/defn unwrap-query-results
+       [query-result-maps]
+       (forv [result-map query-result-maps]
+         (apply glue
+           (forv [mapentry result-map]
+             (let [[me-key me-val] mapentry
+                   param-raw (unwrap-param me-key)
+                   val-raw   (cond
+                               (wrapped-eid? me-val) (unwrap-eid me-val)
+                               :else me-val)]
+               {param-raw val-raw})))))
+
+     (s/defn ^:no-doc query-triples-impl :- s/Any
        [query-result env qspec-list]
        (t/with-spy-indent
          ;(println :---------------------------------------------------------------------------------------------------)
@@ -461,13 +489,34 @@
 
              (forv [env-frame env-frames-found]
                (let [env-next (glue env env-frame)]
-                 (query-impl query-result env-next qspec-rest)))))))
+                 (query-triples-impl query-result env-next qspec-rest)))))))
 
      (s/defn query-triples
        [qspec-list :- [tsk/Triple]]
-       (let [query-result (atom [])]
-         (query-impl query-result {} qspec-list)
-         @query-result))
+       (let [query-results (atom [])]
+         (query-triples-impl query-results {} qspec-list)
+         ; (spyx-pretty :query-triples--results @query-results)
+         @query-results))
+
+     (s/defn query-triples+preds
+       [qspec-list :- [tsk/Triple]
+        pred-list :- [tsk/Fn]]
+       (let [query-results      (query-triples qspec-list)
+             ; >>                 (spyx query-results)
+             keep-result?       (fn fn-keep-result? [query-result]
+                                  (let [keep-flags (forv [pred pred-list]
+                                                     (pred query-result))
+                                        all-keep   (every? t/truthy? keep-flags)]
+                                    all-keep))
+             query-results-kept (with-cum-vector
+                                  (doseq [query-result query-results]
+                                    ; (spyx query-result)
+                                    (let [query-result-unwrapped (unwrap-query-result query-result)
+                                          keep-result            (keep-result? query-result-unwrapped)]
+                                      (when keep-result
+                                        (cum-vector-append query-result)))))]
+         ; (spyx query-results-kept)
+         query-results-kept))
 
      (defn ^:no-doc ->SearchParam-fn
        [arg]
@@ -516,7 +565,10 @@
      (s/defn index-find-leaf :- [{:eid EidType}]
        [target :- LeafType]
        ; (println :index-find-leaf )
-       (let [results (query-triples [[{:param :e} {:param :a}  target]])
+       (let [results (query-triples+preds
+                       [[{:param :e} {:param :a}  target]]
+                       []) ; no preds
+
              eids    (mapv #(t/fetch % {:param :e}) results)]
          eids))
 
@@ -634,7 +686,7 @@
 
      (defn ^:no-doc query-maps->wrapped-fn
        [query-specs]
-       ; (spyx-pretty query-specs)
+       (spyx-pretty :query-maps->wrapped-fn-enter query-specs)
        (exclude-reserved-identifiers query-specs)
        (let [maps-in      (keep-if map? query-specs)
              triple-forms (keep-if search-triple-form? query-specs)
@@ -649,11 +701,16 @@
          (let [map-triples    (query-maps->triples maps-in)
                search-triples (glue map-triples triples-proc)]
            ; (spyx-pretty *cumulative-val*)
-           (let [unfiltered-results# (query-triples search-triples)]
-             ; (spyx unfiltered-results#)
-             (query-results-filter-tmp-attr-mapentry
-               (query-results-filter-tmp-eid-mapentry
-                 unfiltered-results#))))))
+           (let [unfiltered-results# (query-triples+preds
+                                       search-triples
+                                       [] ; no preds
+                                       )
+                 ; >> (spyx unfiltered-results#)
+                 filtered-results#   (query-results-filter-tmp-attr-mapentry
+                                       (query-results-filter-tmp-eid-mapentry
+                                         unfiltered-results#))]
+             (spyx-pretty :query-maps->wrapped-fn-leave filtered-results#)
+             filtered-results#))))
 
      (defn ^:no-doc query-maps->wrapped-impl
        [qspecs]
@@ -663,22 +720,12 @@
        [qspecs]
        (query-maps->wrapped-impl qspecs))
 
-     (s/defn unwrap-query-results
-       [query-result-maps]
-       (forv [result-map query-result-maps]
-         (apply glue
-           (forv [mapentry result-map]
-             (let [[me-key me-val] mapentry
-                   param-raw (unwrap-param me-key)
-                   val-raw   (cond
-                               (wrapped-eid? me-val) (unwrap-eid me-val)
-                               :else me-val)]
-               {param-raw val-raw})))))
-
      (defn query-maps-impl
        [qspecs]
        ; #todo need a linter to catch nonsensical qspecs (attr <> keyword for example)
-       `(unwrap-query-results (query-maps->wrapped ~qspecs)))
+       `(let [unwrapped-query-results# (unwrap-query-results (query-maps->wrapped ~qspecs))]
+          (spyx unwrapped-query-results#)
+          unwrapped-query-results#))
 
      (defmacro query-maps
        "Will evaluate embedded calls to `(search-triple ...)` "
