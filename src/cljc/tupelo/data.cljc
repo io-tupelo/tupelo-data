@@ -672,12 +672,19 @@
                    (when (or (tmp-eid-sym? item) (tmp-eid-kw? item))
                      (throw (ex-info "Error: detected reserved tmp-eid-xxxx value" (vals->map item)))))}))
 
+     (s/defn fn-form? :- s/Bool
+       [arg :- s/Any]
+       (and (list? arg)
+         (fn? (first arg))))
+
      (defn ^:no-doc query-maps->wrapped-fn
        [query-specs]
-       (spyx-pretty :query-maps->wrapped-fn-enter query-specs)
+       ; (spyx-pretty :query-maps->wrapped-fn-enter query-specs)
        (exclude-reserved-identifiers query-specs)
        (let [maps-in      (keep-if map? query-specs)
              triple-forms (keep-if search-triple-form? query-specs)
+             pred-forms   (keep-if fn-form? query-specs)
+
              triples-proc (forv [triple-form triple-forms]
                             ; (spyx triple-form)
                             (let [form-to-eval   (cons
@@ -692,23 +699,14 @@
            ; (spyx-pretty *cumulative-val*)
            (let [unfiltered-results# (query-triples+preds
                                        search-triples
-                                       [] ; no preds
-                                       )
+                                       pred-forms )
                  ; >> (spyx unfiltered-results#)
                  filtered-results#   (query-results-filter-tmp-attr-mapentry
                                        (query-results-filter-tmp-eid-mapentry
                                          unfiltered-results#))]
-             (spyx-pretty :query-maps->wrapped-fn-leave filtered-results#)
+             ; (spyx-pretty :query-maps->wrapped-fn-leave filtered-results#)
              filtered-results#))))
 
-     ;(defn ^:no-doc query-maps->wrapped-impl
-     ;  [qspecs]
-     ;  `(query-maps->wrapped-fn (quote ~qspecs)))
-     ;
-     ;(defmacro query-maps->wrapped
-     ;  [qspecs]
-     ;  (query-maps->wrapped-impl qspecs))
-     ;
      (s/defn unwrap-query-results
        [query-result-maps]
        (forv [result-map query-result-maps]
@@ -725,7 +723,7 @@
        [qspecs]
        ; #todo need a linter to catch nonsensical qspecs (attr <> keyword for example)
        `(let [unwrapped-query-results# (unwrap-query-results (query-maps->wrapped-fn (quote ~qspecs)))]
-          (spyx unwrapped-query-results#)
+          ; (spyx unwrapped-query-results#)
           unwrapped-query-results#))
 
      (defmacro query-maps
@@ -733,9 +731,7 @@
        [qspecs]
        (query-maps-impl qspecs))
 
-
-
-
+     ;----------------------------------------------------------------------------------------------
      ;(s/defn index-find-mapentry :- [EidType]
      ;  [tgt-me :- tsk/MapEntry]
      ;  (let [[tgt-key tgt-val] (mapentry->kv tgt-me)

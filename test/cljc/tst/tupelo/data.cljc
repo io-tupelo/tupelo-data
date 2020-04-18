@@ -10,7 +10,7 @@
   #?(:clj (:require
             [tupelo.test :refer [define-fixture deftest dotest dotest-focus is isnt is= isnt= is-set= is-nonblank= testing throws?]]
             [tupelo.core :as t :refer [spy spyx spyxx spy-pretty spyx-pretty unlazy let-spy
-                                       only only2 forv glue grab nl
+                                       only only2 forv glue grab nl keep-if drop-if
                                        ]]
             [tupelo.data :as td :refer [with-tdb new-tdb eid-count-reset lookup query-triples boolean->binary search-triple
                                         *tdb*
@@ -344,13 +344,14 @@
                          (pos? x)))
                pred2 (fn [query-result]
                        (t/with-map-vals query-result [x]
-                         (int? x)))]
-           (spyx-pretty (td/query-triples+preds
-                          triple-specs
-                          [pred1 pred2])))
-         (is= (query-triples triple-specs)
-           [{{:param :x} {:eid 1001}}]))
-       ))
+                         (int? x)))
+               ]
+           (is= (query-triples triple-specs)
+             [{{:param :x} {:eid 1001}}])
+           (is= (td/query-triples+preds
+                  triple-specs
+                  [pred1 pred2])
+             [{{:param :x} {:eid 1001}}])))))
 
    (dotest
      (with-tdb (new-tdb)
@@ -590,22 +591,17 @@
                                          {:param :i} 2}])
            [{:e 1003, :i 2}])
 
-         (newline)
          (is= (td/query-maps [{:map     {:a a1}
                                :hashmap {:a a2}}])
            [{:a1 1
              :a2 21}])
 
-         (newline)
          (is-set= (td/query-maps [{kk {:a ?}}]) ; Awesome!  Found both solutions!
            [{:kk :map, :a 1}
             {:kk :hashmap, :a 21}])
 
-         (newline)
          (is= (only (td/query-maps [{:num ?}])) {:num 5})
-         (newline)
          (is= (only (td/query-maps [{:eid ? :num ?}])) {:eid 1001, :num 5})
-         (newline)
          (is= (only (td/query-maps [{:eid ? :num num}])) {:eid 1001, :num 5})
          )))
 
@@ -1106,7 +1102,7 @@
                                     :address2 "apt 2"
                                     :city     "Townville"
                                     :state    "IN"
-                                    :zip      "46201"
+                                    :zip      "11201"
                                     :pref     true}
                                    {:addr     "534 street ave",
                                     :address2 "apt 5",
@@ -1118,25 +1114,23 @@
                                     :address2 "apt 200"
                                     :city     "Town"
                                     :state    "CA"
-                                    :zip      "86753"
+                                    :zip      "11753"
                                     :pref     true}]
                                 3 [{:addr     "1448 street st"
                                     :address2 "apt 1"
                                     :city     "City"
                                     :state    "WA"
-                                    :zip      "92456"
+                                    :zip      "11456"
                                     :pref     true}]
                                 }
-                       :visits {1 [{:date "12-25-1900" :geo-loc {:zip "46203"}}
+                       :visits {1 [{:date "12-25-1900" :geo-loc {:zip "11201"}}
                                    {:date "12-31-1900" :geo-loc {:zip "00666"}}]
                                 2 [{:date "1-1-1970" :geo-loc {:zip "12345"}}
-                                   {:date "2-1-1970" :geo-loc {:zip "86753"}}]
+                                   {:date "2-1-1970" :geo-loc {:zip "11753"}}]
                                 3 [{:date "4-4-4444" :geo-loc {:zip "54221"}}
-                                   {:date "5-4-4444" :geo-loc {:zip "92456"}}]
-                                }}
+                                   {:date "5-4-4444" :geo-loc {:zip "11456"}}]}}
 
              root-eid (td/add-edn data)]
-         ; (spyx-pretty td/*tdb*)
          (let [results (td/query-maps [{:people [{:name ? :id id}]}])]
            (is= results
              [{:name "jimmy", :id 1}
@@ -1144,10 +1138,33 @@
               {:name "tim", :id 3}]))
 
          (let [results-2 (td/query-maps [{:addrs {id [{:zip ? :pref true}]}}])]
-           (is= results-2
-             [{:id 2, :zip "86753"}
-              {:id 1, :zip "46201"}
-              {:id 3, :zip "92456"}]))
+           (is-set= results-2
+             [{:id 2, :zip "11753"}
+              {:id 1, :zip "11201"}
+              {:id 3, :zip "11456"}])
+
+           ; Basically an "anti-join" query.  Could be much better!
+           (let [user-pref-zip   (apply glue
+                                   (forv [m results-2]
+                                     {(grab :id m) (grab :zip m)}))
+                 results-9       (td/query-maps [{:visits {id [{:date ? :geo-loc {:zip ?}}]}}])
+                 results-9-by-id (group-by :id results-9)
+                 results-9-by-id-bad
+                                 (apply glue
+                                   (sorted-map)
+                                   (forv [me-use results-9-by-id]
+                                     (let [[id acc-maps] me-use]
+                                       {id (keep-if
+                                             (fn [acc-map]
+                                               (let [id       (grab :id acc-map)
+                                                     zip-acc  (grab :zip acc-map)
+                                                     zip-pref (grab id user-pref-zip)]
+                                                 (not= zip-acc zip-pref)))
+                                             acc-maps)}))) ]
+             (is= results-9-by-id-bad
+               {1 [{:date "12-31-1900", :zip "00666", :id 1}],
+                2 [{:date "1-1-1970", :zip "12345", :id 2}],
+                3 [{:date "4-4-4444", :zip "54221", :id 3}]}) ))
 
          ; ***** this is the big one! *****
          (let [results (td/query-maps
@@ -1174,7 +1191,7 @@
                {:param :eid-addr-deets} {:eid 1012},
                {:param :idx-deet}       {:idx 0},
                {:param :eid-addr-deet}  {:eid 1013},
-               {:param :zip}            "92456"}
+               {:param :zip}            "11456"}
               {{:param :eid-pers}       {:eid 1004},
                {:param :name}           "joel",
                {:param :person-id}      2,
@@ -1182,7 +1199,7 @@
                {:param :eid-addr-deets} {:eid 1010},
                {:param :idx-deet}       {:idx 0},
                {:param :eid-addr-deet}  {:eid 1011},
-               {:param :zip}            "86753"}
+               {:param :zip}            "11753"}
               {{:param :eid-pers}       {:eid 1003},
                {:param :name}           "jimmy",
                {:param :person-id}      1,
@@ -1190,7 +1207,7 @@
                {:param :eid-addr-deets} {:eid 1007},
                {:param :idx-deet}       {:idx 0},
                {:param :eid-addr-deet}  {:eid 1008},
-               {:param :zip}            "46201"}]))
+               {:param :zip}            "11201"}]))
 
          (let [results-4 (td/query-maps [{:people {:eid eid-pers :name ? :id ?}
                                           :addrs {:eid eid-addrs }
@@ -1199,7 +1216,32 @@
                                          (search-triple eid-addrs id eid-addr-deets)
                                          (search-triple eid-addr-deets idx-deet eid-addr-deet)
                                          {:eid eid-addr-deet :zip zip :pref true}])]
-           (spyx-pretty results-4)
+           (is= results-4
+             [{:eid-addr-deets 1012,
+               :eid-pers       1005,
+               :eid-addr-deet  1013,
+               :zip            "11456",
+               :idx-deet       {:idx 0},
+               :id             3,
+               :name           "tim",
+               :eid-addrs      1006}
+              {:eid-addr-deets 1010,
+               :eid-pers       1004,
+               :eid-addr-deet  1011,
+               :zip            "11753",
+               :idx-deet       {:idx 0},
+               :id             2,
+               :name           "joel",
+               :eid-addrs      1006}
+              {:eid-addr-deets 1007,
+               :eid-pers       1003,
+               :eid-addr-deet  1008,
+               :zip            "11201",
+               :idx-deet       {:idx 0},
+               :id             1,
+               :name           "jimmy",
+               :eid-addrs      1006}])
+
            )
          )))
 
