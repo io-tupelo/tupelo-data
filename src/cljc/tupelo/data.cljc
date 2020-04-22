@@ -14,13 +14,15 @@
                                        keep-if drop-if append prepend
                                        ]]
             [tupelo.data.index :as index]
+            [tupelo.lexical :as lex]
             [tupelo.schema :as tsk]
             [tupelo.vec :as vec]
             [tupelo.tag :as tv]
 
             [clojure.set :as set]
+            [clojure.walk :as walk]
             [schema.core :as s]
-            [tupelo.lexical :as lex]))
+            ))
   #?(:cljs (:require
              [tupelo.core :as t :refer [spy spyx spyxx spyx-pretty grab]] ; #todo :include-macros true
              [tupelo.schema :as tsk]
@@ -77,6 +79,65 @@
 
      ; #todo Tupelo Data Language (TDL)
 
+     ;-----------------------------------------------------------------------------
+     (defprotocol IVal (<val [this]))
+     (defprotocol ITag (<tag [this]))
+
+     (defrecord TagVal
+       [tag val]
+       ITag (<tag [this] tag)
+       IVal (<val [this] val))
+
+     (defn tagged? :- s/Bool
+       [arg :- s/Any]
+       (= TagVal (type arg)))
+
+     (defn untagged :- s/Any
+       [arg :- s/Any]
+       (t/cond-it-> arg
+         (tagged? arg) (<val arg)))
+
+     (defmethod print-method TagVal
+       [tv ^java.io.Writer writer]
+       (.write writer
+         (format "<%s %s>" (<tag tv) (<val tv) ) ))
+
+     ;-----------------------------------------------------------------------------
+     (defn unquote-form?
+       [arg]
+       (and (list? arg)
+         (= (quote unquote) (first arg)) ) )
+
+     (defn unquote-splicing-form?
+       [arg]
+       (and (list? arg)
+         (= (quote unquote-splicing) (first arg)) ) )
+
+     (defn quote-template-impl
+       [form]
+       (walk/prewalk
+         (fn [item]
+           (cond
+             (unquote-form? item) (eval (xsecond item))
+             (sequential? item) (let [unquoted-vec (apply glue
+                                                     (forv [it item]
+                                                       (if (unquote-splicing-form? it)
+                                                         (eval (xsecond it))
+                                                         [it])))
+                                      final-result (if (list? item)
+                                                     (t/->list unquoted-vec)
+                                                     unquoted-vec)]
+                                  final-result)
+             :else item))
+         form))
+
+     (defmacro quote-template
+       [form]
+       (quote-template-impl form))
+
+
+
+     ;-----------------------------------------------------------------------------
      (def customers ; #todo be able to process this data & delete unwise users
        [{:customer-id 1
          :plants      [{:plant-id  1
@@ -175,19 +236,17 @@
        [] (sorted-set-by lex/compare-generic))
 
      ;-----------------------------------------------------------------------------
+     ; (def WrappedEid {:eid s/Int})
      (def WrappedParam {:param s/Any})
-     (def WrappedEid {:eid s/Int})
      (def WrappedIdx {:idx s/Int})
      ; (def WrappedAttr {:attr s/Any})
      ; (def WrappedLeaf {:leaf s/Any})
 
      ; #todo inline all of these?
-     (s/defn wrap-eid :- WrappedEid
-       [arg :- s/Int]
-       (tv/new :eid (t/validate int? arg)))
-     (s/defn wrap-idx :- WrappedIdx
-       [arg :- s/Int]
-       (tv/new :idx (t/validate int? arg)))
+     (s/defn tag-eid :- TagVal
+       [arg :- s/Int] (->TagVal :eid (t/validate int? arg)))
+     (s/defn tag-idx :- WrappedIdx
+       [arg :- s/Int] (->TagVal :idx (t/validate int? arg)))
 
      ;(s/defn wrap-attr :- WrappedAttr
      ;  [arg] (tv/new :attr arg))
@@ -196,7 +255,7 @@
 
      (defn pair-map? [arg] (and (map? arg) (= 1 (count arg))))
      (defn wrapped-param? [x] (and (pair-map? x) (= :param (key (t/only x)))))
-     (defn wrapped-eid? [x] (and (pair-map? x) (= :eid (key (t/only x)))))
+     (defn tagged-eid? [x] (and (= TagVal (type x)) (= :eid (<key  x))))
      ;(defn wrapped-attr? [x] (and (pair-map? x) (= :attr (key (t/only x)))))
      ;(defn wrapped-leaf? [x] (and (pair-map? x) (= :leaf (key (t/only x)))))
 
@@ -206,24 +265,6 @@
        [arg :- WrappedParam]
        (t/validate wrapped-param? arg)
        (val (t/only arg)))
-     (s/defn unwrap-eid :- s/Int
-       "Unwraps an EidMap to return the eid value
-         (unwrap-param {:eid 1234} )  =>  1234 "
-       [arg :- WrappedEid]
-       (t/validate wrapped-eid? arg)
-       (val (t/only arg)))
-     ;(s/defn unwrap-attr :- s/Any
-     ;  "Unwraps an AttrMap to return the attr value
-     ;    (unwrap-param {:attr :color} )  =>  :color "
-     ;  [arg :- WrappedAttr]
-     ;  (t/validate wrapped-attr? arg)
-     ;  (val (t/only arg)))
-     ;(s/defn unwrap-leaf :- s/Any
-     ;  "Unwraps an LeafMap to return the leaf value
-     ;    (unwrap-param {:leaf :color} )  =>  :color "
-     ;  [arg :- WrappedLeaf]
-     ;  (t/validate wrapped-leaf? arg)
-     ;  (val (t/only arg)))
 
      ;-----------------------------------------------------------------------------
      (s/defn tmp-eid-prefix-str? :- s/Bool
@@ -295,7 +336,7 @@
        "Returns the next integer EID"
        [] (swap! eid-counter inc))
 
-     (s/defn add-edn :- WrappedEid ; EidType ; #todo maybe rename:  load-edn->eid  ???
+     (s/defn add-edn :- TagVal ; EidType ; #todo maybe rename:  load-edn->eid  ???
        "Add the EDN arg to the indexes, returning the EID"
        [edn-in :- s/Any]
        ;(spyq :-----------------------------------------------------------------------------)
@@ -304,14 +345,14 @@
        (with-spy-indent
          (when-not (entity-like? edn-in)
            (throw (ex-info "invalid edn-in" (vals->map edn-in))))
-         (let [eid-this (wrap-eid (new-eid))
+         (let [eid-this (tag-eid (new-eid))
                ctx      (cond ; #todo add set
                           (map? edn-in) {:entity-type :map :edn-use edn-in}
                           (set? edn-in) {:entity-type :set :edn-use (zipmap edn-in edn-in)}
                           (array-like? edn-in) {:entity-type :array
                                                 :edn-use ;  (indexed edn-in)
                                                              (forv [[idx val] (indexed edn-in)]
-                                                               [(wrap-idx idx) val])}
+                                                               [(tag-idx idx) val])}
                           :else (throw (ex-info "unknown value found" (vals->map edn-in))))]
            (t/with-map-vals ctx [entity-type edn-use]
              ;(newline)
@@ -333,14 +374,14 @@
      ; #todo need to handle sets
      (s/defn eid->edn :- s/Any
        "Returns the EDN subtree rooted at a eid."
-       [eid-in :- WrappedEid]
+       [eid-in :- TagVal]
        (let [eav-matches (index/prefix-matches [eid-in] (grab :idx-eav @*tdb*))
              result-map  (apply glue
                            (forv [[match-eid match-attr match-val] eav-matches]
                              ; (spyx [match-eid match-attr match-val])
                              (assert (= eid-in match-eid)) ; verify is a prefix match
                              (let [attr-edn  match-attr
-                                   val-edn  (if (wrapped-eid? match-val)
+                                   val-edn  (if (tagged-eid? match-val)
                                               (eid->edn match-val) ; Eid rec
                                                match-val)] ; Leaf rec
                                (t/map-entry attr-edn val-edn))))
@@ -433,12 +474,8 @@
        (let [result (apply glue
                       (for [me resmap]
                         (let [[kk vv] me
-                              kk-out (if (wrapped-param? kk)
-                                       (unwrap-param kk)
-                                       kk)
-                              vv-out (if (wrapped-eid? vv)
-                                       (unwrap-eid vv)
-                                       vv)]
+                              kk-out (untagged kk)
+                              vv-out (untagged vv) ]
                           {kk-out vv-out})))]
          ; (spyx :unwrap-query-result-leave result)
          result))
@@ -490,7 +527,7 @@
        [qspec-list :- [tsk/Triple]
         pred-list :- [tsk/Fn]]
        (let [query-results      (query-triples qspec-list)
-             ; >>                 (spyx query-results)
+             >>                 (spyx query-results)
              keep-result?       (fn fn-keep-result? [query-result]
                                   (let [keep-flags (forv [pred pred-list]
                                                      (pred query-result))
@@ -498,12 +535,12 @@
                                     all-keep))
              query-results-kept (with-cum-vector
                                   (doseq [query-result query-results]
-                                    ; (spyx query-result)
+                                    (spyx query-result)
                                     (let [query-result-unwrapped (unwrap-query-result query-result)
                                           keep-result            (keep-result? query-result-unwrapped)]
                                       (when keep-result
                                         (cum-vector-append query-result)))))]
-         ; (spyx query-results-kept)
+         (spyx query-results-kept)
          query-results-kept))
 
      (defn ^:no-doc ->SearchParam-fn
@@ -528,7 +565,7 @@
          (let [[e a v] args
                e-out (if (symbol? e)
                        (->SearchParam-fn e)
-                       (wrap-eid e))
+                       (tag-eid e))
                a-out (if (symbol? a)
                        (->SearchParam-fn a)
                        a)
@@ -674,37 +711,49 @@
 
      (s/defn fn-form? :- s/Bool
        [arg :- s/Any]
-       (and (list? arg)
-         (fn? (first arg))))
+       (and (list? (spyx arg))
+         (let [elem0 (xfirst arg)]
+           (and (symbol? elem0)
+             (spy :fn-result (fn? (spyxx (eval elem0))))))))
 
      (defn ^:no-doc query-maps->wrapped-fn
        [query-specs]
-       ; (spyx-pretty :query-maps->wrapped-fn-enter query-specs)
+       (spyx-pretty :query-maps->wrapped-fn-enter query-specs)
        (exclude-reserved-identifiers query-specs)
        (let [maps-in      (keep-if map? query-specs)
              triple-forms (keep-if search-triple-form? query-specs)
              pred-forms   (keep-if fn-form? query-specs)
+             >> (spyx maps-in)
+             >> (spyx triple-forms)
+             >> (spyx pred-forms)
+             pred-fns     (forv [pred-form pred-forms]
+                            (fn [arg]
+                              (newline)
+                              (println :pred-fn arg)
+                              (newline)
+                              (tupelo.core/with-map-vals arg [zip-acc zip-pref]
+                                (not= zip-acc zip-pref))))
 
              triples-proc (forv [triple-form triple-forms]
-                            ; (spyx triple-form)
-                            (let [form-to-eval   (cons
-                                                (quote tupelo.data/search-triple)
-                                                (rest triple-form))
-                                  form-result (eval form-to-eval)]
-                              ; (spyx form-result)
+                            (spyx triple-form)
+                            (let [form-to-eval (cons
+                                                 (quote tupelo.data/search-triple)
+                                                 (rest triple-form))
+                                  form-result  (eval form-to-eval)]
+                              (spyx form-result)
                               form-result))]
          ; returns result in *cumulative-val* ; #todo cleanup
          (let [map-triples    (query-maps->triples maps-in)
                search-triples (glue map-triples triples-proc)]
-           ; (spyx-pretty *cumulative-val*)
+           (spyx-pretty *cumulative-val*)
            (let [unfiltered-results# (query-triples+preds
                                        search-triples
-                                       pred-forms )
-                 ; >> (spyx unfiltered-results#)
+                                       pred-fns )
+                 >> (spyx unfiltered-results#)
                  filtered-results#   (query-results-filter-tmp-attr-mapentry
                                        (query-results-filter-tmp-eid-mapentry
                                          unfiltered-results#))]
-             ; (spyx-pretty :query-maps->wrapped-fn-leave filtered-results#)
+             (spyx-pretty :query-maps->wrapped-fn-leave filtered-results#)
              filtered-results#))))
 
      (s/defn unwrap-query-results
@@ -715,7 +764,7 @@
              (let [[me-key me-val] mapentry
                    param-raw (unwrap-param me-key)
                    val-raw   (cond
-                               (wrapped-eid? me-val) (unwrap-eid me-val)
+                               (tagged-eid? me-val) (<val me-val)
                                :else me-val)]
                {param-raw val-raw})))))
 

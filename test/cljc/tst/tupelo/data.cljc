@@ -10,19 +10,17 @@
   #?(:clj (:require
             [tupelo.test :refer [define-fixture deftest dotest dotest-focus is isnt is= isnt= is-set= is-nonblank= testing throws?]]
             [tupelo.core :as t :refer [spy spyx spyxx spy-pretty spyx-pretty unlazy let-spy
-                                       only only2 forv glue grab nl keep-if drop-if
+                                       only only2 forv glue grab nl keep-if drop-if ->sym
                                        ]]
             [tupelo.data :as td :refer [with-tdb new-tdb eid-count-reset lookup query-triples boolean->binary search-triple
                                         *tdb*
                                         ]]
-            [tupelo.misc :as misc]
             [clojure.set :as set]
+            [clojure.string :as str]
             [schema.core :as s]
             [tupelo.data.index :as index]
-            [tupelo.string :as ts]
             [tupelo.tag :as tv]
-            [tupelo.profile :as prof]
-            [clojure.walk :as walk]))
+            ))
   #?(:cljs (:require
              [tupelo.test-cljs :refer [define-fixture deftest dotest is isnt is= isnt= is-set= is-nonblank= testing throws?]
               :include-macros true]
@@ -36,6 +34,93 @@
 
 #?(:clj
  (do
+
+   ;-----------------------------------------------------------------------------
+   (dotest
+     (let [tv     (td/->TagVal :a 1)
+           tv-str (with-out-str (println tv))]
+       (is= {:tag :a :val 1} (unlazy tv))
+       (is= :a (td/<tag tv))
+       (is= 1 (td/<val tv))
+       (is= "<:a 1>" (str/trim tv-str))
+       (is (td/tagged? tv))
+       (isnt (td/tagged? 1))
+       (is= 1 (td/untagged tv))
+       (is= 1 (td/untagged 1)) )
+
+     (let [sa  (t/->sym :a)
+           tva (td/->TagVal :sym sa)]
+       (is= (unlazy tva) {:tag :sym, :val (quote a)})))
+
+   ;-----------------------------------------------------------------------------
+   (def vec234 [2 3 4])
+
+   (dotest
+     (is (td/unquote-form? (quote (unquote (+ 2 3)))))
+     (is (td/unquote-splicing-form? (quote (unquote-splicing (+ 2 3)))))
+
+     (is= (td/quote-template-impl (quote {:a 1 :b (unquote (+ 2 3))}))
+       {:a 1, :b 5})
+     (is= (td/quote-template {:a 1 :b (unquote (+ 2 3))})
+       {:a 1, :b 5})
+     (is= (td/quote-template {:a 1 :b (unquote (vec (range 3)))})
+       {:a 1, :b [0 1 2]})
+     (is= (td/quote-template {:a 1 :b (unquote vec234)})
+       {:a 1, :b [2 3 4]})
+
+     (let [result (td/quote-template (list 1 2 (unquote (inc 2)) 4 5))]
+       (is (list? result))
+       (is= result (quote (1 2 3 4 5))))
+
+     (is= (td/quote-template-impl (quote [1 (unquote-splicing (range 2 5)) 5]))
+       [1 2 3 4 5])
+     (is= (td/quote-template-impl (quote [1 (unquote-splicing tst.tupelo.data/vec234) 5])) ; must be fully-qualified Var here
+       [1 2 3 4 5])
+     (is= (td/quote-template [1 (unquote-splicing vec234) 5]) ; unqualified name OK here
+       [1 2 3 4 5])
+     (is= (td/quote-template [1 (unquote-splicing (t/thru 2 4)) 5])
+       [1 2 3 4 5])
+     (is= (td/quote-template [1 (unquote (t/thru 2 4)) 5])
+       [1 [2 3 4] 5])
+     )
+
+   ;-----------------------------------------------------------------------------
+   (def users-and-accesses {:people [{:name "jimmy" :id 1}
+                                     {:name "joel" :id 2}
+                                     {:name "tim" :id 3} ]
+                            :addrs  {1 [{:addr     "123 street ave"
+                                         :address2 "apt 2"
+                                         :city     "Townville"
+                                         :state    "IN"
+                                         :zip      "11201"
+                                         :pref     true}
+                                        {:addr     "534 street ave",
+                                         :address2 "apt 5",
+                                         :city     "Township",
+                                         :state    "IN",
+                                         :zip      "00666"
+                                         :pref     false}]
+                                     2 [{:addr     "2026 park ave"
+                                         :address2 "apt 200"
+                                         :city     "Town"
+                                         :state    "CA"
+                                         :zip      "11753"
+                                         :pref     true}]
+                                     3 [{:addr     "1448 street st"
+                                         :address2 "apt 1"
+                                         :city     "City"
+                                         :state    "WA"
+                                         :zip      "11456"
+                                         :pref     true}] }
+                            :visits {1 [{:date "12-25-1900" :geo-loc {:zip "11201"}}
+                                        {:date "12-31-1900" :geo-loc {:zip "00666"}}]
+                                     2 [{:date "1-1-1970" :geo-loc {:zip "12345"}}
+                                        {:date "2-1-1970" :geo-loc {:zip "11753"}}]
+                                     3 [{:date "4-4-4444" :geo-loc {:zip "54221"}}
+                                        {:date "5-4-4444" :geo-loc {:zip "11456"}}]}})
+
+
+   (comment
 
    (dotest
      (is= 3 (eval (quote (+ 1 2))))
@@ -113,33 +198,33 @@
        (is= (vec ss123) [[1 :a] [2 :a] [3 :a]])
        (is= ss13 #{[1 :a] [3 :a]}))
 
-     (is (map? (td/wrap-eid 3)))
+     (is (map? (td/tag-eid 3)))
      (is (map? {:a 1}))
-     (isnt (record? (td/wrap-idx 3)))
+     (isnt (record? (td/tag-idx 3)))
      (isnt (record? {:a 1}))
 
      ; Leaf and entity-id records sort separately in the index. Eid sorts first since the type name
      ; `tupelo.data.Eid` sorts before `tupelo.data.Leaf`
-     (is= (td/wrap-eid 5) {:eid 5})
-     (throws?  (td/wrap-eid "hello"))
-     (is= (td/wrap-idx 5) {:idx 5})
-     (throws?  (td/wrap-idx "hello"))
+     (is= (td/tag-eid 5) {:eid 5})
+     (throws?  (td/tag-eid "hello"))
+     (is= (td/tag-idx 5) {:idx 5})
+     (throws?  (td/tag-idx "hello"))
 
      (let [idx      (-> (index/empty-index)
 
                       (index/add-entry [1 3])
-                      (index/add-entry [1 (td/wrap-eid 3)])
+                      (index/add-entry [1 (td/tag-eid 3)])
                       (index/add-entry [1 1])
-                      (index/add-entry [1 (td/wrap-eid 1)])
+                      (index/add-entry [1 (td/tag-eid 1)])
                       (index/add-entry [1 2])
-                      (index/add-entry [1 (td/wrap-eid 2)])
+                      (index/add-entry [1 (td/tag-eid 2)])
 
                       (index/add-entry [0 3])
-                      (index/add-entry [0 (td/wrap-eid 3)])
+                      (index/add-entry [0 (td/tag-eid 3)])
                       (index/add-entry [0 1])
-                      (index/add-entry [0 (td/wrap-eid 1)])
+                      (index/add-entry [0 (td/tag-eid 1)])
                       (index/add-entry [0 2])
-                      (index/add-entry [0 (td/wrap-eid 2)]))
+                      (index/add-entry [0 (td/tag-eid 2)]))
 
            expected [[0 {:eid 1}]
                      [0 {:eid 2}]
@@ -164,7 +249,7 @@
        (let [edn-val  {:a 1}
              root-eid (td/add-edn edn-val)]
          (is= root-eid
-           (td/wrap-eid 1001)
+           (td/tag-eid 1001)
            (tv/new :eid 1001))
          (is= (unlazy (deref *tdb*))
            {:eid-type {{:eid 1001} :map},
@@ -178,7 +263,7 @@
        (eid-count-reset)
        (let [edn-val  {:a 1 :b 2}
              root-eid (td/add-edn edn-val)]
-         (is= (td/wrap-eid 1001) root-eid)
+         (is= (td/tag-eid 1001) root-eid)
          (is= (unlazy (deref *tdb*))
            {:eid-type {{:eid 1001} :map},
             :idx-ave  #{[:a 1 {:eid 1001}]
@@ -194,7 +279,7 @@
        (eid-count-reset)
        (let [edn-val  {:a 1 :b 2 :c {:d 4}}
              root-eid (td/add-edn edn-val)]
-         (is= (td/wrap-eid 1001) root-eid)
+         (is= (td/tag-eid 1001) root-eid)
          (is= (unlazy (deref *tdb*))
            {:eid-type {{:eid 1001} :map, {:eid 1002} :map},
             :idx-ave  #{[:a 1 {:eid 1001}]
@@ -255,7 +340,7 @@
                        [11 {:idx 1} {:eid 1002}]
                         [12 {:idx 2} {:eid 1002}]}} )
          (is= edn-val (td/eid->edn root-eid))
-         (is= (td/eid->edn (td/wrap-eid 1002)) [10 11 12]))))
+         (is= (td/eid->edn (td/tag-eid 1002)) [10 11 12]))))
 
    (dotest
      (with-tdb (new-tdb)
@@ -295,7 +380,7 @@
               [2 :a {:eid 1002}] [2 :b {:eid 1005}] [2 :c {:eid 1008}]
               [3 :a {:eid 1003}] [3 :b {:eid 1006}] [3 :c {:eid 1009}]}})
          ;---------------------------------------------------------------------------------------------------
-         (is= (lookup [(td/wrap-eid 1003) nil nil])
+         (is= (lookup [(td/tag-eid 1003) nil nil])
            #{[{:eid 1003} :a 3]})
          (is= (lookup [nil :b nil])
            #{[{:eid 1004} :b 1]
@@ -308,9 +393,9 @@
        ;---------------------------------------------------------------------------------------------------
        (is= (lookup [nil :a 3])
          #{[{:eid 1003} :a 3]})
-       (is= (lookup [(td/wrap-eid 1009) nil 3])
+       (is= (lookup [(td/tag-eid 1009) nil 3])
          #{[{:eid 1009} :c 3]})
-       (is= (lookup [(td/wrap-eid 1005) :b nil])
+       (is= (lookup [(td/tag-eid 1005) :b nil])
          #{[{:eid 1005} :b 2]}) ))
 
    (dotest
@@ -429,7 +514,7 @@
         (td/->SearchParam z)]
        [{:param :x} {:param :y} {:param :z}])
      (is= (td/search-triple 123 :color "Joey")
-       [(td/wrap-eid 123) :color  "Joey"]))
+       [(td/tag-eid 123) :color  "Joey"]))
 
    (dotest
      (with-tdb (new-tdb)
@@ -783,11 +868,11 @@
                        :i 1}
              root-hid (td/add-edn data)]
          (let [found (td/query-maps [{:a ?}])]
-           (is= (td/eid->edn (td/wrap-eid (val (only2 found))))
+           (is= (td/eid->edn (td/tag-eid (val (only2 found))))
              [{:b 2} {:c 3} {:d 4}]))
          (let [found (td/query-maps [{:a e1}
                                      {:eid e1 {:idx 0} val}])]
-           (is= (td/eid->edn (td/wrap-eid (:val (only found))))
+           (is= (td/eid->edn (td/tag-eid (:val (only found))))
              {:b 2}))
          (let [found (td/query-triples [(td/search-triple e1 :a e2)
                                         (td/search-triple e2 {:idx 2} e3)])]
@@ -818,7 +903,7 @@
              root-hid      (td/add-edn data)
              found         (td/query-maps [{:eid ? a1 1}])
              eids          (mapv #(grab :eid %) found)
-             one-leaf-maps (mapv #(td/eid->edn (td/wrap-eid %)) eids)]
+             one-leaf-maps (mapv #(td/eid->edn (td/tag-eid %)) eids)]
          (is-set= found [{:eid 1008, :a1 :a} {:eid 1007, :a1 :a} {:eid 1002, :a1 :a}])
          (is-set= one-leaf-maps [{:a 1, :b :first}
                                  {:a 1, :b 101}
@@ -1018,6 +1103,27 @@
                                    ["Cyberdyne" "Model-201" "Mimetic polyalloy"]
                                    ["ACME" "Dynamite" "Boom!"]]]
            (is-set= results-normalized normalized-desired)))))
+   (dotest
+     (td/eid-count-reset)
+     (td/with-tdb (td/new-tdb)
+       (let [data     [{:a 1 :b 1 :c 1}
+                       {:a 1 :b 2 :c 2}
+                       {:a 1 :b 1 :c 3}
+                       {:a 2 :b 2 :c 4}
+                       {:a 2 :b 1 :c 5}
+                       {:a 2 :b 2 :c 6}]
+             root-hid (td/add-edn data)]
+         (let [found (td/query-maps [{:eid eid :a 1}
+                                     (search-triple eid :b 2)])]
+           (is-set= (mapv td/eid->edn found)
+             [{:a 1, :b 2, :c 2}]))
+         (let [found (td/query-maps [{:eid eid :a 1}
+                                     (search-triple eid :b b)
+                                     (search-triple eid :c c)])]
+           (is-set= found
+             [{:eid 1002, :b 1, :c 1}
+              {:eid 1004, :b 1, :c 3}
+              {:eid 1003, :b 2, :c 2}])))))
 
    (dotest
      (td/with-tdb (td/new-tdb)
@@ -1094,77 +1200,42 @@
    (dotest
      (td/eid-count-reset)
      (td/with-tdb (td/new-tdb)
-       (let [data     {:people [{:name "jimmy" :id 1}
-                                {:name "joel" :id 2}
-                                {:name "tim" :id 3}
-                                ]
-                       :addrs  {1 [{:addr     "123 street ave"
-                                    :address2 "apt 2"
-                                    :city     "Townville"
-                                    :state    "IN"
-                                    :zip      "11201"
-                                    :pref     true}
-                                   {:addr     "534 street ave",
-                                    :address2 "apt 5",
-                                    :city     "Township",
-                                    :state    "IN",
-                                    :zip      "00666"
-                                    :pref     false}]
-                                2 [{:addr     "2026 park ave"
-                                    :address2 "apt 200"
-                                    :city     "Town"
-                                    :state    "CA"
-                                    :zip      "11753"
-                                    :pref     true}]
-                                3 [{:addr     "1448 street st"
-                                    :address2 "apt 1"
-                                    :city     "City"
-                                    :state    "WA"
-                                    :zip      "11456"
-                                    :pref     true}]
-                                }
-                       :visits {1 [{:date "12-25-1900" :geo-loc {:zip "11201"}}
-                                   {:date "12-31-1900" :geo-loc {:zip "00666"}}]
-                                2 [{:date "1-1-1970" :geo-loc {:zip "12345"}}
-                                   {:date "2-1-1970" :geo-loc {:zip "11753"}}]
-                                3 [{:date "4-4-4444" :geo-loc {:zip "54221"}}
-                                   {:date "5-4-4444" :geo-loc {:zip "11456"}}]}}
-
-             root-eid (td/add-edn data)]
+       (let [root-eid (td/add-edn users-and-accesses)]
          (let [results (td/query-maps [{:people [{:name ? :id id}]}])]
            (is= results
              [{:name "jimmy", :id 1}
               {:name "joel", :id 2}
               {:name "tim", :id 3}]))
 
-         (let [results-2 (td/query-maps [{:addrs {id [{:zip ? :pref true}]}}])]
-           (is-set= results-2
+         (let [pref-zip-data     (td/query-maps [{:addrs {id [{:zip ? :pref true}]}}])
+               user-id->pref-zip (apply glue
+                                   (forv [m pref-zip-data]
+                                     {(grab :id m) (grab :zip m)}))
+
+               access-data       (td/query-maps [{:visits {id [{:date ? :geo-loc {:zip ?}}]}}])
+               accesses-bad      (keep-if (fn [access-map]
+                                            (let [user-id  (grab :id access-map)
+                                                  zip-acc  (grab :zip access-map)
+                                                  zip-pref (grab user-id user-id->pref-zip)]
+                                              (not= zip-acc zip-pref)))
+                                   access-data)]
+           (is-set= pref-zip-data
              [{:id 2, :zip "11753"}
               {:id 1, :zip "11201"}
               {:id 3, :zip "11456"}])
+           (is= access-data
+             [{:date "1-1-1970", :zip "12345", :id 2}
+              {:date "2-1-1970", :zip "11753", :id 2}
+              {:date "4-4-4444", :zip "54221", :id 3}
+              {:date "5-4-4444", :zip "11456", :id 3}
+              {:date "12-31-1900", :zip "00666", :id 1}
+              {:date "12-25-1900", :zip "11201", :id 1}])
 
-           ; Basically an "anti-join" query.  Could be much better!
-           (let [user-pref-zip   (apply glue
-                                   (forv [m results-2]
-                                     {(grab :id m) (grab :zip m)}))
-                 results-9       (td/query-maps [{:visits {id [{:date ? :geo-loc {:zip ?}}]}}])
-                 results-9-by-id (group-by :id results-9)
-                 results-9-by-id-bad
-                                 (apply glue
-                                   (sorted-map)
-                                   (forv [me-use results-9-by-id]
-                                     (let [[id acc-maps] me-use]
-                                       {id (keep-if
-                                             (fn [acc-map]
-                                               (let [id       (grab :id acc-map)
-                                                     zip-acc  (grab :zip acc-map)
-                                                     zip-pref (grab id user-pref-zip)]
-                                                 (not= zip-acc zip-pref)))
-                                             acc-maps)}))) ]
-             (is= results-9-by-id-bad
-               {1 [{:date "12-31-1900", :zip "00666", :id 1}],
-                2 [{:date "1-1-1970", :zip "12345", :id 2}],
-                3 [{:date "4-4-4444", :zip "54221", :id 3}]}) ))
+           (is= user-id->pref-zip {2 "11753", 1 "11201", 3 "11456"})
+           (is-set= accesses-bad
+             [{:date "12-31-1900", :zip "00666", :id 1},
+              {:date "1-1-1970", :zip "12345", :id 2},
+              {:date "4-4-4444", :zip "54221", :id 3}]))
 
          ; ***** this is the big one! *****
          (let [results (td/query-maps
@@ -1210,7 +1281,7 @@
                {:param :zip}            "11201"}]))
 
          (let [results-4 (td/query-maps [{:people {:eid eid-pers :name ? :id ?}
-                                          :addrs {:eid eid-addrs }
+                                          :addrs  {:eid eid-addrs}
                                           :visits {:eid eid-visits}
                                           }
                                          (search-triple eid-addrs id eid-addr-deets)
@@ -1241,43 +1312,30 @@
                :id             1,
                :name           "jimmy",
                :eid-addrs      1006}])
+           ))))
 
-           )
-         )))
+     )
 
    (dotest
      (td/eid-count-reset)
      (td/with-tdb (td/new-tdb)
-       (let [data     [{:a 1 :b 1 :c 1}
-                       {:a 1 :b 2 :c 2}
-                       {:a 1 :b 1 :c 3}
-                       {:a 2 :b 2 :c 4}
-                       {:a 2 :b 1 :c 5}
-                       {:a 2 :b 2 :c 6}]
-             root-hid (td/add-edn data)]
-         (let [found (td/query-maps [{:eid eid :a 1}
-                                     (search-triple eid :b 2)])]
-           (is-set= (mapv td/eid->edn found)
-             [{:a 1, :b 2, :c 2}]))
-         (let [found (td/query-maps [{:eid eid :a 1}
-                                     (search-triple eid :b b)
-                                     (search-triple eid :c c)])]
-           (is-set= found
-             [{:eid 1002, :b 1, :c 1}
-              {:eid 1004, :b 1, :c 3}
-              {:eid 1003, :b 2, :c 2}])))))
+       (let [root-eid (td/add-edn users-and-accesses)]
+
+         ; ***** this is the big one! *****
+         (let [results (td/query-maps
+                         [{:people [{:name ? :id id}]
+                           :addrs  {id [{:zip zip-pref :pref true}]}
+                           :visits {id [{:date ? :geo-loc {:zip zip-acc}}]}}
+                          (not= zip-acc zip-pref)
+                          ])]
+           (spyx-pretty results)
+           )
+
+
+
+         )))
+
 
    ))
-
-
-
-
-
-
-
-
-
-
-
 
 
