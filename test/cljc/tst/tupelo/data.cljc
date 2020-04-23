@@ -19,7 +19,6 @@
             [clojure.string :as str]
             [schema.core :as s]
             [tupelo.data.index :as index]
-            [tupelo.tag :as tv]
             ))
   #?(:cljs (:require
              [tupelo.test-cljs :refer [define-fixture deftest dotest is isnt is= isnt= is-set= is-nonblank= testing throws?]

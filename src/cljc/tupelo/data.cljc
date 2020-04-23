@@ -17,9 +17,7 @@
             [tupelo.lexical :as lex]
             [tupelo.schema :as tsk]
             [tupelo.vec :as vec]
-            [tupelo.tag :as tv]
 
-            [clojure.set :as set]
             [clojure.walk :as walk]
             [schema.core :as s]
             ))
@@ -88,9 +86,9 @@
        ITag (<tag [this] tag)
        IVal (<val [this] val))
 
-     (s/defn tagged? :- s/Bool
-       [arg :- s/Any]
-       (= TagVal (type arg)))
+     ; ***** fails strangely under lein-test-refresh after 1st file save if define this using Plumatic schema *****
+     (defn tagged? ; :- s/Bool
+       [arg] (= TagVal (type arg)))
 
      (s/defn untagged :- s/Any
        [arg :- s/Any]
@@ -100,7 +98,7 @@
      (defmethod print-method TagVal
        [tv ^java.io.Writer writer]
        (.write writer
-         (format "<%s %s>" (<tag tv) (<val tv) ) ))
+         (format "<%s %s>" (<tag tv) (<val tv))))
 
      ;-----------------------------------------------------------------------------
      (defn unquote-form?
@@ -454,16 +452,12 @@
 
      (s/defn unwrap-query-result :- tsk/KeyMap
        [resmap :- tsk/Map]
-       (newline)
-       (spyx :unwrap-query-result-enter resmap)
+       ; (newline) (spyx :unwrap-query-result-enter resmap)
        (let [result (apply glue
-                      (for [me resmap]
-                        (let [[kk vv] me
-                              kk-out (untagged kk)
-                              vv-out (untagged vv) ]
-                          {kk-out vv-out})))]
-         (newline)
-         (spyx :unwrap-query-result-leave result)
+                      (forv [me resmap]
+                        {(untagged (key me))
+                         (untagged (val me))}))]
+         ; (newline) (spyx :unwrap-query-result-leave result)
          result))
 
      (s/defn ^:no-doc query-triples-impl :- s/Any
@@ -727,15 +721,15 @@
          ; returns result in *cumulative-val* ; #todo cleanup
          (let [map-triples    (query-maps->triples maps-in)
                search-triples (glue map-triples triples-proc)]
-           (spyx-pretty *cumulative-val*)
+           ; (spyx-pretty *cumulative-val*)
            (let [unfiltered-results# (query-triples+preds
                                        search-triples
                                        pred-fns )
-                 >> (spyx unfiltered-results#)
+                 ; >> (spyx unfiltered-results#)
                  filtered-results#   (query-results-filter-tmp-attr-mapentry
                                        (query-results-filter-tmp-eid-mapentry
                                          unfiltered-results#))]
-             (spyx-pretty :query-maps->wrapped-fn-leave filtered-results#)
+             ; (spyx-pretty :query-maps->wrapped-fn-leave filtered-results#)
              filtered-results#))))
 
      (s/defn unwrap-query-results
