@@ -88,11 +88,11 @@
        ITag (<tag [this] tag)
        IVal (<val [this] val))
 
-     (defn tagged? :- s/Bool
+     (s/defn tagged? :- s/Bool
        [arg :- s/Any]
        (= TagVal (type arg)))
 
-     (defn untagged :- s/Any
+     (s/defn untagged :- s/Any
        [arg :- s/Any]
        (t/cond-it-> arg
          (tagged? arg) (<val arg)))
@@ -175,6 +175,7 @@
      (s/defn cum-vector-append :- s/Any
        "Works inside of a `with-cum-vector` block to append a new vector value."
        [value :- s/Any] (cum-val-set-it (append it value)))
+
      (defmacro with-cum-vector
        "Wraps forms containing `cum-vector-append` calls to accumulate values into a vector."
        [& forms]
@@ -196,33 +197,32 @@
        (def EidType
          "The Plumatic Schema type name for a pointer to a tdb node (abbrev. for Hex ID)"
          s/Int)
-       (s/defn eid? :- s/Bool
-         "Returns true iff the arg type is a legal EID value"
-         [arg] (int? arg)))
+       ;(s/defn eid? :- s/Bool ; #todo keep?  rename -> validate-eid  ???
+       ;  "Returns true iff the arg type is a legal EID value"
+       ;  [arg] (int? arg))
+       )
 
      (do  ; keep these in sync
        (def AttrType
          "The Plumatic Schema type name for an attribute"
          (s/cond-pre s/Keyword s/Int))
-       (s/defn attr? :- s/Bool
-         "Returns true iff the arg type is a legal attribute value"
-         [arg] (or (keyword? arg) (int? arg))))
+       ;(s/defn attr? :- s/Bool ; #todo keep?
+       ;  "Returns true iff the arg type is a legal attribute value"
+       ;  [arg] (or (keyword? arg) (int? arg)))
+       )
 
      (do  ; keep these in sync
+       (def LeafType (s/maybe ; maybe nil
+                       (s/cond-pre s/Num s/Str s/Keyword))) ; instant, uuid, Time ID (TID) (as strings?)
        (s/defn leaf-val? :- s/Bool
          "Returns true iff a value is of leaf type (number, string, keyword, nil)"
          [arg :- s/Any] (or (nil? arg) (number? arg) (string? arg) (keyword? arg) (boolean? arg)))
-       (def LeafType (s/maybe ; maybe nil
-                       (s/cond-pre s/Num s/Str s/Keyword)))) ; instant, uuid, Time ID (TID) (as strings?)
-
-     (s/defn array-like? :- s/Bool
-       "Returns true for vectors, lists, and seq's."
-       [arg] (or (vector? arg) (list? arg) (seq? arg)))
+       )
 
      ; #todo add tsk/Set
      (do  ; keep these in sync
        (def EntityType (s/cond-pre tsk/Map tsk/Vec))
-       (s/defn entity-like? [arg] (or (map? arg) (set? arg) (array-like? arg))))
+       (s/defn entity-like? [arg] (or (map? arg) (set? arg) (sequential? arg))))
 
      (def TripleIndex #{tsk/Triple})
 
@@ -236,35 +236,18 @@
        [] (sorted-set-by lex/compare-generic))
 
      ;-----------------------------------------------------------------------------
-     ; (def WrappedEid {:eid s/Int})
-     (def WrappedParam {:param s/Any})
-     (def WrappedIdx {:idx s/Int})
-     ; (def WrappedAttr {:attr s/Any})
-     ; (def WrappedLeaf {:leaf s/Any})
-
      ; #todo inline all of these?
+     (s/defn tag-param :- TagVal
+       [arg :- s/Any] (->TagVal :param (t/->kw arg )))
      (s/defn tag-eid :- TagVal
-       [arg :- s/Int] (->TagVal :eid (t/validate int? arg)))
-     (s/defn tag-idx :- WrappedIdx
-       [arg :- s/Int] (->TagVal :idx (t/validate int? arg)))
+       [eid :- s/Int] (->TagVal :eid (t/validate int? eid)))
+     (s/defn tag-idx :- TagVal
+       [idx :- s/Int] (->TagVal :idx (t/validate int? idx)))
 
-     ;(s/defn wrap-attr :- WrappedAttr
-     ;  [arg] (tv/new :attr arg))
-     ;(s/defn wrap-leaf :- WrappedLeaf
-     ;  [arg] (tv/new :leaf arg))
+     ; (defn pair-map? [arg] (and (map? arg) (= 1 (count arg))))
+     (defn tagged-param? [x] (and (= TagVal (type x)) (= :param (<tag  x))))
+     (defn tagged-eid? [x] (and (= TagVal (type x)) (= :eid (<tag  x))))
 
-     (defn pair-map? [arg] (and (map? arg) (= 1 (count arg))))
-     (defn wrapped-param? [x] (and (pair-map? x) (= :param (key (t/only x)))))
-     (defn tagged-eid? [x] (and (= TagVal (type x)) (= :eid (<key  x))))
-     ;(defn wrapped-attr? [x] (and (pair-map? x) (= :attr (key (t/only x)))))
-     ;(defn wrapped-leaf? [x] (and (pair-map? x) (= :leaf (key (t/only x)))))
-
-     (s/defn unwrap-param :- s/Keyword
-       "Unwraps a ParamMap to return the param name as a keyword
-         (unwrap-param {:param :x} )  =>  :x "
-       [arg :- WrappedParam]
-       (t/validate wrapped-param? arg)
-       (val (t/only arg)))
 
      ;-----------------------------------------------------------------------------
      (s/defn tmp-eid-prefix-str? :- s/Bool
@@ -283,8 +266,8 @@
      (s/defn ^:no-doc param-tmp-eid? :- s/Bool
        "Returns true iff arg is a map that looks like {:param :tmp-eid-99999}"
        [arg]
-       (and (wrapped-param? arg)
-         (tmp-eid-kw? (unwrap-param arg))))
+       (and (tagged-param? arg)
+         (tmp-eid-kw? (<val arg))))
 
      ;-----------------------------------------------------------------------------
      (s/defn tmp-attr-prefix-str? :- s/Bool
@@ -294,17 +277,18 @@
 
      (s/defn tmp-attr-sym? :- s/Bool
        "Returns true iff arg is a symbol like `tmp-attr-99999`"
-       [arg :- s/Any] (and (symbol? arg) (tmp-attr-prefix-str? (t/sym->str arg))))
+       [arg :- s/Any] (and (symbol? arg)
+                        (tmp-attr-prefix-str? (t/sym->str arg))))
 
      (s/defn tmp-attr-kw? :- s/Bool
        "Returns true iff arg is a symbol like `tmp-attr-99999`"
-       [arg :- s/Any] (and (keyword? arg) (tmp-attr-prefix-str? (t/kw->str arg))))
+       [arg :- s/Any] (and (keyword? arg)
+                        (tmp-attr-prefix-str? (t/kw->str arg))))
 
      (s/defn ^:no-doc param-tmp-attr? :- s/Bool
        "Returns true iff arg is a map that looks like {:param :tmp-attr-99999}"
-       [arg]
-       (and (wrapped-param? arg)
-         (tmp-attr-kw? (unwrap-param arg))))
+       [arg] (and (tagged-param? arg)
+               (tmp-attr-kw? (<val arg))))
 
 
      ;-----------------------------------------------------------------------------
@@ -349,7 +333,7 @@
                ctx      (cond ; #todo add set
                           (map? edn-in) {:entity-type :map :edn-use edn-in}
                           (set? edn-in) {:entity-type :set :edn-use (zipmap edn-in edn-in)}
-                          (array-like? edn-in) {:entity-type :array
+                          (sequential? edn-in) {:entity-type :array
                                                 :edn-use ;  (indexed edn-in)
                                                              (forv [[idx val] (indexed edn-in)]
                                                                [(tag-idx idx) val])}
@@ -390,7 +374,7 @@
                            (cond
                              (= entity-type :map) result-map
                              (= entity-type :set) (into #{} (keys result-map))
-                             (= entity-type :array) (let [result-keys (mapv tv/val (keys result-map))
+                             (= entity-type :array) (let [result-keys (mapv <val (keys result-map))
                                                           result-vals (vec (vals result-map))]
                                                       ; if array entity, keys should be in 0..N-1 (already sorted by eav index)
                                                       (assert (= result-keys (range (count result-keys))))
@@ -470,14 +454,16 @@
 
      (s/defn unwrap-query-result :- tsk/KeyMap
        [resmap :- tsk/Map]
-       ; (spyx :unwrap-query-result-enter resmap)
+       (newline)
+       (spyx :unwrap-query-result-enter resmap)
        (let [result (apply glue
                       (for [me resmap]
                         (let [[kk vv] me
                               kk-out (untagged kk)
                               vv-out (untagged vv) ]
                           {kk-out vv-out})))]
-         ; (spyx :unwrap-query-result-leave result)
+         (newline)
+         (spyx :unwrap-query-result-leave result)
          result))
 
      (s/defn ^:no-doc query-triples-impl :- s/Any
@@ -497,7 +483,7 @@
                  ;>>                 (spyx qspec-curr-env)
 
                  {idxs-param :idxs-true
-                  idxs-other :idxs-false} (vec/pred-index wrapped-param? qspec-curr-env)
+                  idxs-other :idxs-false} (vec/pred-index tagged-param? qspec-curr-env)
                  qspec-lookup       (vec/set-lax qspec-curr-env idxs-param nil)
                  ;>>                 (spyx idxs-param)
                  ;>>                 (spyx idxs-other)
@@ -543,13 +529,9 @@
          (spyx query-results-kept)
          query-results-kept))
 
-     (defn ^:no-doc ->SearchParam-fn
-       [arg]
-       (let [result (cond
-                      (keyword? arg) arg
-                      (symbol? arg) (t/sym->kw arg)
-                      :else (throw (ex-info "->SearchParam:  only symbol & keyword are accepted" {:arg arg})))]
-         {:param result}))
+     (s/defn ^:no-doc ->SearchParam-fn
+       [arg :- (s/cond-pre s/Keyword s/Symbol)]
+       (->TagVal :param (t/->kw arg)))
 
      (defn ^:no-doc ->SearchParam-impl
        [arg] `(->SearchParam-fn (quote ~arg)))
@@ -558,19 +540,19 @@
        [arg]
        (->SearchParam-impl arg))
 
-     (defn ^:no-doc search-triple-fn
-       [args]
-       (assert (= 3 (count args)))
+     (s/defn ^:no-doc search-triple-fn
+       [args :- tsk/Triple]
+       ; (assert (= 3 (count args)))
        (with-spy-indent
-         (let [[e a v] args
+         (let [[e a v] (spyx args)
                e-out (if (symbol? e)
-                       (->SearchParam-fn e)
+                       (tag-param e)
                        (tag-eid e))
                a-out (if (symbol? a)
-                       (->SearchParam-fn a)
+                       (tag-param a)
                        a)
                v-out (if (symbol? v)
-                       (->SearchParam-fn v)
+                       (tag-param v)
                        v)]
            [e-out a-out v-out])))
 
@@ -587,7 +569,7 @@
        (and (list? form)
          (= (quote search-triple) (xfirst form))))
 
-     (s/defn index-find-leaf :- [{:eid EidType}]
+     (s/defn index-find-leaf :- [TagVal]
        [target :- LeafType]
        ; (println :index-find-leaf )
        (let [results (query-triples+preds
@@ -762,7 +744,7 @@
          (apply glue
            (forv [mapentry result-map]
              (let [[me-key me-val] mapentry
-                   param-raw (unwrap-param me-key)
+                   param-raw (<val me-key)
                    val-raw   (cond
                                (tagged-eid? me-val) (<val me-val)
                                :else me-val)]
@@ -771,7 +753,8 @@
      (defn query-maps-impl
        [qspecs]
        ; #todo need a linter to catch nonsensical qspecs (attr <> keyword for example)
-       `(let [unwrapped-query-results# (unwrap-query-results (query-maps->wrapped-fn (quote ~qspecs)))]
+       `(let [unwrapped-query-results# (unwrap-query-results
+                                         (query-maps->wrapped-fn (quote ~qspecs)))]
           ; (spyx unwrapped-query-results#)
           unwrapped-query-results#))
 

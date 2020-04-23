@@ -30,29 +30,29 @@
 #?(:clj
    (do
 
-     (def TaggedValue {s/Any s/Any}) ; a map with a SINGLE entry
-
-     (s/defn tagged-value? :- s/Bool
-       "Returns true iff arg is a TaggedValue"
-       [arg] (and (map? arg)
-               (= 1 (count arg))))
-
-     (s/defn tag :- s/Any
-       [tv :- TaggedValue]
-       (clojure.core/key
-         (t/only
-           (t/validate tagged-value? tv))))
-
-     (s/defn val :- s/Any
-       [tv :- TaggedValue]
-       (clojure.core/val
-         (t/only
-           (t/validate tagged-value? tv))))
-
-     (defn new
-       "Create a new TaggedValue"
-       [tag val]
-       {tag val})
+     ;(def TaggedValue {s/Any s/Any}) ; a map with a SINGLE entry
+     ;
+     ;(s/defn tagged-value? :- s/Bool
+     ;  "Returns true iff arg is a TaggedValue"
+     ;  [arg] (and (map? arg)
+     ;          (= 1 (count arg))))
+     ;
+     ;(s/defn tag :- s/Any
+     ;  [tv :- TaggedValue]
+     ;  (clojure.core/key
+     ;    (t/only
+     ;      (t/validate tagged-value? tv))))
+     ;
+     ;(s/defn val :- s/Any
+     ;  [tv :- TaggedValue]
+     ;  (clojure.core/val
+     ;    (t/only
+     ;      (t/validate tagged-value? tv))))
+     ;
+     ;(defn new
+     ;  "Create a new TaggedValue"
+     ;  [tag val]
+     ;  {tag val})
 
 ))
 

@@ -406,8 +406,8 @@
 
      (let [spa (td/->SearchParam :a)
            spb (td/->SearchParam b)]
-       (is (td/wrapped-param? spa))
-       (is (td/wrapped-param? spb))
+       (is (td/tagged-param? spa))
+       (is (td/tagged-param? spb))
        (is= spa {:param :a})
        (is= spb {:param :b}))
 
@@ -648,9 +648,7 @@
        (td/eid-count-reset)
        (let [root-hid (td/add-edn edn-val)]
          ; (spyx-pretty (grab :idx-eav (deref *tdb*)))
-         (is= edn-val (td/eid->edn root-hid))
-         (is= :x (td/unwrap-param {:param :x}))
-         (is= 1234 (td/unwrap-eid {:eid 1234})) )))
+         (is= edn-val (td/eid->edn root-hid)) )))
 
    (dotest
      (td/with-tdb (td/new-tdb)
