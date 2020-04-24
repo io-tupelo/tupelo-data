@@ -895,10 +895,12 @@
                (is= (td/eid->edn (td/tag-eid (val (only2 found))))
                  [{:b 2} {:c 3} {:d 4}]))
 
-             ;(let [found (td/query-maps [{:a e1}
-             ;                            {:eid e1 {:idx 0} val}])]
-             ;  (is= (td/eid->edn (td/tag-eid (:val (only found))))
-             ;    {:b 2}))
+             (let [found (td/query-maps [{:a e1}
+                                         {:eid e1 {:idx 0} val}])]
+               (spyx found)
+               ;(is= (td/eid->edn (td/tag-eid (:val (only found))))
+               ;  {:b 2})
+               )
 
              ;(let [found (td/query-triples [(td/search-triple e1 :a e2)
              ;                               (td/search-triple e2 {:idx 2} e3)])]

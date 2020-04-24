@@ -9,7 +9,7 @@
   ; #?(:clj (:use tupelo.core)) ; #todo remove for cljs
   #?(:clj (:require
             [tupelo.core :as t :refer [spy spyx spyxx spyx-pretty with-spy-indent
-                                       grab glue map-entry indexed
+                                       grab glue map-entry indexed only only2
                                        it-> forv vals->map fetch-in let-spy xfirst xsecond xthird xlast xrest
                                        keep-if drop-if append prepend
                                        ]]
@@ -150,49 +150,47 @@
        [form]
        (quote-template-impl form))
 
-     ;-----------------------------------------------------------------------------
-     ; #todo => tupelo.core
-     (def ^:dynamic *cumulative-val*
-       "A dynamic Var pointing to an `atom`. Used by `with-cum-val` to accumulate state,
-       such as in a vector or map.  Typically manipulated via helper functions such as
-       `cum-val-set-it` or `cum-vector-append`. Can also be manipulated directly via `swap!` et al."
-       nil)
+     (do ; #todo => tupelo.core
+       ;-----------------------------------------------------------------------------
+       (def ^:dynamic *cumulative-val*
+         "A dynamic Var pointing to an `atom`. Used by `with-cum-val` to accumulate state,
+         such as in a vector or map.  Typically manipulated via helper functions such as
+         `cum-val-set-it` or `cum-vector-append`. Can also be manipulated directly via `swap!` et al."
+         nil)
 
-     (defmacro cum-val-set-it
-       "Works inside of a `with-cum-val` block to append a new val value."
-       [& forms]
-       `(swap! *cumulative-val*
-          (fn [~'it]
-            ~@forms)))
+       (defmacro cum-val-set-it
+         "Works inside of a `with-cum-val` block to append a new val value."
+         [& forms]
+         `(swap! *cumulative-val*
+            (fn [~'it]
+              ~@forms)))
 
-     (defmacro with-cum-val
-       "Wraps forms containing `cum-val-set-it` calls to accumulate values into a vector."
-       [init-val & forms]
-       `(binding [*cumulative-val* (atom ~init-val)]
-          (do ~@forms)
-          (deref *cumulative-val*)))
+       (defmacro with-cum-val
+         "Wraps forms containing `cum-val-set-it` calls to accumulate values into a vector."
+         [init-val & forms]
+         `(binding [*cumulative-val* (atom ~init-val)]
+            (do ~@forms)
+            (deref *cumulative-val*)))
 
-     ;-----------------------------------------------------------------------------
-     ; #todo => tupelo.core
-     (s/defn cum-vector-append :- s/Any
-       "Works inside of a `with-cum-vector` block to append a new vector value."
-       [value :- s/Any] (cum-val-set-it (append it value)))
+       ;-----------------------------------------------------------------------------
+       (s/defn cum-vector-append :- s/Any
+         "Works inside of a `with-cum-vector` block to append a new vector value."
+         [value :- s/Any] (cum-val-set-it (append it value)))
 
-     (defmacro with-cum-vector
-       "Wraps forms containing `cum-vector-append` calls to accumulate values into a vector."
-       [& forms]
-       `(with-cum-val []
-          ~@forms))
+       (defmacro with-cum-vector
+         "Wraps forms containing `cum-vector-append` calls to accumulate values into a vector."
+         [& forms]
+         `(with-cum-val []
+            ~@forms))
 
-     ;-----------------------------------------------------------------------------
-     ; #todo => tupelo.core
-     (s/defn only? :- s/Bool
-       "Returns true iff collection has length=1"
-       [coll :- s/Any] (and (t/has-length? coll 1)))
-     (s/defn only2? :- s/Bool
-       "Returns true iff arg is two nested collections of length=1"
-       [coll :- s/Any] (and (t/has-length? coll 1)
-                         (t/has-length? (first coll) 1)))
+       ;-----------------------------------------------------------------------------
+       (s/defn only? :- s/Bool
+         "Returns true iff collection has length=1"
+         [coll :- s/Any] (and (t/has-length? coll 1)))
+       (s/defn only2? :- s/Bool
+         "Returns true iff arg is two nested collections of length=1"
+         [coll :- s/Any] (and (t/has-length? coll 1)
+                           (t/has-length? (first coll) 1))))
 
      ;---------------------------------------------------------------------------------------------------
      (do  ; keep these in sync
@@ -250,6 +248,8 @@
      (defn tagged-param? [x] (and (= TagVal (type x)) (= :param (<tag  x))))
      (defn tagged-eid? [x] (and (= TagVal (type x)) (= :eid (<tag  x))))
 
+     (defn idx-literal? [x] (and (map? x) (= [:idx] (keys x))))
+     (defn idx-literal->tagged [x] (tag-idx (only (vals x))))
 
      ;-----------------------------------------------------------------------------
      (s/defn tmp-eid-prefix-str? :- s/Bool
@@ -555,6 +555,7 @@
                        (tag-eid e))
                a-out (cond
                        (symbol? a) (tag-param a)
+                       (idx-literal? a) (idx-literal->tagged a)
                        :else a)
                v-out (if (symbol? v)
                        (tag-param v)
@@ -609,60 +610,46 @@
      (defn ^:no-doc query-maps->triples-impl
        [qmaps]
        (with-spy-indent
-         ;(newline)
-         ;(spyq :query-maps->triples)
-         ;(spyx-pretty (deref *cumulative-val*))
-         ;(spyx qmaps)
+         (newline)
+         (spyq :query-maps->triples)
+         (spyx qmaps)
          (doseq [qmap qmaps]
-           ;(spyx-pretty qmap)
+           (spyx-pretty qmap)
            (s/validate tsk/Map qmap)
            (let [eid-val       (if (contains? qmap :eid)
                                  (autosym-resolve :eid (grab :eid qmap))
                                  (gensym "tmp-eid-"))
                  map-remaining (dissoc qmap :eid)]
-             ;(spyx map-remaining)
+             (spyx map-remaining)
              (forv [[kk vv] map-remaining]
-               ;(spyx [kk vv])
+               (spyx [kk vv])
                (cond
                  (sequential? vv) ; (throw (ex-info "not implemented" {:type :sequential :value vv}))
                  (let [array-val       vv
                        tmp-eid         (gensym "tmp-eid-")
                        triple-modified (search-triple-fn [eid-val kk tmp-eid])
-                       ;>>              (spyx triple-modified)
+                       >>              (spyx triple-modified)
                        qmaps-modified  (forv [elem array-val]
                                          {:eid tmp-eid (gensym "tmp-attr-") elem})]
-                   ;(spyx qmaps-modified)
-                   ; (swap! *cumulative-val* append triple-modified)
+                   (spyx qmaps-modified)
                    (cum-vector-append triple-modified)
-                   ;(spyx-pretty *cumulative-val*)
                    (query-maps->triples-impl qmaps-modified))
 
                  (map? vv) (let [tmp-eid         (gensym "tmp-eid-")
                                  triple-modified (search-triple-fn [eid-val kk tmp-eid])
-                                 ;>>              (spyx triple-modified)
+                                 >>              (spyx triple-modified)
                                  qmaps-modified  [(glue {:eid tmp-eid} vv)]]
-                             ;(spyx qmaps-modified)
-                             ; (swap! *cumulative-val* append triple-modified)
+                             (spyx qmaps-modified)
                              (cum-vector-append triple-modified)
-
-                             ;(spyx-pretty *cumulative-val*)
                              (query-maps->triples-impl qmaps-modified))
                  (leaf-val? vv) (let [triple (search-triple-fn [eid-val kk vv])]
                                   ;(spyx triple)
-                                  ; (swap! *cumulative-val* append triple)
-                                  (cum-vector-append triple)
-
-                                  ; (spyx-pretty *cumulative-val*)
-                                  )
+                                  (cum-vector-append triple) )
                  (symbol? vv) (do
                                 (let [sym-to-use (autosym-resolve kk vv)
                                       triple     (search-triple-fn [eid-val kk sym-to-use])]
                                   ;(spyx triple)
-                                  ; (swap! *cumulative-val* append triple)
-                                  (cum-vector-append triple)
-
-                                  ; (spyx-pretty *cumulative-val*)
-                                  ))
+                                  (cum-vector-append triple) ))
                  :else (throw (ex-info "unrecognized value" (vals->map kk vv map-remaining)))
                  ))))))
 
@@ -714,9 +701,9 @@
        (let [maps-in      (keep-if map? query-specs)
              triple-forms (keep-if search-triple-form? query-specs)
              pred-forms   (keep-if fn-form? query-specs)
-             ;>> (spyx-pretty maps-in)
-             ;>> (spyx triple-forms)
-             ;>> (spyx pred-forms)
+             >> (spyx-pretty maps-in)
+             >> (spyx triple-forms)
+             >> (spyx pred-forms)
              pred-fns     (forv [pred-form pred-forms]
                             (fn [arg]
                               (newline)
@@ -726,29 +713,28 @@
                                 (not= zip-acc zip-pref))))
 
              triples-proc (forv [triple-form triple-forms]
-                            ; (spyx triple-form)
+                            (spyx triple-form)
                             (let [form-to-eval (cons
                                                  (quote tupelo.data/search-triple)
                                                  (rest triple-form))
                                   form-result  (eval form-to-eval)]
-                              ; (spyx form-result)
+                              (spyx form-result)
                               form-result))]
 
-         ; returns result in *cumulative-val* ; #todo cleanup
          (let [map-triples    (query-maps->triples maps-in)
                search-triples (glue map-triples triples-proc)]
-           ; (spyx-pretty *cumulative-val*)
-           (let [unfiltered-results# (query-triples+preds
+           ; (spyx-pretty
+           (let [unfiltered-results (query-triples+preds
                                        search-triples
                                        pred-fns )
-                 ; >> (spyx unfiltered-results#)
-                 filtered-results#   (query-results-filter-tmp-attr-mapentry
+                 >> (spyx unfiltered-results)
+                 filtered-results   (query-results-filter-tmp-attr-mapentry
                                        (query-results-filter-tmp-eid-mapentry
-                                         unfiltered-results#))]
-             ; (spyx-pretty :query-maps->wrapped-fn-leave filtered-results#)
-             filtered-results#))))
+                                         unfiltered-results))]
+             (spyx-pretty :query-maps->wrapped-fn-leave filtered-results)
+             filtered-results))))
 
-     (s/defn unwrap-query-results
+     (s/defn unwrap-query-results :- [tsk/KeyMap]
        [query-result-maps]
        (forv [result-map query-result-maps]
          (apply glue
@@ -758,9 +744,11 @@
                    ; >> (spyxx me-val)
 
                    param-raw (<val me-key)
-                   val-raw   (cond
-                               (tagged-eid? me-val) (<val me-val)
-                               :else me-val)]
+                   val-raw   (untagged me-val) ; me-val might not be a TagVal
+                             ;(cond ; #todo kill this if continues to work
+                             ;  (tagged-eid? me-val) (<val me-val)
+                             ;  :else me-val)
+                   ]
                {param-raw val-raw})))))
 
      (defn query-maps-fn
