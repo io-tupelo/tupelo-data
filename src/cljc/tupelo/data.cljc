@@ -20,16 +20,8 @@
 
             [clojure.walk :as walk]
             [schema.core :as s]
-            ))
-  #?(:cljs (:require
-             [tupelo.core :as t :refer [spy spyx spyxx spyx-pretty grab]] ; #todo :include-macros true
-             [tupelo.schema :as tsk]
-             [tupelo.data.index :as index]
-
-             [clojure.set :as set]
-             [schema.core :as s]
-             ))
-  (:import [com.google.common.base Verify]))
+            [clojure.core :as cc]))
+  )
 
 ; #todo Treeify: {k1 v1 k2 v2} =>
 ; #todo   {:data/id 100 :edn/type :edn/map ::kids [101 102] }
@@ -121,12 +113,12 @@
      (defn unquote-form?
        [arg]
        (and (list? arg)
-         (= (quote unquote) (first arg)) ) )
+         (= (quote unquote) (first arg))))
 
      (defn unquote-splicing-form?
        [arg]
        (and (list? arg)
-         (= (quote unquote-splicing) (first arg)) ) )
+         (= (quote unquote-splicing) (first arg))))
 
      (defn quote-template-impl
        [form]
@@ -150,7 +142,7 @@
        [form]
        (quote-template-impl form))
 
-     (do ; #todo => tupelo.core
+     (do  ; #todo => tupelo.core
        ;-----------------------------------------------------------------------------
        (def ^:dynamic *cumulative-val*
          "A dynamic Var pointing to an `atom`. Used by `with-cum-val` to accumulate state,
@@ -238,15 +230,15 @@
      ;-----------------------------------------------------------------------------
      ; #todo inline all of these?
      (s/defn tag-param :- TagVal
-       [arg :- s/Any] (->TagVal :param (t/->kw arg )))
+       [arg :- s/Any] (->TagVal :param (t/->kw arg)))
      (s/defn tag-eid :- TagVal
        [eid :- s/Int] (->TagVal :eid (t/validate int? eid)))
      (s/defn tag-idx :- TagVal
        [idx :- s/Int] (->TagVal :idx (t/validate int? idx)))
 
      ; (defn pair-map? [arg] (and (map? arg) (= 1 (count arg))))
-     (defn tagged-param? [x] (and (= TagVal (type x)) (= :param (<tag  x))))
-     (defn tagged-eid? [x] (and (= TagVal (type x)) (= :eid (<tag  x))))
+     (defn tagged-param? [x] (and (= TagVal (type x)) (= :param (<tag x))))
+     (defn tagged-eid? [x] (and (= TagVal (type x)) (= :eid (<tag x))))
 
      (defn idx-literal? [x] (and (map? x) (= [:idx] (keys x))))
      (defn idx-literal->tagged [x] (tag-idx (only (vals x))))
@@ -369,13 +361,13 @@
 
      ; #todo need to handle sets
      (s/defn ^:no-doc eid->edn-impl :- s/Any
-       [eid-rec  :- TagVal]
+       [eid-rec :- TagVal]
        (let [eav-matches (index/prefix-matches [eid-rec] (grab :idx-eav @*tdb*))
              result-map  (apply glue
                            (forv [[match-eid match-attr match-val] eav-matches]
                              ; (spyx [match-eid match-attr match-val])
                              (assert (= eid-rec match-eid)) ; verify is a prefix match
-                             (let [attr-edn  match-attr
+                             (let [attr-edn match-attr
                                    val-edn  (if (tagged-eid? match-val)
                                               (eid->edn-impl match-val) ; Eid rec
                                               match-val)] ; Leaf rec
@@ -505,41 +497,49 @@
                (let [env-next (glue env env-frame)]
                  (query-triples-impl query-result env-next qspec-rest)))))))
 
-     (s/defn unwrap-query-result :- tsk/KeyMap
+     (s/defn untag-query-result :- tsk/KeyMap
        [resmap :- tsk/Map]
        ; (newline) (spyx :unwrap-query-result-enter resmap)
        (let [result (apply glue
                       (forv [me resmap]
-                        {(untagged (key me))
-                         (untagged (val me))}))]
+                        {(<val (key me)) ; mapentry key is always a TagVal
+                         (untagged (val me))}))] ; mapentry val might be a primative
          ; (newline) (spyx :unwrap-query-result-leave result)
          result))
 
-     (s/defn query-triples
+     (s/defn query-triples->tagged
        [qspec-list :- [tsk/Triple]]
        (let [query-results (atom [])]
          (query-triples-impl query-results {} qspec-list)
          ; (spyx-pretty :query-triples--results @query-results)
          @query-results))
 
+     (s/defn query-triples :- [tsk/KeyMap]
+       [qspec-list :- [tsk/Triple]]
+       (let [results-tagged (query-triples->tagged qspec-list)
+             results-plain (forv [result-tagged results-tagged]
+                             (untag-query-result result-tagged))]
+         results-plain))
+
+
      (s/defn query-triples+preds
        [qspec-list :- [tsk/Triple]
         pred-list :- [tsk/Fn]]
-       (let [query-results      (query-triples qspec-list)
-             ; >>                 (spyx-pretty query-results)
-             keep-result?       (fn fn-keep-result? [query-result]
-                                  (let [keep-flags (forv [pred pred-list]
-                                                     (pred query-result))
-                                        all-keep   (every? t/truthy? keep-flags)]
-                                    all-keep))
-             query-results-kept (with-cum-vector
-                                  (doseq [query-result query-results]
-                                    ; (spyx-pretty query-result)
-                                    (let [query-result-unwrapped (unwrap-query-result query-result)
-                                          keep-result            (keep-result? query-result-unwrapped)]
-                                      (when keep-result
-                                        (cum-vector-append query-result)))))]
-         ; (spyx-pretty query-results-kept)
+       (let [query-results-tagged (query-triples->tagged qspec-list)
+             ; >>                 (spyx-pretty query-results-tagged)
+             keep-result?         (fn fn-keep-result? [query-result]
+                                    (let [keep-flags (forv [pred pred-list]
+                                                       (pred query-result))
+                                          all-keep   (every? t/truthy? keep-flags)]
+                                      all-keep))
+             query-results-kept   (with-cum-vector
+                                    (doseq [query-result query-results-tagged]
+                                      ; (spyx-pretty query-result)
+                                      (let [query-result-plain (untag-query-result query-result)
+                                            keep-result        (keep-result? query-result-plain)]
+                                        (when keep-result
+                                          (cum-vector-append query-result)))))]
+         ; (spyx-pretty query-results-tagged-kept)
          query-results-kept))
 
      (s/defn ^:no-doc ->SearchParam-fn
@@ -652,12 +652,12 @@
                              (query-maps->triples-impl qmaps-modified))
                  (leaf-val? vv) (let [triple (search-triple-fn [eid-val kk vv])]
                                   ;(spyx triple)
-                                  (cum-vector-append triple) )
+                                  (cum-vector-append triple))
                  (symbol? vv) (do
                                 (let [sym-to-use (autosym-resolve kk vv)
                                       triple     (search-triple-fn [eid-val kk sym-to-use])]
                                   ;(spyx triple)
-                                  (cum-vector-append triple) ))
+                                  (cum-vector-append triple)))
                  :else (throw (ex-info "unrecognized value" (vals->map kk vv map-remaining)))
                  ))))))
 
@@ -699,8 +699,8 @@
            (let [elem0 (xfirst arg)]
              (and (symbol? elem0)
                (let [eval-result (eval elem0)]
-                 ; (spyxx eval-result)
-                  (fn? eval-result)))))))
+                 (spyxx eval-result)
+                 (fn? eval-result)))))))
 
      (defn ^:no-doc query-maps->tagged
        [query-specs]
@@ -708,10 +708,11 @@
        (exclude-reserved-identifiers query-specs)
        (let [maps-in      (keep-if map? query-specs)
              triple-forms (keep-if search-triple-form? query-specs)
-             pred-forms   (keep-if fn-form? query-specs)
-             >> (spyx-pretty maps-in)
-             >> (spyx triple-forms)
-             >> (spyx pred-forms)
+             pred-forms   (keep-if #(and (not (search-triple-form? %))
+                                      (fn-form? %)) query-specs)
+             ;>>           (spyx-pretty maps-in)
+             ;>>           (spyx triple-forms)
+             ;>>           (spyx pred-forms)
              pred-fns     (forv [pred-form pred-forms]
                             (fn [arg]
                               (newline)
@@ -725,6 +726,7 @@
                             (let [form-to-eval (cons
                                                  (quote tupelo.data/search-triple)
                                                  (rest triple-form))
+                                  >>           (spyx form-to-eval)
                                   form-result  (eval form-to-eval)]
                               (spyx form-result)
                               form-result))]
@@ -733,16 +735,16 @@
                search-triples (glue map-triples triples-proc)]
            ; (spyx-pretty
            (let [unfiltered-results (query-triples+preds
-                                       search-triples
-                                       pred-fns )
-                 >> (spyx unfiltered-results)
+                                      search-triples
+                                      pred-fns)
+                 ; >>                 (spyx unfiltered-results)
                  filtered-results   (query-results-filter-tmp-attr-mapentry
-                                       (query-results-filter-tmp-eid-mapentry
-                                         unfiltered-results))]
-             (spyx-pretty :query-maps->wrapped-fn-leave filtered-results)
+                                      (query-results-filter-tmp-eid-mapentry
+                                        unfiltered-results))]
+             ; (spyx-pretty :query-maps->wrapped-fn-leave filtered-results)
              filtered-results))))
 
-     (s/defn unwrap-query-results :- [tsk/KeyMap]
+     (s/defn untag-query-results :- [tsk/KeyMap]
        [query-result-maps]
        (forv [result-map query-result-maps]
          (apply glue
@@ -753,16 +755,16 @@
 
                    param-raw (<val me-key)
                    val-raw   (untagged me-val) ; me-val might not be a TagVal
-                             ;(cond ; #todo kill this if continues to work
-                             ;  (tagged-eid? me-val) (<val me-val)
-                             ;  :else me-val)
+                   ;(cond ; #todo kill this if continues to work
+                   ;  (tagged-eid? me-val) (<val me-val)
+                   ;  :else me-val)
                    ]
                {param-raw val-raw})))))
 
      (defn query-maps-fn
        [args]
        ; #todo need a linter to catch nonsensical qspecs (attr <> keyword for example)
-       (let [unwrapped-query-results (unwrap-query-results
+       (let [unwrapped-query-results (untag-query-results
                                        (query-maps->tagged args))]
          ; (spyx unwrapped-query-results)
          unwrapped-query-results))
@@ -863,6 +865,6 @@
      ;                  [:v :a :e :idx-vae]
      ;                  [:a :v :e :idx-ave]]))
 
-))
+     ))
 
 
