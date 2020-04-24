@@ -247,7 +247,7 @@
              {:eid-type {} :idx-eav #{} :idx-vae #{} :idx-ave #{}})
            (let [edn-val  {:a 1}
                  root-eid (td/add-edn edn-val)]
-             (is= root-eid (td/tag-eid 1001) )
+             (is= root-eid 1001 )
              (is= (td/tagval-walk-compact (deref *tdb*))
                {:eid-type {{:eid 1001} :map},
                 :idx-ave  #{[:a 1 {:eid 1001}]},
@@ -260,7 +260,7 @@
            (eid-count-reset)
            (let [edn-val  {:a 1 :b 2}
                  root-eid (td/add-edn edn-val)]
-             (is= (td/tag-eid 1001) root-eid)
+             (is= 1001 root-eid)
              (is= (td/tagval-walk-compact (deref *tdb*))
 
                {:eid-type {{:eid 1001} :map},
@@ -277,7 +277,7 @@
            (eid-count-reset)
            (let [edn-val  {:a 1 :b 2 :c {:d 4}}
                  root-eid (td/add-edn edn-val)]
-             (is= (td/tag-eid 1001) root-eid)
+             (is= 1001 root-eid)
              (is= (td/tagval-walk-compact (deref *tdb*))
                {:eid-type {{:eid 1001} :map, {:eid 1002} :map},
                 :idx-ave  #{[:a 1 {:eid 1001}]
@@ -338,7 +338,7 @@
                             [11 {:idx 1} {:eid 1002}]
                             [12 {:idx 2} {:eid 1002}]}})
              (is= edn-val (td/eid->edn root-eid))
-             (is= (td/eid->edn (td/tag-eid 1002)) [10 11 12]))))
+             (is= (td/eid->edn 1002) [10 11 12]))))
 
        (dotest
          (with-tdb (new-tdb)
@@ -632,7 +632,7 @@
              (when true
                (let-spy
                  [eids-match (td/index-find-leaf 1) ; only 1 match
-                  entity-edn (td/eid->edn (only eids-match))]
+                  entity-edn (td/eid->edn (<val (only eids-match)))]
                  (is= entity-edn {:a 1, :b 2}))
                (is= (td/tagval-walk-compact (query-triples [(search-triple e :num v)]))
                  [{{:param :e} {:eid 1001},
@@ -651,8 +651,8 @@
            (let [root-hid (td/add-edn edn-val)]
              ; (spyx-pretty (grab :idx-eav (deref *tdb*)))
              (is= edn-val (td/eid->edn root-hid))
-             (is= edn-val (td/eid->edn (tag-eid 1001)))
-             (is= (td/eid->edn (tag-eid 1003)) {:a 1 :b 2})
+             (is= edn-val (td/eid->edn 1001))
+             (is= (td/eid->edn 1003) {:a 1 :b 2})
              (comment ; #todo API:  output should look like
                {:x 1001 :y 1002 :a 1})
 
@@ -660,9 +660,9 @@
                    r2 (only (td/index-find-leaf 7))]
                (is= r1 {(tag-param :e) (tag-eid 1004)
                         (tag-param :i) (tag-idx 2)})
-               (is= (td/eid->edn (tag-eid 1004)) [5 6 7])
+               (is= (td/eid->edn 1004) [5 6 7])
                (is= r2 (tag-eid 1004))
-               (is= (td/eid->edn r2) [5 6 7])))))
+               (is= (td/eid->edn (<val r2)) [5 6 7])))))
 
          (dotest
            (td/with-tdb (td/new-tdb)
@@ -812,21 +812,21 @@
                (is= (td/eid->edn root-eid) {:aa [1 2 3]
                                             :bb [2 3 4]
                                             :cc [3 4 5 6]})
-               (is= (td/eid->edn (val (t/only2 found))) [1 2 3]))
+               (is= (td/eid->edn (<val (val (t/only2 found)))) [1 2 3]))
 
              (let [found    (td/query-triples [(td/search-triple eid idx 3)])
                    entities (t/it-> found
-                              (mapv #(grab (tag-param :eid) %) it)
+                              (mapv #(<val (grab (tag-param :eid) %)) it)
                               (mapv td/eid->edn it))]
-               (is-set= (td/tagval-walk-compact found)
+               (is-set= (spyx-pretty (td/tagval-walk-compact found))
                  [{{:param :eid} {:eid 1003}, {:param :idx} {:idx 1}}
                   {{:param :eid} {:eid 1002}, {:param :idx} {:idx 2}}
                   {{:param :eid} {:eid 1004}, {:param :idx} {:idx 0}}])
                (is-set= entities [[1 2 3] [2 3 4] [3 4 5 6]]))
 
-             (is= (td/eid->edn (val (t/only2 (td/query-triples [(td/search-triple-fn [(quote eid) (tag-idx 2) 3])])))) [1 2 3])
-             (is= (td/eid->edn (val (t/only2 (td/query-triples [(td/search-triple-fn [(quote eid) (tag-idx 1) 3])])))) [2 3 4])
-             (is= (td/eid->edn (val (t/only2 (td/query-triples [(td/search-triple-fn [(quote eid) (tag-idx 0) 3])])))) [3 4 5 6])
+             (is= (td/eid->edn (<val (val (t/only2 (td/query-triples [(td/search-triple-fn [(quote eid) (tag-idx 2) 3])]))))) [1 2 3])
+             (is= (td/eid->edn (<val (val (t/only2 (td/query-triples [(td/search-triple-fn [(quote eid) (tag-idx 1) 3])]))))) [2 3 4])
+             (is= (td/eid->edn (<val (val (t/only2 (td/query-triples [(td/search-triple-fn [(quote eid) (tag-idx 0) 3])]))))) [3 4 5 6])
              )))
 
          (dotest
@@ -892,14 +892,14 @@
                            :i 1}
                  root-hid (td/add-edn data)]
              (let [found (td/query-maps [{:a ?}])]
-               (is= (td/eid->edn (td/tag-eid (val (only2 found))))
+               (is= (td/eid->edn (val (only2 found)))
                  [{:b 2} {:c 3} {:d 4}]))
 
              (let [found (td/query-maps [{:a e1}
                                          {:eid e1 {:idx 0} val}])]
                (spyx found)
-               ;(is= (td/eid->edn (td/tag-eid (:val (only found))))
-               ;  {:b 2})
+               (is= (td/eid->edn (:val (only found)))
+                 {:b 2})
                )
 
              ;(let [found (td/query-triples [(td/search-triple e1 :a e2)

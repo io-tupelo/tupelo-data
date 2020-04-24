@@ -329,8 +329,7 @@
        "Returns the next integer EID"
        [] (swap! eid-counter inc))
 
-     (s/defn add-edn :- TagVal ; EidType ; #todo maybe rename:  load-edn->eid  ???
-       "Add the EDN arg to the indexes, returning the EID"
+     (s/defn ^:no-doc add-edn-impl :- TagVal ; EidType ; #todo maybe rename:  load-edn->eid  ???
        [edn-in :- s/Any]
        ;(spyq :-----------------------------------------------------------------------------)
        ;(newline)
@@ -338,48 +337,51 @@
        (with-spy-indent
          (when-not (entity-like? edn-in)
            (throw (ex-info "invalid edn-in" (vals->map edn-in))))
-         (let [eid-this (tag-eid (new-eid))
-               ctx      (cond ; #todo add set
-                          (map? edn-in) {:entity-type :map :edn-use edn-in}
-                          (set? edn-in) {:entity-type :set :edn-use (zipmap edn-in edn-in)}
-                          (sequential? edn-in) {:entity-type :array
-                                                :edn-use ;  (indexed edn-in)
-                                                             (forv [[idx val] (indexed edn-in)]
-                                                               [(tag-idx idx) val])}
-                          :else (throw (ex-info "unknown value found" (vals->map edn-in))))]
+         (let [eid-rec (tag-eid (new-eid))
+               ctx     (cond ; #todo add set
+                         (map? edn-in) {:entity-type :map :edn-use edn-in}
+                         (set? edn-in) {:entity-type :set :edn-use (zipmap edn-in edn-in)}
+                         (sequential? edn-in) {:entity-type :array
+                                               :edn-use ;  (indexed edn-in)
+                                                            (forv [[idx val] (indexed edn-in)]
+                                                              [(tag-idx idx) val])}
+                         :else (throw (ex-info "unknown value found" (vals->map edn-in))))]
            (t/with-map-vals ctx [entity-type edn-use]
              ;(newline)
              ;(spyx-pretty entity-type )
              ;(spyx-pretty edn-use)
              ; #todo could switch to transients & reduce here in a single swap
-             (swap! *tdb* update :eid-type assoc eid-this entity-type)
+             (swap! *tdb* update :eid-type assoc eid-rec entity-type)
              (doseq [[attr-edn val-edn] edn-use]
                ;(spyx [attr-edn val-edn])
                (let [attr-rec attr-edn
                      val-rec  (if (leaf-val? val-edn)
                                 val-edn
-                                (add-edn val-edn))]
-                 (swap! *tdb* update :idx-eav index/add-entry [eid-this attr-rec val-rec])
-                 (swap! *tdb* update :idx-vae index/add-entry [val-rec attr-rec eid-this])
-                 (swap! *tdb* update :idx-ave index/add-entry [attr-rec val-rec eid-this]))))
-           eid-this)))
+                                (add-edn-impl val-edn))]
+                 (swap! *tdb* update :idx-eav index/add-entry [eid-rec attr-rec val-rec])
+                 (swap! *tdb* update :idx-vae index/add-entry [val-rec attr-rec eid-rec])
+                 (swap! *tdb* update :idx-ave index/add-entry [attr-rec val-rec eid-rec]))))
+           eid-rec)))
+
+     (s/defn add-edn :- s/Int
+       "Add the EDN arg to the indexes, returning the EID"
+       [edn-in :- s/Any] (<val (add-edn-impl edn-in)))
 
      ; #todo need to handle sets
-     (s/defn eid->edn :- s/Any
-       "Returns the EDN subtree rooted at a eid."
-       [eid-in :- TagVal]
-       (let [eav-matches (index/prefix-matches [eid-in] (grab :idx-eav @*tdb*))
+     (s/defn ^:no-doc eid->edn-impl :- s/Any
+       [eid-rec  :- TagVal]
+       (let [eav-matches (index/prefix-matches [eid-rec] (grab :idx-eav @*tdb*))
              result-map  (apply glue
                            (forv [[match-eid match-attr match-val] eav-matches]
                              ; (spyx [match-eid match-attr match-val])
-                             (assert (= eid-in match-eid)) ; verify is a prefix match
+                             (assert (= eid-rec match-eid)) ; verify is a prefix match
                              (let [attr-edn  match-attr
                                    val-edn  (if (tagged-eid? match-val)
-                                              (eid->edn match-val) ; Eid rec
-                                               match-val)] ; Leaf rec
+                                              (eid->edn-impl match-val) ; Eid rec
+                                              match-val)] ; Leaf rec
                                (t/map-entry attr-edn val-edn))))
              ; >> (spyx-pretty result-map)
-             result-out  (let [entity-type (fetch-in @*tdb* [:eid-type eid-in])]
+             result-out  (let [entity-type (fetch-in @*tdb* [:eid-type eid-rec])]
                            (cond
                              (= entity-type :map) result-map
                              (= entity-type :set) (into #{} (keys result-map))
@@ -390,6 +392,12 @@
                                                       result-vals)
                              :else (throw (ex-info "invalid entity type found" (vals->map entity-type)))))]
          result-out))
+
+     (s/defn eid->edn :- s/Any
+       "Returns the EDN subtree rooted at a eid."
+       [eid-in :- s/Int]
+       (eid->edn-impl (tag-eid eid-in)))
+
 
      (s/defn boolean->binary :- s/Int ; #todo => misc
        "Convert true => 1, false => 0"
@@ -611,35 +619,35 @@
        [qmaps]
        (with-spy-indent
          (newline)
-         (spyq :query-maps->triples)
-         (spyx qmaps)
+         ;(spyq :query-maps->triples)
+         ;(spyx qmaps)
          (doseq [qmap qmaps]
-           (spyx-pretty qmap)
+           ; (spyx-pretty qmap)
            (s/validate tsk/Map qmap)
            (let [eid-val       (if (contains? qmap :eid)
                                  (autosym-resolve :eid (grab :eid qmap))
                                  (gensym "tmp-eid-"))
                  map-remaining (dissoc qmap :eid)]
-             (spyx map-remaining)
+             ; (spyx map-remaining)
              (forv [[kk vv] map-remaining]
-               (spyx [kk vv])
+               ; (spyx [kk vv])
                (cond
                  (sequential? vv) ; (throw (ex-info "not implemented" {:type :sequential :value vv}))
                  (let [array-val       vv
                        tmp-eid         (gensym "tmp-eid-")
                        triple-modified (search-triple-fn [eid-val kk tmp-eid])
-                       >>              (spyx triple-modified)
+                       ; >>              (spyx triple-modified)
                        qmaps-modified  (forv [elem array-val]
                                          {:eid tmp-eid (gensym "tmp-attr-") elem})]
-                   (spyx qmaps-modified)
+                   ; (spyx qmaps-modified)
                    (cum-vector-append triple-modified)
                    (query-maps->triples-impl qmaps-modified))
 
                  (map? vv) (let [tmp-eid         (gensym "tmp-eid-")
                                  triple-modified (search-triple-fn [eid-val kk tmp-eid])
-                                 >>              (spyx triple-modified)
+                                 ;>>              (spyx triple-modified)
                                  qmaps-modified  [(glue {:eid tmp-eid} vv)]]
-                             (spyx qmaps-modified)
+                             ;(spyx qmaps-modified)
                              (cum-vector-append triple-modified)
                              (query-maps->triples-impl qmaps-modified))
                  (leaf-val? vv) (let [triple (search-triple-fn [eid-val kk vv])]
@@ -685,7 +693,7 @@
 
      (s/defn fn-form? :- s/Bool
        [arg :- s/Any]
-       (spyx arg)
+       (spyx :fn-form?--enter arg)
        (spy :fn-form?--result
          (and (list? arg)
            (let [elem0 (xfirst arg)]
