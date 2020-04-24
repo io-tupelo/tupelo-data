@@ -773,7 +773,7 @@
                  root-eid (td/add-edn edn-val)]
              (comment
                (spyx-pretty @*tdb*)
-               (spyx-pretty (td/db-pretty (td/tagval-walk-compact (deref td/*tdb*))))
+               (spyx-pretty (td/db-pretty (deref td/*tdb*)))
                {:eid-type {{:eid 1001} :map,
                            {:eid 1002} :array,
                            {:eid 1003} :array,

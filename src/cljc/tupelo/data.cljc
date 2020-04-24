@@ -10,7 +10,7 @@
   #?(:clj (:require
             [tupelo.core :as t :refer [spy spyx spyxx spyx-pretty with-spy-indent
                                        grab glue map-entry indexed
-                                       forv vals->map fetch-in let-spy xfirst xsecond xthird xlast xrest
+                                       it-> forv vals->map fetch-in let-spy xfirst xsecond xthird xlast xrest
                                        keep-if drop-if append prepend
                                        ]]
             [tupelo.data.index :as index]
@@ -116,14 +116,6 @@
                      (or (tagged? item)
                        (tagval-map? item))
                      {(grab :tag item) (grab :val item)}))}))
-
-     (s/defn db-pretty :- tsk/KeyMap
-       "Returns a pretty version of the DB"
-       [db :- tsk/KeyMap]
-       {:eid-type (t/->sorted-map-generic (grab :eid-type db))
-        :idx-ave  (index/->index (grab :idx-ave db))
-        :idx-eav  (index/->index (grab :idx-eav db))
-        :idx-vae  (index/->index (grab :idx-vae db))} )
 
      ;-----------------------------------------------------------------------------
      (defn unquote-form?
@@ -314,6 +306,17 @@
           :idx-vae  (index/empty-index)
           :idx-ave  (index/empty-index)
           }))
+
+     (s/defn db-pretty :- tsk/KeyMap
+       "Returns a pretty version of the DB"
+       [db :- tsk/KeyMap]
+       (let [db-compact (tagval-walk-compact db) ; returns plain maps & sets instead of sorted or index
+             result     (it-> (new-tdb)
+                          (update it :eid-type glue (grab :eid-type db-compact))
+                          (update it :idx-ave glue (grab :idx-ave db-compact))
+                          (update it :idx-eav glue (grab :idx-eav db-compact))
+                          (update it :idx-vae glue (grab :idx-vae db-compact)))]
+         result))
 
      (def ^:no-doc eid-count-base 1000)
      (def ^:no-doc eid-counter (atom eid-count-base))
@@ -550,9 +553,9 @@
                e-out (if (symbol? e)
                        (tag-param e)
                        (tag-eid e))
-               a-out (if (symbol? a)
-                       (tag-param a)
-                       a)
+               a-out (cond
+                       (symbol? a) (tag-param a)
+                       :else a)
                v-out (if (symbol? v)
                        (tag-param v)
                        v)]
