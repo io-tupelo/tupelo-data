@@ -861,8 +861,6 @@
                    root-eid (td/add-edn data-val)]
                (is= data-val (td/eid->edn root-eid)))))
 
-       (comment ; <<comment>>
-
          (dotest
            (td/with-tdb (td/new-tdb)
              (let [edn-val    #{1 2 3}
@@ -880,39 +878,46 @@
                    root-hid (td/add-edn edn-val)]
                (is= edn-val (td/eid->edn root-hid)))))
 
-         (dotest
-           (td/eid-count-reset)
-           (td/with-tdb (td/new-tdb)
-             (let [data     {:a [{:b 2}
-                                 {:c 3}
-                                 {:d 4}]
-                             :e {:f 6}
-                             :g :green
-                             :h "hotel"
-                             :i 1}
-                   root-hid (td/add-edn data)]
-               (let [found (td/query-maps [{:a ?}])]
-                 (is= (td/eid->edn (td/tag-eid (val (only2 found))))
-                   [{:b 2} {:c 3} {:d 4}]))
-               (let [found (td/query-maps [{:a e1}
-                                           {:eid e1 {:idx 0} val}])]
-                 (is= (td/eid->edn (td/tag-eid (:val (only found))))
-                   {:b 2}))
-               (let [found (td/query-triples [(td/search-triple e1 :a e2)
-                                              (td/search-triple e2 {:idx 2} e3)])]
-                 (is= (td/eid->edn (grab {:param :e3} (only found))) {:d 4}))
+       (defn tv [t v] (td/->TagVal t v))
 
-               (let [found (td/query-triples [(td/search-triple e1 a1 e2)
-                                              (td/search-triple e2 a2 e3)
-                                              (td/search-triple e3 a3 4)])]
-                 (is= found
-                   [{{:param :e1} {:eid 1001},
-                     {:param :a1} :a,
-                     {:param :e2} {:eid 1002},
-                     {:param :a2} {:idx 2},
-                     {:param :e3} {:eid 1005},
-                     {:param :a3} :d}])
-                 (is= data (td/eid->edn (grab {:param :e1} (only found))))))))
+       (dotest ; -focus
+         (td/eid-count-reset)
+         (td/with-tdb (td/new-tdb)
+           (let [data     {:a [{:b 2}
+                               {:c 3}
+                               {:d 4}]
+                           :e {:f 6}
+                           :g :green
+                           :h "hotel"
+                           :i 1}
+                 root-hid (td/add-edn data)]
+             (let [found (td/query-maps [{:a ?}])]
+               (is= (td/eid->edn (td/tag-eid (val (only2 found))))
+                 [{:b 2} {:c 3} {:d 4}]))
+
+             ;(let [found (td/query-maps [{:a e1}
+             ;                            {:eid e1 {:idx 0} val}])]
+             ;  (is= (td/eid->edn (td/tag-eid (:val (only found))))
+             ;    {:b 2}))
+
+             ;(let [found (td/query-triples [(td/search-triple e1 :a e2)
+             ;                               (td/search-triple e2 {:idx 2} e3)])]
+             ;  (is= (td/eid->edn (grab {:param :e3} (only found))) {:d 4}))
+             ;
+             ;(let [found (td/query-triples [(td/search-triple e1 a1 e2)
+             ;                               (td/search-triple e2 a2 e3)
+             ;                               (td/search-triple e3 a3 4)])]
+             ;  (is= found
+             ;    [{(tv :param :e1) (tv :eid 1001),
+             ;      (tv :param :a1) :a,
+             ;      (tv :param :e2) (tv :eid 1002)
+             ;      (tv :param :a2) (tv :idx 2)
+             ;      (tv :param :e3) (tv :eid 1005)
+             ;      (tv :param :a3) :d}])
+             ;  (is= data (td/eid->edn (grab {:param :e1} (only found)))))
+             )))
+
+       (comment ; <<comment>>
 
          (dotest
            (td/with-tdb (td/new-tdb)
