@@ -133,19 +133,6 @@
        [form]
        (quote-template-impl form))
 
-
-
-     ;-----------------------------------------------------------------------------
-     (def customers ; #todo be able to process this data & delete unwise users
-       [{:customer-id 1
-         :plants      [{:plant-id  1
-                        :employees [{:name "Alice" :age 35 :sex "F"}
-                                    {:name "Bob" :age 25 :sex "M"}]}
-                       {:plant-id  2
-                        :employees []}]}
-        {:customer-id 2}])
-     (def age-of-wisdom 30)
-
      ;-----------------------------------------------------------------------------
      ; #todo => tupelo.core
      (def ^:dynamic *cumulative-val*
@@ -182,13 +169,13 @@
 
      ;-----------------------------------------------------------------------------
      ; #todo => tupelo.core
-     (defn only?
+     (s/defn only? :- s/Bool
        "Returns true iff collection has length=1"
-       [coll] (and (t/has-length? coll 1)))
-     (defn only2?
+       [coll :- s/Any] (and (t/has-length? coll 1)))
+     (s/defn only2? :- s/Bool
        "Returns true iff arg is two nested collections of length=1"
-       [coll] (and (t/has-length? coll 1)
-                (t/has-length? (first coll) 1)))
+       [coll :- s/Any] (and (t/has-length? coll 1)
+                         (t/has-length? (first coll) 1)))
 
      ;---------------------------------------------------------------------------------------------------
      (do  ; keep these in sync
@@ -729,7 +716,7 @@
                  filtered-results#   (query-results-filter-tmp-attr-mapentry
                                        (query-results-filter-tmp-eid-mapentry
                                          unfiltered-results#))]
-             ; (spyx-pretty :query-maps->wrapped-fn-leave filtered-results#)
+             (spyx-pretty :query-maps->wrapped-fn-leave filtered-results#)
              filtered-results#))))
 
      (s/defn unwrap-query-results
