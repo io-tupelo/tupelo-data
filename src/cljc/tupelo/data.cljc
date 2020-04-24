@@ -100,6 +100,31 @@
        (.write writer
          (format "<%s %s>" (<tag tv) (<val tv))))
 
+     (s/defn tagval-map? :- s/Bool
+       "Returns true iff arg is a map that looks like a TagVal record:  {:tag :something :val 42}"
+       [item]
+       (and (map? item)
+         (= #{:tag :val} (set (keys item)))))
+
+     (defn tagval-walk-compact
+       "Walks a data structure, converting any TagVal record like
+         {:tag :something :val 42}  =>  {:something 42}"
+       [data]
+       (t/walk-with-parents data
+         {:leave (fn [-parents- item]
+                   (t/cond-it-> item
+                     (or (tagged? item)
+                       (tagval-map? item))
+                     {(grab :tag item) (grab :val item)}))}))
+
+     (s/defn db-pretty :- tsk/KeyMap
+       "Returns a pretty version of the DB"
+       [db :- tsk/KeyMap]
+       {:eid-type (t/->sorted-map-generic (grab :eid-type db))
+        :idx-ave  (index/->index (grab :idx-ave db))
+        :idx-eav  (index/->index (grab :idx-eav db))
+        :idx-vae  (index/->index (grab :idx-vae db))} )
+
      ;-----------------------------------------------------------------------------
      (defn unquote-form?
        [arg]
@@ -255,26 +280,22 @@
          (tmp-eid-kw? (<val arg))))
 
      ;-----------------------------------------------------------------------------
-     (s/defn tmp-attr-prefix-str? :- s/Bool
-       "Returns true iff arg is a String like `tmp-attr-99999`"
+     (s/defn ^:no-doc tmp-attr-prefix-str? :- s/Bool
        [arg :- s/Str]
        (.startsWith arg "tmp-attr-"))
 
-     (s/defn tmp-attr-sym? :- s/Bool
-       "Returns true iff arg is a symbol like `tmp-attr-99999`"
+     (s/defn ^:no-doc tmp-attr-sym? :- s/Bool
        [arg :- s/Any] (and (symbol? arg)
                         (tmp-attr-prefix-str? (t/sym->str arg))))
 
-     (s/defn tmp-attr-kw? :- s/Bool
-       "Returns true iff arg is a symbol like `tmp-attr-99999`"
+     (s/defn ^:no-doc tmp-attr-kw? :- s/Bool
        [arg :- s/Any] (and (keyword? arg)
                         (tmp-attr-prefix-str? (t/kw->str arg))))
 
-     (s/defn ^:no-doc param-tmp-attr? :- s/Bool
+     (s/defn ^:no-doc tmp-attr-param? :- s/Bool
        "Returns true iff arg is a map that looks like {:param :tmp-attr-99999}"
        [arg] (and (tagged-param? arg)
                (tmp-attr-kw? (<val arg))))
-
 
      ;-----------------------------------------------------------------------------
      (def ^:dynamic ^:no-doc *tdb* nil)
@@ -375,77 +396,67 @@
        "Given a triple of [e a v] values, use the best index to find a matching subset, where
        'nil' represents unknown values. Returns an index in [e a v] format."
        [triple :- tsk/Triple]
-       (let [[e a v] triple
-             known-flgs (mapv #(boolean->binary (t/not-nil? %)) triple)]
-         (cond
-           (= known-flgs [0 0 0]) (grab :idx-eav @*tdb*)
-           :else (let [found-entries (cond
-                                       (= known-flgs [1 0 0]) (let [entries (index/prefix-matches [e] (grab :idx-eav @*tdb*))
-                                                                    result  {:e-vals (mapv xfirst entries)
-                                                                             :a-vals (mapv xsecond entries)
-                                                                             :v-vals (mapv xthird entries)}]
-                                                                result)
-                                       (= known-flgs [0 1 0]) (let [entries (index/prefix-matches [a] (grab :idx-ave @*tdb*))
-                                                                    result  {:a-vals (mapv xfirst entries)
-                                                                             :v-vals (mapv xsecond entries)
-                                                                             :e-vals (mapv xthird entries)}]
-                                                                result)
+       (let [known-flgs (mapv #(boolean->binary (t/not-nil? %)) triple)]
+         (if (= known-flgs [0 0 0])
+           (grab :idx-eav @*tdb*)
+           (let [[e a v] triple
+                 found-entries (cond
+                                 (= known-flgs [1 0 0]) (let [entries (index/prefix-matches [e] (grab :idx-eav @*tdb*))
+                                                              result  {:e-vals (mapv xfirst entries)
+                                                                       :a-vals (mapv xsecond entries)
+                                                                       :v-vals (mapv xthird entries)}]
+                                                          result)
+                                 (= known-flgs [0 1 0]) (let [entries (index/prefix-matches [a] (grab :idx-ave @*tdb*))
+                                                              result  {:a-vals (mapv xfirst entries)
+                                                                       :v-vals (mapv xsecond entries)
+                                                                       :e-vals (mapv xthird entries)}]
+                                                          result)
 
-                                       (= known-flgs [0 0 1]) (let [entries (index/prefix-matches [v] (grab :idx-vae @*tdb*))
-                                                                    result  {:v-vals (mapv xfirst entries)
-                                                                             :a-vals (mapv xsecond entries)
-                                                                             :e-vals (mapv xthird entries)}]
-                                                                result)
+                                 (= known-flgs [0 0 1]) (let [entries (index/prefix-matches [v] (grab :idx-vae @*tdb*))
+                                                              result  {:v-vals (mapv xfirst entries)
+                                                                       :a-vals (mapv xsecond entries)
+                                                                       :e-vals (mapv xthird entries)}]
+                                                          result)
 
-                                       (= known-flgs [1 1 0]) (let [entries (index/prefix-matches [e a] (grab :idx-eav @*tdb*))
-                                                                    result  {:e-vals (mapv xfirst entries)
-                                                                             :a-vals (mapv xsecond entries)
-                                                                             :v-vals (mapv xthird entries)}]
-                                                                result)
+                                 (= known-flgs [1 1 0]) (let [entries (index/prefix-matches [e a] (grab :idx-eav @*tdb*))
+                                                              result  {:e-vals (mapv xfirst entries)
+                                                                       :a-vals (mapv xsecond entries)
+                                                                       :v-vals (mapv xthird entries)}]
+                                                          result)
 
-                                       (= known-flgs [0 1 1]) (let [entries (index/prefix-matches [a v] (grab :idx-ave @*tdb*))
-                                                                    result  {:a-vals (mapv xfirst entries)
-                                                                             :v-vals (mapv xsecond entries)
-                                                                             :e-vals (mapv xthird entries)}]
-                                                                result)
+                                 (= known-flgs [0 1 1]) (let [entries (index/prefix-matches [a v] (grab :idx-ave @*tdb*))
+                                                              result  {:a-vals (mapv xfirst entries)
+                                                                       :v-vals (mapv xsecond entries)
+                                                                       :e-vals (mapv xthird entries)}]
+                                                          result)
 
-                                       (= known-flgs [1 0 1]) (let [entries-e  (index/prefix-matches [e] (grab :idx-eav @*tdb*))
-                                                                    entries-ev (keep-if #(= v (xlast %)) entries-e)
-                                                                    result     {:e-vals (mapv xfirst entries-ev)
-                                                                                :a-vals (mapv xsecond entries-ev)
-                                                                                :v-vals (mapv xthird entries-ev)}]
-                                                                result)
+                                 (= known-flgs [1 0 1]) (let [entries-e  (index/prefix-matches [e] (grab :idx-eav @*tdb*))
+                                                              entries-ev (keep-if #(= v (xlast %)) entries-e)
+                                                              result     {:e-vals (mapv xfirst entries-ev)
+                                                                          :a-vals (mapv xsecond entries-ev)
+                                                                          :v-vals (mapv xthird entries-ev)}]
+                                                          result)
 
-                                       (= known-flgs [1 1 1]) (let [entries (index/prefix-matches [e a v] (grab :idx-eav @*tdb*))
-                                                                    result  {:e-vals (mapv xfirst entries)
-                                                                             :a-vals (mapv xsecond entries)
-                                                                             :v-vals (mapv xthird entries)}]
-                                                                result)
+                                 (= known-flgs [1 1 1]) (let [entries (index/prefix-matches [e a v] (grab :idx-eav @*tdb*))
+                                                              result  {:e-vals (mapv xfirst entries)
+                                                                       :a-vals (mapv xsecond entries)
+                                                                       :v-vals (mapv xthird entries)}]
+                                                          result)
 
-                                       :else (throw (ex-info "invalid known-flags" (vals->map triple known-flgs))))
-                       result-index  (t/with-map-vals found-entries [e-vals a-vals v-vals]
-                                       (set ; was: index/->index
-                                         (map vector e-vals a-vals v-vals))) ; #todo can just return a vec/set instead of an index (?)
-                       ]
-                   result-index))))
+                                 :else (throw (ex-info "invalid known-flags" (vals->map triple known-flgs))))
+                 result-index  (t/with-map-vals found-entries [e-vals a-vals v-vals]
+                                 (set ; was: index/->index
+                                   (map vector e-vals a-vals v-vals))) ; #todo can just return a vec/set instead of an index (?)
+                 ]
+             result-index))))
 
      (s/defn apply-env
        [env :- tsk/Map
         elements :- tsk/Vec]
        (forv [elem elements]
-         (if (contains? env elem) ; #todo make sure works witn `nil` value
+         (if (contains? env elem) ; #todo make sure works with `nil` value
            (get env elem)
            elem)))
-
-     (s/defn unwrap-query-result :- tsk/KeyMap
-       [resmap :- tsk/Map]
-       ; (newline) (spyx :unwrap-query-result-enter resmap)
-       (let [result (apply glue
-                      (forv [me resmap]
-                        {(untagged (key me))
-                         (untagged (val me))}))]
-         ; (newline) (spyx :unwrap-query-result-leave result)
-         result))
 
      (s/defn ^:no-doc query-triples-impl :- s/Any
        [query-result env qspec-list]
@@ -483,6 +494,16 @@
                (let [env-next (glue env env-frame)]
                  (query-triples-impl query-result env-next qspec-rest)))))))
 
+     (s/defn unwrap-query-result :- tsk/KeyMap
+       [resmap :- tsk/Map]
+       ; (newline) (spyx :unwrap-query-result-enter resmap)
+       (let [result (apply glue
+                      (forv [me resmap]
+                        {(untagged (key me))
+                         (untagged (val me))}))]
+         ; (newline) (spyx :unwrap-query-result-leave result)
+         result))
+
      (s/defn query-triples
        [qspec-list :- [tsk/Triple]]
        (let [query-results (atom [])]
@@ -494,7 +515,7 @@
        [qspec-list :- [tsk/Triple]
         pred-list :- [tsk/Fn]]
        (let [query-results      (query-triples qspec-list)
-             >>                 (spyx query-results)
+             >>                 (spyx-pretty query-results)
              keep-result?       (fn fn-keep-result? [query-result]
                                   (let [keep-flags (forv [pred pred-list]
                                                      (pred query-result))
@@ -502,12 +523,12 @@
                                     all-keep))
              query-results-kept (with-cum-vector
                                   (doseq [query-result query-results]
-                                    (spyx query-result)
+                                    (spyx-pretty query-result)
                                     (let [query-result-unwrapped (unwrap-query-result query-result)
                                           keep-result            (keep-result? query-result-unwrapped)]
                                       (when keep-result
                                         (cum-vector-append query-result)))))]
-         (spyx query-results-kept)
+         (spyx-pretty query-results-kept)
          query-results-kept))
 
      (s/defn ^:no-doc ->SearchParam-fn
@@ -525,7 +546,7 @@
        [args :- tsk/Triple]
        ; (assert (= 3 (count args)))
        (with-spy-indent
-         (let [[e a v] (spyx args)
+         (let [[e a v] args
                e-out (if (symbol? e)
                        (tag-param e)
                        (tag-eid e))
@@ -554,10 +575,10 @@
        [target :- LeafType]
        ; (println :index-find-leaf )
        (let [results (query-triples+preds
-                       [[{:param :e} {:param :a}  target]]
+                       [[(tag-param :e) (tag-param :a) target]]
                        []) ; no preds
-
-             eids    (mapv #(t/fetch % {:param :e}) results)]
+             ; >> (spyx-pretty results)
+             eids    (mapv #(t/fetch % (tag-param :e)) results)]
          eids))
 
      (def ^:no-doc ^:dynamic *autosyms-seen* nil)
@@ -652,7 +673,7 @@
        [query-results]
        (let [results-filtered (forv [qres query-results]
                                 (drop-if
-                                  (fn [k v] (param-tmp-attr? k))
+                                  (fn [k v] (tmp-attr-param? k))
                                   qres))]
          results-filtered))
 
@@ -674,10 +695,14 @@
 
      (s/defn fn-form? :- s/Bool
        [arg :- s/Any]
-       (and (list? (spyx arg))
-         (let [elem0 (xfirst arg)]
-           (and (symbol? elem0)
-             (spy :fn-result (fn? (spyxx (eval elem0))))))))
+       (spyx arg)
+       (spy :fn-form?--result
+         (and (list? arg)
+           (let [elem0 (xfirst arg)]
+             (and (symbol? elem0)
+               (let [eval-result (eval elem0)]
+                 ; (spyxx eval-result)
+                  (fn? eval-result)))))))
 
      (defn ^:no-doc query-maps->wrapped-fn
        [query-specs]
@@ -686,7 +711,7 @@
        (let [maps-in      (keep-if map? query-specs)
              triple-forms (keep-if search-triple-form? query-specs)
              pred-forms   (keep-if fn-form? query-specs)
-             >> (spyx maps-in)
+             >> (spyx-pretty maps-in)
              >> (spyx triple-forms)
              >> (spyx pred-forms)
              pred-fns     (forv [pred-form pred-forms]
@@ -705,6 +730,7 @@
                                   form-result  (eval form-to-eval)]
                               (spyx form-result)
                               form-result))]
+
          ; returns result in *cumulative-val* ; #todo cleanup
          (let [map-triples    (query-maps->triples maps-in)
                search-triples (glue map-triples triples-proc)]
@@ -725,6 +751,9 @@
          (apply glue
            (forv [mapentry result-map]
              (let [[me-key me-val] mapentry
+                   ; >> (spyxx me-key)
+                   ; >> (spyxx me-val)
+
                    param-raw (<val me-key)
                    val-raw   (cond
                                (tagged-eid? me-val) (<val me-val)
