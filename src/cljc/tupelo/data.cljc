@@ -289,7 +289,14 @@
        `(binding [*tdb* (atom ~tdb-arg)]
           ~@forms))
 
-     (defn new-tdb
+     (def TDB
+       "Plumatic Schema type definition for tupelo.data DB"
+       {:eid-type {TagVal s/Keyword}
+        :idx-eav  #{tsk/Triple}
+        :idx-vae  #{tsk/Triple}
+        :idx-ave  #{tsk/Triple}})
+
+     (s/defn new-tdb :- TDB
        "Returns a new, empty db."
        []
        (into (sorted-map)
@@ -301,7 +308,7 @@
 
      (s/defn db-pretty :- tsk/KeyMap
        "Returns a pretty version of the DB"
-       [db :- tsk/KeyMap]
+       [db :- TDB]
        (let [db-compact (tagval-walk-compact db) ; returns plain maps & sets instead of sorted or index
              result     (it-> (new-tdb)
                           (update it :eid-type glue (grab :eid-type db-compact))
@@ -398,60 +405,63 @@
      (s/defn lookup :- [tsk/Triple] ; #todo maybe use :unk or :* for unknown?
        "Given a triple of [e a v] values, use the best index to find a matching subset, where
        'nil' represents unknown values. Returns an index in [e a v] format."
-       [triple :- tsk/Triple]
-       (let [known-flgs (mapv #(boolean->binary (t/not-nil? %)) triple)]
-         (if (= known-flgs [0 0 0])
-           (vec (grab :idx-eav @*tdb*))
-           (let [[e a v] triple
-                 found-entries (cond
-                                 ; #todo: instead of these blocks => map, apply a function like (mapv ave->eav entries)
-                                 (= known-flgs [1 0 0]) (let [entries (index/prefix-matches [e] (grab :idx-eav @*tdb*))
-                                                              result  {:e-vals (mapv xfirst entries)
-                                                                       :a-vals (mapv xsecond entries)
-                                                                       :v-vals (mapv xthird entries)}]
-                                                          result)
-                                 (= known-flgs [0 1 0]) (let [entries (index/prefix-matches [a] (grab :idx-ave @*tdb*))
-                                                              result  {:a-vals (mapv xfirst entries)
-                                                                       :v-vals (mapv xsecond entries)
-                                                                       :e-vals (mapv xthird entries)}]
-                                                          result)
+       ([triple :- tsk/Triple]
+        (lookup (deref *tdb*) triple))
+       ([db :- TDB
+         triple :- tsk/Triple]
+        (let [known-flgs (mapv #(boolean->binary (t/not-nil? %)) triple)]
+          (if (= known-flgs [0 0 0])
+            (vec (grab :idx-eav db))
+            (let [[e a v] triple
+                  found-entries (cond
+                                  ; #todo: instead of these blocks => map, apply a function like (mapv ave->eav entries)
+                                  (= known-flgs [1 0 0]) (let [entries (index/prefix-matches [e] (grab :idx-eav db))
+                                                               result  {:e-vals (mapv xfirst entries)
+                                                                        :a-vals (mapv xsecond entries)
+                                                                        :v-vals (mapv xthird entries)}]
+                                                           result)
+                                  (= known-flgs [0 1 0]) (let [entries (index/prefix-matches [a] (grab :idx-ave db))
+                                                               result  {:a-vals (mapv xfirst entries)
+                                                                        :v-vals (mapv xsecond entries)
+                                                                        :e-vals (mapv xthird entries)}]
+                                                           result)
 
-                                 (= known-flgs [0 0 1]) (let [entries (index/prefix-matches [v] (grab :idx-vae @*tdb*))
-                                                              result  {:v-vals (mapv xfirst entries)
-                                                                       :a-vals (mapv xsecond entries)
-                                                                       :e-vals (mapv xthird entries)}]
-                                                          result)
+                                  (= known-flgs [0 0 1]) (let [entries (index/prefix-matches [v] (grab :idx-vae db))
+                                                               result  {:v-vals (mapv xfirst entries)
+                                                                        :a-vals (mapv xsecond entries)
+                                                                        :e-vals (mapv xthird entries)}]
+                                                           result)
 
-                                 (= known-flgs [1 1 0]) (let [entries (index/prefix-matches [e a] (grab :idx-eav @*tdb*))
-                                                              result  {:e-vals (mapv xfirst entries)
-                                                                       :a-vals (mapv xsecond entries)
-                                                                       :v-vals (mapv xthird entries)}]
-                                                          result)
+                                  (= known-flgs [1 1 0]) (let [entries (index/prefix-matches [e a] (grab :idx-eav db))
+                                                               result  {:e-vals (mapv xfirst entries)
+                                                                        :a-vals (mapv xsecond entries)
+                                                                        :v-vals (mapv xthird entries)}]
+                                                           result)
 
-                                 (= known-flgs [0 1 1]) (let [entries (index/prefix-matches [a v] (grab :idx-ave @*tdb*))
-                                                              result  {:a-vals (mapv xfirst entries)
-                                                                       :v-vals (mapv xsecond entries)
-                                                                       :e-vals (mapv xthird entries)}]
-                                                          result)
+                                  (= known-flgs [0 1 1]) (let [entries (index/prefix-matches [a v] (grab :idx-ave db))
+                                                               result  {:a-vals (mapv xfirst entries)
+                                                                        :v-vals (mapv xsecond entries)
+                                                                        :e-vals (mapv xthird entries)}]
+                                                           result)
 
-                                 (= known-flgs [1 0 1]) (let [entries-e  (index/prefix-matches [e] (grab :idx-eav @*tdb*))
-                                                              entries-ev (keep-if #(= v (xlast %)) entries-e)
-                                                              result     {:e-vals (mapv xfirst entries-ev)
-                                                                          :a-vals (mapv xsecond entries-ev)
-                                                                          :v-vals (mapv xthird entries-ev)}]
-                                                          result)
+                                  (= known-flgs [1 0 1]) (let [entries-e  (index/prefix-matches [e] (grab :idx-eav db))
+                                                               entries-ev (keep-if #(= v (xlast %)) entries-e)
+                                                               result     {:e-vals (mapv xfirst entries-ev)
+                                                                           :a-vals (mapv xsecond entries-ev)
+                                                                           :v-vals (mapv xthird entries-ev)}]
+                                                           result)
 
-                                 (= known-flgs [1 1 1]) (let [entries (index/prefix-matches [e a v] (grab :idx-eav @*tdb*))
-                                                              result  {:e-vals (mapv xfirst entries)
-                                                                       :a-vals (mapv xsecond entries)
-                                                                       :v-vals (mapv xthird entries)}]
-                                                          result)
+                                  (= known-flgs [1 1 1]) (let [entries (index/prefix-matches [e a v] (grab :idx-eav db))
+                                                               result  {:e-vals (mapv xfirst entries)
+                                                                        :a-vals (mapv xsecond entries)
+                                                                        :v-vals (mapv xthird entries)}]
+                                                           result)
 
-                                 :else (throw (ex-info "invalid known-flags" (vals->map triple known-flgs))))
-                 result-index  (t/with-map-vals found-entries [e-vals a-vals v-vals]
-                                 (mapv vector e-vals a-vals v-vals))
-                 ]
-             result-index))))
+                                  :else (throw (ex-info "invalid known-flags" (vals->map triple known-flgs))))
+                  result-index  (t/with-map-vals found-entries [e-vals a-vals v-vals]
+                                  (mapv vector e-vals a-vals v-vals))
+                  ]
+              result-index)))))
 
      (s/defn apply-env
        [env :- tsk/Map
