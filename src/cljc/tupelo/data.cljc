@@ -282,14 +282,6 @@
                (tmp-attr-kw? (<val arg))))
 
      ;-----------------------------------------------------------------------------
-     (s/defn ^:no-doc map-eav->eav :- [tsk/Triple]
-       [triples :- #{tsk/Triple}] (vec triples))
-     (s/defn ^:no-doc map-vae->eav :- [tsk/Triple]
-       [triples :- #{tsk/Triple}] (mapv (fn [[v a e]] [e a v]) triples))
-     (s/defn ^:no-doc map-ave->eav :- [tsk/Triple]
-       [triples :- #{tsk/Triple}] (mapv (fn [[a v e]] [e a v]) triples))
-
-     ;-----------------------------------------------------------------------------
      (def ^:dynamic ^:no-doc *tdb* nil)
 
      (defmacro with-tdb ; #todo swap names?
@@ -405,11 +397,19 @@
        [eid-in :- s/Int]
        (eid->edn-impl (tag-eid eid-in)))
 
-
+     ;-----------------------------------------------------------------------------
      (s/defn boolean->binary :- s/Int ; #todo => misc
        "Convert true => 1, false => 0"
        [arg :- s/Bool] (if arg 1 0))
 
+     (s/defn ^:no-doc map-eav->eav :- [tsk/Triple]
+       [triples :- #{tsk/Triple}] (vec triples))
+     (s/defn ^:no-doc map-vae->eav :- [tsk/Triple]
+       [triples :- #{tsk/Triple}] (mapv (fn [[v a e]] [e a v]) triples))
+     (s/defn ^:no-doc map-ave->eav :- [tsk/Triple]
+       [triples :- #{tsk/Triple}] (mapv (fn [[a v e]] [e a v]) triples))
+
+     ;-----------------------------------------------------------------------------
      (s/defn lookup :- [tsk/Triple] ; #todo maybe use :unk or :* for unknown?
        "Given a triple of [e a v] values, use the best index to find a matching subset, where
        'nil' represents unknown values. Returns an index in [e a v] format."
