@@ -379,22 +379,22 @@
                 [3 :a {:eid 1003}] [3 :b {:eid 1006}] [3 :c {:eid 1009}]}})
            ;---------------------------------------------------------------------------------------------------
            (is= (td/tagval-walk-compact (lookup [(td/tag-eid 1003) nil nil]))
-             #{[{:eid 1003} :a 3]})
+             [ [{:eid 1003} :a 3]])
            (is= (td/tagval-walk-compact (lookup [nil :b nil]))
-             #{[{:eid 1004} :b 1]
-               [{:eid 1005} :b 2]
-               [{:eid 1006} :b 3]})
+             [[{:eid 1004} :b 1]
+              [{:eid 1005} :b 2]
+              [{:eid 1006} :b 3]])
            (is= (td/tagval-walk-compact (lookup [nil nil 3]))
-             #{[{:eid 1003} :a 3]
-               [{:eid 1006} :b 3]
-               [{:eid 1009} :c 3]}))
+             [[{:eid 1003} :a 3]
+              [{:eid 1006} :b 3]
+              [{:eid 1009} :c 3]]))
          ;---------------------------------------------------------------------------------------------------
          (is= (td/tagval-walk-compact (lookup [nil :a 3]))
-           #{[{:eid 1003} :a 3]})
+           [[{:eid 1003} :a 3]])
          (is= (td/tagval-walk-compact (lookup [(td/tag-eid 1009) nil 3]))
-           #{[{:eid 1009} :c 3]})
+           [[{:eid 1009} :c 3]])
          (is= (td/tagval-walk-compact (lookup [(td/tag-eid 1005) :b nil]))
-           #{[{:eid 1005} :b 2]})))
+           [[{:eid 1005} :b 2]])))
 
      (dotest
        (with-tdb (new-tdb)
@@ -1000,7 +1000,7 @@
                              {:id [3 33] :color :yellow}
                              {:id [4 44] :color :blue}]}
                root-eid (td/add-edn data)]
-           (is= (td/query-maps [{:a [{:color cc}]}])
+           (is-set= (td/query-maps [{:a [{:color cc}]}])
              [{:cc :red}
               {:cc :blue}
               {:cc :yellow}])))
@@ -1344,7 +1344,7 @@
      (comment ; <<comment>>
        )  ; <<comment>>
 
-     (dotest-focus
+     (dotest ; -focus
          (td/eid-count-reset)
          (td/with-tdb (td/new-tdb)
            (let [root-eid (td/add-edn users-and-accesses)]

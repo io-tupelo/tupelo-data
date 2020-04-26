@@ -395,15 +395,16 @@
        "Convert true => 1, false => 0"
        [arg :- s/Bool] (if arg 1 0))
 
-     (s/defn lookup :- TripleIndex ; #todo maybe use :unk or :* for unknown?
+     (s/defn lookup :- [tsk/Triple] ; #todo maybe use :unk or :* for unknown?
        "Given a triple of [e a v] values, use the best index to find a matching subset, where
        'nil' represents unknown values. Returns an index in [e a v] format."
        [triple :- tsk/Triple]
        (let [known-flgs (mapv #(boolean->binary (t/not-nil? %)) triple)]
          (if (= known-flgs [0 0 0])
-           (grab :idx-eav @*tdb*)
+           (vec (grab :idx-eav @*tdb*))
            (let [[e a v] triple
                  found-entries (cond
+                                 ; #todo: instead of these blocks => map, apply a function like (mapv ave->eav entries)
                                  (= known-flgs [1 0 0]) (let [entries (index/prefix-matches [e] (grab :idx-eav @*tdb*))
                                                               result  {:e-vals (mapv xfirst entries)
                                                                        :a-vals (mapv xsecond entries)
@@ -448,8 +449,7 @@
 
                                  :else (throw (ex-info "invalid known-flags" (vals->map triple known-flgs))))
                  result-index  (t/with-map-vals found-entries [e-vals a-vals v-vals]
-                                 (set ; was: index/->index
-                                   (map vector e-vals a-vals v-vals))) ; #todo can just return a vec/set instead of an index (?)
+                                 (mapv vector e-vals a-vals v-vals))
                  ]
              result-index))))
 
