@@ -115,7 +115,7 @@
   "Return the `:matches` values found via `split-key-prefix` as a seq."
   [match-val :- LexicalValType
    lex-set :- SortedSetType]
-  (let [[smaller-set found-val larger-set] (avl/split-key match-val lex-set)
+  (let [[-smaller-set- found-val larger-set] (avl/split-key match-val lex-set)
         result (if (t/not-nil? found-val)
                  [found-val]
                  (let [[matches-seq -larger-seq-] (clojure.core/split-with #(prefix-match? match-val %) larger-set)]
