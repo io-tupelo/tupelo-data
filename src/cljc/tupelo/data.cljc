@@ -416,20 +416,19 @@
         (lookup (deref *tdb*) triple))
        ([db :- TDB
          triple :- tsk/Triple]
-        (let [known-flgs (mapv #(boolean->binary (t/not-nil? %)) triple)]
-          (if (= known-flgs [0 0 0])
-            (vec (grab :idx-eav db))
-            (let [[e a v] triple
-                  found-entries (cond
-                                  (= known-flgs [1 0 0]) (map-eav->eav (index/prefix-matches [e] (grab :idx-eav db)))
-                                  (= known-flgs [0 1 0]) (map-ave->eav (index/prefix-matches [a] (grab :idx-ave db)))
-                                  (= known-flgs [0 0 1]) (map-vea->eav (index/prefix-matches [v] (grab :idx-vea db)))
-                                  (= known-flgs [1 1 0]) (map-eav->eav (index/prefix-matches [e a] (grab :idx-eav db)))
-                                  (= known-flgs [0 1 1]) (map-ave->eav (index/prefix-matches [a v] (grab :idx-ave db)))
-                                  (= known-flgs [1 0 1]) (map-vea->eav (index/prefix-matches [v e] (grab :idx-vea db)))
-                                  (= known-flgs [1 1 1]) (map-eav->eav (index/prefix-matches [e a v] (grab :idx-eav db)))
-                                  :else (throw (ex-info "invalid known-flags" (vals->map triple known-flgs))))]
-              found-entries)))))
+        (let [[e a v] triple
+              known-flgs    (mapv #(boolean->binary (t/not-nil? %)) triple)
+              found-entries (cond
+                              (= known-flgs [0 0 0]) (map-eav->eav (grab :idx-eav db)) ; everything matches
+                              (= known-flgs [1 0 0]) (map-eav->eav (index/prefix-matches [e] (grab :idx-eav db)))
+                              (= known-flgs [0 1 0]) (map-ave->eav (index/prefix-matches [a] (grab :idx-ave db)))
+                              (= known-flgs [0 0 1]) (map-vea->eav (index/prefix-matches [v] (grab :idx-vea db)))
+                              (= known-flgs [1 1 0]) (map-eav->eav (index/prefix-matches [e a] (grab :idx-eav db)))
+                              (= known-flgs [0 1 1]) (map-ave->eav (index/prefix-matches [a v] (grab :idx-ave db)))
+                              (= known-flgs [1 0 1]) (map-vea->eav (index/prefix-matches [v e] (grab :idx-vea db)))
+                              (= known-flgs [1 1 1]) (map-eav->eav (index/prefix-matches [e a v] (grab :idx-eav db)))
+                              :else (throw (ex-info "invalid known-flags" (vals->map triple known-flgs))))]
+          found-entries)))
 
      (s/defn apply-env
        [env :- tsk/Map

@@ -377,7 +377,7 @@
                           [2 {:eid 1008} :c] [1 {:eid 1001} :a] [1 {:eid 1004} :b]}})
            ;---------------------------------------------------------------------------------------------------
            (is= (td/tagval-walk-compact (lookup [(td/tag-eid 1003) nil nil]))
-             [ [{:eid 1003} :a 3]])
+             [[{:eid 1003} :a 3]])
            (is= (td/tagval-walk-compact (lookup [nil :b nil]))
              [[{:eid 1004} :b 1]
               [{:eid 1005} :b 2]
@@ -385,14 +385,25 @@
            (is= (td/tagval-walk-compact (lookup [nil nil 3]))
              [[{:eid 1003} :a 3]
               [{:eid 1006} :b 3]
-              [{:eid 1009} :c 3]]))
-         ;---------------------------------------------------------------------------------------------------
-         (is= (td/tagval-walk-compact (lookup [nil :a 3]))
-           [[{:eid 1003} :a 3]])
-         (is= (td/tagval-walk-compact (lookup [(td/tag-eid 1009) nil 3]))
-           [[{:eid 1009} :c 3]])
-         (is= (td/tagval-walk-compact (lookup [(td/tag-eid 1005) :b nil]))
-           [[{:eid 1005} :b 2]])))
+              [{:eid 1009} :c 3]])
+           (is= (td/tagval-walk-compact (lookup [nil nil nil]))
+             [[{:eid 1001} :a 1]
+              [{:eid 1002} :a 2]
+              [{:eid 1003} :a 3]
+              [{:eid 1004} :b 1]
+              [{:eid 1005} :b 2]
+              [{:eid 1006} :b 3]
+              [{:eid 1007} :c 1]
+              [{:eid 1008} :c 2]
+              [{:eid 1009} :c 3]])
+
+           ;---------------------------------------------------------------------------------------------------
+           (is= (td/tagval-walk-compact (lookup [nil :a 3]))
+             [[{:eid 1003} :a 3]])
+           (is= (td/tagval-walk-compact (lookup [(td/tag-eid 1009) nil 3]))
+             [[{:eid 1009} :c 3]])
+           (is= (td/tagval-walk-compact (lookup [(td/tag-eid 1005) :b nil]))
+             [[{:eid 1005} :b 2]]))))
 
      (dotest
        (with-tdb (new-tdb)
