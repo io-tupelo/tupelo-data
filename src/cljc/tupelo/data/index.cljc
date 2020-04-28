@@ -91,24 +91,36 @@
   [match-val :- LexicalValType
    lex-set :- SortedSetType]
   (let [[smaller-set found-val larger-set] (avl/split-key match-val lex-set)
-        result (if (nil? found-val)
-                 (let [[matches-seq larger-seq] (split-with #(prefix-match? match-val %) larger-set)]
-                   {:smaller smaller-set
-                    :matches (->index matches-seq)
-                    :larger  (->index larger-seq)})
+        result (if (t/not-nil? found-val)
                  {:smaller smaller-set
                   :matches (avl/sorted-set found-val)
-                  :larger  larger-set})]
-    ;(s/validate SortedSetType (grab :smaller result))
-    ;(s/validate SortedSetType (grab :matches result))
-    ;(s/validate SortedSetType (grab :larger result))
+                  :larger  larger-set}
+                 (let [[matches-seq larger-seq] (clojure.core/split-with #(prefix-match? match-val %) larger-set)]
+                   {:smaller smaller-set
+                    :matches (->index matches-seq)
+                    :larger  (->index larger-seq)}))]
+    (when false
+      (s/validate SortedSetType (grab :smaller result))
+      (s/validate SortedSetType (grab :matches result))
+      (s/validate SortedSetType (grab :larger result)))
     result))
 
-(s/defn prefix-matches :- SortedSetType
+(s/defn prefix-match-index :- SortedSetType
   "Return the `:matches` values found via `split-key-prefix`."
   [match-val :- LexicalValType
    lex-set :- SortedSetType]
   (t/grab :matches (split-key-prefix match-val lex-set )))
+
+(s/defn prefix-match-seq :- [tsk/Triple]
+  "Return the `:matches` values found via `split-key-prefix` as a seq."
+  [match-val :- LexicalValType
+   lex-set :- SortedSetType]
+  (let [[smaller-set found-val larger-set] (avl/split-key match-val lex-set)
+        result (if (t/not-nil? found-val)
+                 [found-val]
+                 (let [[matches-seq -larger-seq-] (clojure.core/split-with #(prefix-match? match-val %) larger-set)]
+                   matches-seq))]
+    result))
 
 ; #todo add-entry & remove-entry instead of conj/disj  ???
 (s/defn add-entry

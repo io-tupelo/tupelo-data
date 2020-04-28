@@ -368,7 +368,7 @@
      ; #todo need to handle sets
      (s/defn ^:no-doc eid->edn-impl :- s/Any
        [eid-rec :- TagVal]
-       (let [eav-matches (index/prefix-matches [eid-rec] (grab :idx-eav @*tdb*))
+       (let [eav-matches (index/prefix-match-index [eid-rec] (grab :idx-eav @*tdb*))
              result-map  (apply glue
                            (forv [[match-eid match-attr match-val] eav-matches]
                              ; (spyx [match-eid match-attr match-val])
@@ -402,11 +402,11 @@
        [arg :- s/Bool] (if arg 1 0))
 
      (s/defn ^:no-doc map-eav->eav :- [tsk/Triple]
-       [triples :- #{tsk/Triple}] (vec triples))
+       [triples :- [tsk/Triple]] (vec triples))
      (s/defn ^:no-doc map-vea->eav :- [tsk/Triple]
-       [triples :- #{tsk/Triple}] (mapv (fn [[v e a]] [e a v]) triples))
+       [triples :- [tsk/Triple]] (mapv (fn [[v e a]] [e a v]) triples))
      (s/defn ^:no-doc map-ave->eav :- [tsk/Triple]
-       [triples :- #{tsk/Triple}] (mapv (fn [[a v e]] [e a v]) triples))
+       [triples :- [tsk/Triple]] (mapv (fn [[a v e]] [e a v]) triples))
 
      ;-----------------------------------------------------------------------------
      (s/defn lookup :- [tsk/Triple] ; #todo maybe use :unk or :* for unknown?
@@ -419,14 +419,14 @@
         (let [[e a v] triple
               known-flgs    (mapv #(boolean->binary (t/not-nil? %)) triple)
               found-entries (cond
-                              (= known-flgs [0 0 0]) (map-eav->eav (grab :idx-eav db)) ; everything matches
-                              (= known-flgs [1 0 0]) (map-eav->eav (index/prefix-matches [e] (grab :idx-eav db)))
-                              (= known-flgs [0 1 0]) (map-ave->eav (index/prefix-matches [a] (grab :idx-ave db)))
-                              (= known-flgs [0 0 1]) (map-vea->eav (index/prefix-matches [v] (grab :idx-vea db)))
-                              (= known-flgs [1 1 0]) (map-eav->eav (index/prefix-matches [e a] (grab :idx-eav db)))
-                              (= known-flgs [0 1 1]) (map-ave->eav (index/prefix-matches [a v] (grab :idx-ave db)))
-                              (= known-flgs [1 0 1]) (map-vea->eav (index/prefix-matches [v e] (grab :idx-vea db)))
-                              (= known-flgs [1 1 1]) (map-eav->eav (index/prefix-matches [e a v] (grab :idx-eav db)))
+                              (= known-flgs [0 0 0]) (map-eav->eav (seq (grab :idx-eav db))) ; everything matches
+                              (= known-flgs [1 0 0]) (map-eav->eav (index/prefix-match-seq [e] (grab :idx-eav db)))
+                              (= known-flgs [0 1 0]) (map-ave->eav (index/prefix-match-seq [a] (grab :idx-ave db)))
+                              (= known-flgs [0 0 1]) (map-vea->eav (index/prefix-match-seq [v] (grab :idx-vea db)))
+                              (= known-flgs [1 1 0]) (map-eav->eav (index/prefix-match-seq [e a] (grab :idx-eav db)))
+                              (= known-flgs [0 1 1]) (map-ave->eav (index/prefix-match-seq [a v] (grab :idx-ave db)))
+                              (= known-flgs [1 0 1]) (map-vea->eav (index/prefix-match-seq [v e] (grab :idx-vea db)))
+                              (= known-flgs [1 1 1]) (map-eav->eav (index/prefix-match-seq [e a v] (grab :idx-eav db)))
                               :else (throw (ex-info "invalid known-flags" (vals->map triple known-flgs))))]
           found-entries)))
 
