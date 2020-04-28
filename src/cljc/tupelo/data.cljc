@@ -422,7 +422,6 @@
             (vec (grab :idx-eav db))
             (let [[e a v] triple
                   found-entries (cond
-                                  ; #todo: instead of these blocks => map, apply a function like (mapv ave->eav entries)
                                   (= known-flgs [1 0 0]) (map-eav->eav (index/prefix-matches [e] (grab :idx-eav db)))
                                   (= known-flgs [0 1 0]) (map-ave->eav (index/prefix-matches [a] (grab :idx-ave db)))
                                   (= known-flgs [0 0 1]) (map-vae->eav (index/prefix-matches [v] (grab :idx-vae db)))
