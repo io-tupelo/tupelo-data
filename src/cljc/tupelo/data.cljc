@@ -293,8 +293,8 @@
        "Plumatic Schema type definition for tupelo.data DB"
        {:eid-type {TagVal s/Keyword}
         :idx-eav  #{tsk/Triple}
-        :idx-vae  #{tsk/Triple}
-        :idx-ave  #{tsk/Triple}})
+        :idx-ave  #{tsk/Triple}
+        :idx-vea  #{tsk/Triple} })
 
      (s/defn new-tdb :- TDB
        "Returns a new, empty db."
@@ -302,9 +302,8 @@
        (into (sorted-map)
          {:eid-type (sorted-map-generic) ; source type of entity (:map :array :set)
           :idx-eav  (index/empty-index)
-          :idx-vae  (index/empty-index)
           :idx-ave  (index/empty-index)
-          }))
+          :idx-vea  (index/empty-index) }))
 
      (s/defn db-pretty :- tsk/KeyMap
        "Returns a pretty version of the DB"
@@ -312,9 +311,9 @@
        (let [db-compact (tagval-walk-compact db) ; returns plain maps & sets instead of sorted or index
              result     (it-> (new-tdb)
                           (update it :eid-type glue (grab :eid-type db-compact))
-                          (update it :idx-ave glue (grab :idx-ave db-compact))
                           (update it :idx-eav glue (grab :idx-eav db-compact))
-                          (update it :idx-vae glue (grab :idx-vae db-compact)))]
+                          (update it :idx-ave glue (grab :idx-ave db-compact))
+                          (update it :idx-vea glue (grab :idx-vea db-compact)) )]
          result))
 
      (def ^:no-doc eid-count-base 1000)
@@ -358,7 +357,7 @@
                                 val-edn
                                 (add-edn-impl val-edn))]
                  (swap! *tdb* update :idx-eav index/add-entry [eid-rec attr-rec val-rec])
-                 (swap! *tdb* update :idx-vae index/add-entry [val-rec attr-rec eid-rec])
+                 (swap! *tdb* update :idx-vea index/add-entry [val-rec eid-rec attr-rec])
                  (swap! *tdb* update :idx-ave index/add-entry [attr-rec val-rec eid-rec]))))
            eid-rec)))
 
@@ -404,8 +403,8 @@
 
      (s/defn ^:no-doc map-eav->eav :- [tsk/Triple]
        [triples :- #{tsk/Triple}] (vec triples))
-     (s/defn ^:no-doc map-vae->eav :- [tsk/Triple]
-       [triples :- #{tsk/Triple}] (mapv (fn [[v a e]] [e a v]) triples))
+     (s/defn ^:no-doc map-vea->eav :- [tsk/Triple]
+       [triples :- #{tsk/Triple}] (mapv (fn [[v e a]] [e a v]) triples))
      (s/defn ^:no-doc map-ave->eav :- [tsk/Triple]
        [triples :- #{tsk/Triple}] (mapv (fn [[a v e]] [e a v]) triples))
 
@@ -424,12 +423,10 @@
                   found-entries (cond
                                   (= known-flgs [1 0 0]) (map-eav->eav (index/prefix-matches [e] (grab :idx-eav db)))
                                   (= known-flgs [0 1 0]) (map-ave->eav (index/prefix-matches [a] (grab :idx-ave db)))
-                                  (= known-flgs [0 0 1]) (map-vae->eav (index/prefix-matches [v] (grab :idx-vae db)))
+                                  (= known-flgs [0 0 1]) (map-vea->eav (index/prefix-matches [v] (grab :idx-vea db)))
                                   (= known-flgs [1 1 0]) (map-eav->eav (index/prefix-matches [e a] (grab :idx-eav db)))
                                   (= known-flgs [0 1 1]) (map-ave->eav (index/prefix-matches [a v] (grab :idx-ave db)))
-                                  (= known-flgs [1 0 1]) (let [entries-e  (index/prefix-matches [e] (grab :idx-eav db))
-                                                               entries-ev (keep-if #(= v (xlast %)) entries-e)]
-                                                           (map-eav->eav entries-ev))
+                                  (= known-flgs [1 0 1]) (map-vea->eav (index/prefix-matches [v e] (grab :idx-vea db)))
                                   (= known-flgs [1 1 1]) (map-eav->eav (index/prefix-matches [e a v] (grab :idx-eav db)))
                                   :else (throw (ex-info "invalid known-flags" (vals->map triple known-flgs))))]
               found-entries)))))
