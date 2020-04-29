@@ -5,6 +5,7 @@
 ;   bound by the terms of this license.  You must not remove this notice, or any other, from this
 ;   software.
 (ns tupelo.data
+  "Effortless data access."
   (:refer-clojure :exclude [load ->VecNode])
   ; #?(:clj (:use tupelo.core)) ; #todo remove for cljs
   #?(:clj (:require
@@ -599,11 +600,11 @@
        [seq-entity :- tsk/List]
        (into {} (indexed seq-entity)))
 
-     (defn ^:no-doc query-maps->triples-impl
+     (defn ^:no-doc query->triples-impl
        [qmaps]
        (with-spy-indent
          ; (newline)
-         ;(spyq :query-maps->triples)
+         ;(spyq :query->triples)
          ;(spyx qmaps)
          (doseq [qmap qmaps]
            ; (spyx-pretty qmap)
@@ -625,7 +626,7 @@
                                          {:eid tmp-eid (gensym "tmp-attr-") elem})]
                    ; (spyx qmaps-modified)
                    (cum-vector-append triple-modified)
-                   (query-maps->triples-impl qmaps-modified))
+                   (query->triples-impl qmaps-modified))
 
                  (map? vv) (let [tmp-eid         (gensym "tmp-eid-")
                                  triple-modified (search-triple-fn [eid-val kk tmp-eid])
@@ -633,7 +634,7 @@
                                  qmaps-modified  [(glue {:eid tmp-eid} vv)]]
                              ;(spyx qmaps-modified)
                              (cum-vector-append triple-modified)
-                             (query-maps->triples-impl qmaps-modified))
+                             (query->triples-impl qmaps-modified))
                  (leaf-val? vv) (let [triple (search-triple-fn [eid-val kk vv])]
                                   ;(spyx triple)
                                   (cum-vector-append triple))
@@ -645,11 +646,11 @@
                  :else (throw (ex-info "unrecognized value" (vals->map kk vv map-remaining)))
                  ))))))
 
-     (defn ^:no-doc query-maps->triples
+     (defn ^:no-doc query->triples
        [qmaps]
        (binding [*autosyms-seen* (atom #{})]
          (with-cum-vector
-           (query-maps->triples-impl qmaps))))
+           (query->triples-impl qmaps))))
 
      (defn ^:no-doc query-results-filter-tmp-attr-mapentry ; #todo make public & optional
        [query-results]
@@ -686,9 +687,9 @@
                ; (spyxx eval-result)
                (fn? eval-result))))))
 
-     (defn ^:no-doc query-maps->tagged
+     (defn ^:no-doc query->tagged
        [query-specs]
-       (spyx-pretty :query-maps->wrapped-fn-enter query-specs)
+       (spyx-pretty :query->wrapped-fn-enter query-specs)
        (exclude-reserved-identifiers query-specs)
        (let [maps-in      (keep-if map? query-specs)
              triple-forms (keep-if search-triple-form? query-specs)
@@ -712,7 +713,7 @@
                               ; (spyx form-result)
                               form-result))]
 
-         (let [map-triples    (query-maps->triples maps-in)
+         (let [map-triples    (query->triples maps-in)
                search-triples (glue map-triples triples-proc)]
            (let [unfiltered-results (query-triples+preds
                                       search-triples
@@ -721,7 +722,7 @@
                  filtered-results   (query-results-filter-tmp-attr-mapentry
                                       (query-results-filter-tmp-eid-mapentry
                                         unfiltered-results))]
-             ; (spyx-pretty :query-maps->wrapped-fn-leave filtered-results)
+             ; (spyx-pretty :query->wrapped-fn-leave filtered-results)
              filtered-results))))
 
      (s/defn untag-query-results :- [tsk/KeyMap]
@@ -741,22 +742,22 @@
                    ]
                {param-raw val-raw})))))
 
-     (defn query-maps-fn
+     (defn query-fn
        [args]
        ; #todo need a linter to catch nonsensical qspecs (attr <> keyword for example)
        (let [unwrapped-query-results (untag-query-results
-                                       (query-maps->tagged args))]
+                                       (query->tagged args))]
          ; (spyx unwrapped-query-results)
          unwrapped-query-results))
 
-     (defn query-maps-impl
+     (defn query-impl
        [qspecs]
-       `(query-maps-fn (quote ~qspecs)))
+       `(query-fn (quote ~qspecs)))
 
-     (defmacro query-maps
+     (defmacro query
        "Will evaluate embedded calls to `(search-triple ...)` "
        [qspecs]
-       (query-maps-impl qspecs))
+       (query-impl qspecs))
 
      ;----------------------------------------------------------------------------------------------
      ;(s/defn index-find-mapentry :- [EidType]

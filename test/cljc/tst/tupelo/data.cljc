@@ -610,23 +610,23 @@
            (is= [] (query-triples search-spec)))))
 
      (dotest
-       (let [map-triples (td/query-maps->triples (quote [{:eid x :map y}
+       (let [map-triples (td/query->triples (quote [{:eid x :map y}
                                                          {:eid y :a a}]))]
          (is= (td/tagval-walk-compact map-triples)
            [[{:param :x} :map {:param :y}]
             [{:param :y} :a {:param :a}]]))
 
-       (let [map-triples (td/query-maps->triples (quote [{:eid ? :map y}]))]
+       (let [map-triples (td/query->triples (quote [{:eid ? :map y}]))]
          (is= (td/tagval-walk-compact map-triples)
            [[{:param :eid} :map {:param :y}]]))
 
-       (let [map-triples (td/query-maps->triples (quote [{:eid ? :map y}
+       (let [map-triples (td/query->triples (quote [{:eid ? :map y}
                                                          {:eid y :a a}]))]
          (is= (td/tagval-walk-compact map-triples)
            [[{:param :eid} :map {:param :y}]
             [{:param :y} :a {:param :a}]]))
 
-       (throws? (td/query-maps->triples (quote [{:eid ? :map y}
+       (throws? (td/query->triples (quote [{:eid ? :map y}
                                                 {:eid ? :a a}]))))
 
      (dotest
@@ -729,18 +729,18 @@
                                           (tag-param :i) 2}])
              [{:e 1003, :i 2}])
 
-           (is= (td/query-maps [{:map     {:a a1}
+           (is= (td/query [{:map          {:a a1}
                                  :hashmap {:a a2}}])
              [{:a1 1
                :a2 21}])
 
-           (is-set= (td/query-maps [{kk {:a ?}}]) ; Awesome!  Found both solutions!
+           (is-set= (td/query [{kk {:a ?}}]) ; Awesome!  Found both solutions!
              [{:kk :map, :a 1}
               {:kk :hashmap, :a 21}])
 
-           (is= (only (td/query-maps [{:num ?}])) {:num 5})
-           (is= (only (td/query-maps [{:eid ? :num ?}])) {:eid 1001, :num 5})
-           (is= (only (td/query-maps [{:eid ? :num num}])) {:eid 1001, :num 5}))))
+           (is= (only (td/query [{:num ?}])) {:num 5})
+           (is= (only (td/query [{:eid ? :num ?}])) {:eid 1001, :num 5})
+           (is= (only (td/query [{:eid ? :num num}])) {:eid 1001, :num 5}))))
 
      ; #todo need to convert all from compile-time macros to runtime functions
      (dotest
@@ -773,10 +773,10 @@
                                                     :salary     0
                                                     :position   :volunteer}}}
                root-hid             (td/add-edn hospital)
-               nm-sal-all           (td/query-maps [{:first-name ? :salary ?}])
-               nm-sal-attending     (td/query-maps [{:first-name ? :salary ? :position :attending}])
-               nm-sal-resident      (td/query-maps [{:first-name ? :salary ? :position :resident}])
-               nm-sal-volunteer     (td/query-maps [{:first-name ? :salary ? :position :volunteer}])
+               nm-sal-all           (td/query [{:first-name ? :salary ?}])
+               nm-sal-attending     (td/query [{:first-name ? :salary ? :position :attending}])
+               nm-sal-resident      (td/query [{:first-name ? :salary ? :position :resident}])
+               nm-sal-volunteer     (td/query [{:first-name ? :salary ? :position :volunteer}])
                average              (fn [vals] (/ (reduce + 0 vals)
                                                  (count vals)))
                salary-avg-attending (average (mapv :salary nm-sal-attending))
@@ -922,11 +922,11 @@
                          :i 1}
                root-eid (td/add-edn data)]
            (is= 1001 root-eid)
-           (let [found (td/query-maps [{:a ?}])]
+           (let [found (td/query [{:a ?}])]
              (is= (td/eid->edn (val (only2 found)))
                [{:b 2} {:c 3} {:d 4}]))
 
-           (let [found (td/query-maps [{:a e1}
+           (let [found (td/query [{:a e1}
                                        {:eid e1 {:idx 0} val}])]
              (is= (td/eid->edn (:val (only found)))
                {:b 2}))
@@ -958,7 +958,7 @@
                               {:a 1 :b 101}
                               {:a 1 :b 102}]
                root-hid      (td/add-edn data)
-               found         (td/query-maps [{:eid ? a1 1}])
+               found         (td/query [{:eid ? a1 1}])
                eids          (mapv #(grab :eid %) found)
                one-leaf-maps (mapv #(td/eid->edn %) eids)]
            (is-set= found [{:eid 1008, :a1 :a} {:eid 1007, :a1 :a} {:eid 1002, :a1 :a}])
@@ -975,7 +975,7 @@
                          {:c 1 :x 301}
                          {:c 2 :x 302}]
                root-hid (td/add-edn data)
-               found    (td/query-maps [{:eid ? :a 1}])]
+               found    (td/query [{:eid ? :a 1}])]
            (is= (td/eid->edn (grab :eid (only found)))
              {:a 1 :x :first}))))
 
@@ -988,29 +988,29 @@
                          {:a 2 :b 1 :c 5}
                          {:a 2 :b 2 :c 6}]
                root-hid (td/add-edn data)]
-           (let [found (td/query-maps [{:eid ? :a 1}])]
+           (let [found (td/query [{:eid ? :a 1}])]
              (is-set= (mapv #(td/eid->edn (grab :eid %)) found)
                [{:a 1, :b 1, :c 1}
                 {:a 1, :b 2, :c 2}
                 {:a 1, :b 1, :c 3}]))
-           (let [found (td/query-maps [{:eid ? :a 2}])]
+           (let [found (td/query [{:eid ? :a 2}])]
              (is-set= (mapv #(td/eid->edn (grab :eid %)) found)
                [{:a 2, :b 2, :c 4}
                 {:a 2, :b 1, :c 5}
                 {:a 2, :b 2, :c 6}]))
-           (let [found (td/query-maps [{:eid ? :b 1}])]
+           (let [found (td/query [{:eid ? :b 1}])]
              (is-set= (mapv #(td/eid->edn (grab :eid %)) found)
                [{:a 1, :b 1, :c 1}
                 {:a 1, :b 1, :c 3}
                 {:a 2, :b 1, :c 5}]))
-           (let [found (td/query-maps [{:eid ? :c 6}])]
+           (let [found (td/query [{:eid ? :c 6}])]
              (is-set= (mapv #(td/eid->edn (grab :eid %)) found)
                [{:a 2, :b 2, :c 6}]))
 
-           (let [found (td/query-maps [{:eid ? :a 1 :b 2}])]
+           (let [found (td/query [{:eid ? :a 1 :b 2}])]
              (is-set= (mapv #(td/eid->edn (grab :eid %)) found)
                [{:a 1, :b 2, :c 2}]))
-           (let [found (td/query-maps [{:eid ? :a 1 :b 1}])]
+           (let [found (td/query [{:eid ? :a 1 :b 1}])]
              (is-set= (mapv #(td/eid->edn (grab :eid %)) found)
                [{:a 1, :b 1, :c 1}
                 {:a 1, :b 1, :c 3}])))))
@@ -1024,7 +1024,7 @@
                              {:id [3 33] :color :yellow}
                              {:id [4 44] :color :blue}]}
                root-eid (td/add-edn data)]
-           (is-set= (td/query-maps [{:a [{:color cc}]}])
+           (is-set= (td/query [{:a [{:color cc}]}])
              [{:cc :red}
               {:cc :blue}
               {:cc :yellow}])))
@@ -1035,7 +1035,7 @@
                              {:id [3 33] :color :yellow}
                              {:id [4 44] :color :blue}]}
                root-eid (td/add-edn data)
-               result   (td/query-maps [{:a [{:eid eid-red :color :red}]}])]
+               result   (td/query [{:a [{:eid eid-red :color :red}]}])]
            (is= result ; #todo fix duplicates for array search
              [{:eid-red 1003}
               {:eid-red 1003}
@@ -1054,7 +1054,7 @@
                                  {:ident 4 :flower :tulip}
                                  ]}}
                root-hid (td/add-edn data)
-               result   (td/query-maps [{:eid ? :a [{:id ?}]}])]
+               result   (td/query [{:eid ? :a [{:id ?}]}])]
            (is-set= result
              [{:eid 1001, :id 2}
               {:eid 1001, :id 6}
@@ -1062,7 +1062,7 @@
               {:eid 1001, :id 4}
               {:eid 1001, :id 5}])
 
-           (is-set= (td/query-maps [{:b {:eid ? :c [{:ident ?}]}}]) ; =>
+           (is-set= (td/query [{:b {:eid ? :c [{:ident ?}]}}]) ; =>
              [{:eid 1008, :ident 2}
               {:eid 1008, :ident 4}
               {:eid 1008, :ident 3}]))))
@@ -1074,9 +1074,9 @@
                              {:id 3 :color :yellow}
                              {:id 4 :color :blue}]}
                root-hid (td/add-edn data)]
-           (is= (td/eid->edn (grab :eid (only (td/query-maps [{:eid ? :color :red}]))))
+           (is= (td/eid->edn (grab :eid (only (td/query [{:eid ? :color :red}]))))
              {:color :red, :id 2})
-           (is= (td/eid->edn (grab :eid (only (td/query-maps [{:eid ? :id 4}]))))
+           (is= (td/eid->edn (grab :eid (only (td/query [{:eid ? :id 4}]))))
              {:color :blue, :id 4}))))
 
      (dotest
@@ -1092,13 +1092,13 @@
                                  {:ident 4 :flower :tulip}
                                  ]}}
                root-hid (td/add-edn data)]
-           (is= (td/eid->edn (grab :eid (only (td/query-maps [{:eid ?, :id 2}]))))
+           (is= (td/eid->edn (grab :eid (only (td/query [{:eid ?, :id 2}]))))
              {:color :red, :id 2})
-           (is= (td/eid->edn (grab :eid (only (td/query-maps [{:eid ?, :ident 2}]))))
+           (is= (td/eid->edn (grab :eid (only (td/query [{:eid ?, :ident 2}]))))
              {:flower :rose, :ident 2})
-           (is= (td/eid->edn (grab :eid (only (td/query-maps [{:eid ?, :flower :rose}]))))
+           (is= (td/eid->edn (grab :eid (only (td/query [{:eid ?, :flower :rose}]))))
              {:flower :rose, :ident 2})
-           (is= (td/eid->edn (grab :eid (only (td/query-maps [{:eid ?, :color :pink}]))))
+           (is= (td/eid->edn (grab :eid (only (td/query [{:eid ?, :color :pink}]))))
              {:color :pink, :id 5}))))
 
      (dotest
@@ -1120,7 +1120,7 @@
                                   :widget-types [{:widget-type-code "c40"
                                                   :description      "Boom!"}]}]
                root-eid         (td/add-edn skynet-widgets)
-               search-results   (td/query-maps [{:basic-info   {:producer-code ?}
+               search-results   (td/query [{:basic-info        {:producer-code ?}
                                                  :widgets      [{:widget-code      ?
                                                                  :widget-type-code wtc}]
                                                  :widget-types [{:widget-type-code wtc
@@ -1169,11 +1169,11 @@
                          {:a 2 :b 1 :c 5}
                          {:a 2 :b 2 :c 6}]
                root-hid (td/add-edn data)]
-           (let [found (td/query-maps [{:eid eid :a 1}
+           (let [found (td/query [{:eid eid :a 1}
                                        (search-triple eid :b 2)])]
              (is-set= (mapv #(td/eid->edn (grab :eid %)) found)
                [{:a 1, :b 2, :c 2}]))
-           (let [found (td/query-maps [{:eid eid :a 1}
+           (let [found (td/query [{:eid eid :a 1}
                                        (search-triple eid :b b)
                                        (search-triple eid :c c)])]
              (is-set= found
@@ -1204,11 +1204,11 @@
 
                  root-eid (td/add-edn person)
                  ]
-             (is-set= (distinct (td/query-maps [{:zip ?}]))
+             (is-set= (distinct (td/query [{:zip ?}]))
                [{:zip "12345"}
                 {:zip "46203"}])
 
-             (is-set= (distinct (td/query-maps [{:zip ? :city ?}]))
+             (is-set= (distinct (td/query [{:zip ? :city ?}]))
                [{:zip "46203", :city "Township"}
                 {:zip "46203", :city "Townville"}
                 {:zip "12345", :city "Cityvillage"}]))))
@@ -1243,7 +1243,7 @@
                                        :preferred true}]}]
 
                root-eid (td/add-edn people)
-               results  (td/query-maps [{:name ? :addresses [{:address1 ? :zip "86753"}]}])]
+               results  (td/query [{:name ? :addresses [{:address1 ? :zip "86753"}]}])]
            (is-set= results
              [{:name "jimmy", :address1 "543 Other St"}
               {:name "joel", :address1 "2026 park ave"}]))))
@@ -1252,18 +1252,18 @@
        (td/eid-count-reset)
        (td/with-tdb (td/new-tdb)
          (let [root-eid (td/add-edn users-and-accesses)]
-           (let [results (td/query-maps [{:people [{:name ? :id id}]}])]
+           (let [results (td/query [{:people [{:name ? :id id}]}])]
              (is-set= results
                [{:name "jimmy", :id 1}
                 {:name "joel", :id 2}
                 {:name "tim", :id 3}]))
 
-           (let [pref-zip-data     (td/query-maps [{:addrs {id [{:zip ? :pref true}]}}])
+           (let [pref-zip-data     (td/query [{:addrs {id [{:zip ? :pref true}]}}])
                  user-id->pref-zip (apply glue
                                      (forv [m pref-zip-data]
                                        {(grab :id m) (grab :zip m)}))
 
-                 access-data       (td/query-maps [{:visits {id [{:date ? :geo-loc {:zip ?}}]}}])
+                 access-data       (td/query [{:visits {id [{:date ? :geo-loc {:zip ?}}]}}])
                  accesses-bad      (keep-if (fn [access-map]
                                               (let [user-id  (grab :id access-map)
                                                     zip-acc  (grab :zip access-map)
@@ -1289,7 +1289,7 @@
                 {:date "4-4-4444", :zip "54221", :id 3}]))
 
            ; ***** this is the big one! *****
-           (let [results (td/query-maps
+           (let [results (td/query
                            [{:people [{:name ? :id id}]}
                             {:addrs {id [{:zip ? :pref false}]}}
                             {:visits {id [{:date ? :geo-loc {:zip zip}}]}}])]
@@ -1331,7 +1331,7 @@
                  :eid-addr-deet  1013,
                  :zip            "11456"}]))
 
-           (let [results-4 (td/query-maps [{:people {:eid eid-pers :name ? :id ?}
+           (let [results-4 (td/query [{:people      {:eid eid-pers :name ? :id ?}
                                             :addrs  {:eid eid-addrs}
                                             :visits {:eid eid-visits}
                                             }
@@ -1387,12 +1387,11 @@
          (let [root-eid (td/add-edn users-and-accesses)]
 
            ; ***** this is the big one! *****
-           (let [results (td/query-maps
+           (let [results (td/query
                            [{:people [{:name ? :id id}]
                              :addrs  {id [{:zip zip-pref :pref true}]}
                              :visits {id [{:date ? :geo-loc {:zip zip-acc}}]}}
-                            (not= zip-acc zip-pref)
-                            ])]
+                            (not= zip-acc zip-pref)])]
              (spyx-pretty results)
              ))))
 
