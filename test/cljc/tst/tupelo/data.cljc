@@ -39,6 +39,23 @@
 (defn tv [t v] (td/->TagVal t v))
 
 ;-----------------------------------------------------------------------------
+(def skynet-widgets [{:basic-info   {:producer-code "Cyberdyne"}
+                      :widgets      [{:widget-code      "Model-101"
+                                      :widget-type-code "t800"}
+                                     {:widget-code      "Model-102"
+                                      :widget-type-code "t800"}
+                                     {:widget-code      "Model-201"
+                                      :widget-type-code "t1000"}]
+                      :widget-types [{:widget-type-code "t800"
+                                      :description      "Resistance Infiltrator"}
+                                     {:widget-type-code "t1000"
+                                      :description      "Mimetic polyalloy"}]}
+                     {:basic-info   {:producer-code "ACME"}
+                      :widgets      [{:widget-code      "Dynamite"
+                                      :widget-type-code "c40"}]
+                      :widget-types [{:widget-type-code "c40"
+                                      :description      "Boom!"}]}])
+
 (def users-and-accesses {:people [{:name "jimmy" :id 1}
                                   {:name "joel" :id 2}
                                   {:name "tim" :id 3} ]
@@ -78,9 +95,9 @@
 
      ;-----------------------------------------------------------------------------
      (dotest
-       (is= true (spyx (and true)))
-       (is= [true] (spyx (cons true [])))
-       (is= true (spyx (every? t/truthy? (cons true [])))) )
+       (is= true (and true))
+       (is= [true] (cons true []))
+       (is= true (every? t/truthy? (cons true []))) )
 
 
      (dotest
@@ -669,9 +686,8 @@
               [{:eid 1004} {:idx 2} 7]])
 
            (when true
-             (let-spy
-               [eids-match (td/index-find-leaf 1) ; only 1 match
-                entity-edn (td/eid->edn (<val (only eids-match)))]
+             (let [eids-match (td/index-find-leaf 1) ; only 1 match
+                   entity-edn (td/eid->edn (<val (only eids-match)))]
                (is= entity-edn {:a 1, :b 2}))
              (is= (query-triples [(search-triple e :num v)])
                [{:e 1001, :v 5}])
@@ -1103,22 +1119,7 @@
 
      (dotest
        (td/with-tdb (td/new-tdb)
-         (let [skynet-widgets   [{:basic-info   {:producer-code "Cyberdyne"}
-                                  :widgets      [{:widget-code      "Model-101"
-                                                  :widget-type-code "t800"}
-                                                 {:widget-code      "Model-102"
-                                                  :widget-type-code "t800"}
-                                                 {:widget-code      "Model-201"
-                                                  :widget-type-code "t1000"}]
-                                  :widget-types [{:widget-type-code "t800"
-                                                  :description      "Resistance Infiltrator"}
-                                                 {:widget-type-code "t1000"
-                                                  :description      "Mimetic polyalloy"}]}
-                                 {:basic-info   {:producer-code "ACME"}
-                                  :widgets      [{:widget-code      "Dynamite"
-                                                  :widget-type-code "c40"}]
-                                  :widget-types [{:widget-type-code "c40"
-                                                  :description      "Boom!"}]}]
+         (let [
                root-eid         (td/add-edn skynet-widgets)
                search-results   (td/query [{:basic-info        {:producer-code ?}
                                                  :widgets      [{:widget-code      ?
@@ -1376,33 +1377,68 @@
                            (tv :param :id)            42
                            (tv :param :zip-pref)      "11201"}
              result       (td/eval-with-tagged-params query-result
-                            (quote [(println :name-3 name)
-                                    (println :id-4 id)
+                            (quote [
+                                   ;(println :name-3 name)
+                                   ;(println :id-4 id)
                                     (+ 42 7)]))]
          (is= result 49) ))
 
-     (dotest-focus
+     (dotest
        (td/eid-count-reset)
        (td/with-tdb (td/new-tdb)
          (let [root-eid (td/add-edn users-and-accesses)]
-
            ; ***** this is the big one! *****
            (let [results (td/query
                            [{:people [{:name ? :id id}]
                              :addrs  {id [{:zip zip-pref :pref true}]}
                              :visits {id [{:date ? :geo-loc {:zip zip-acc}}]}}
                             (not= zip-acc zip-pref)])]
-             (spyx-pretty results)
-             ))))
+             (is= results
+               [{:name     "jimmy",
+                 :date     "12-31-1900",
+                 :zip-acc  "00666",
+                 :id       1,
+                 :zip-pref "11201"}
+                {:name     "joel",
+                 :date     "1-1-1970",
+                 :zip-acc  "12345",
+                 :id       2,
+                 :zip-pref "11753"}
+                {:name     "tim",
+                 :date     "4-4-4444",
+                 :zip-acc  "54221",
+                 :id       3,
+                 :zip-pref "11456"}])))))
 
+     (dotest
+       (td/eid-count-reset)
+       (td/with-tdb (td/new-tdb)
+         (let [root-eid (td/add-edn skynet-widgets)
+               results  (td/query
+                          [{:basic-info   {:producer-code ?}
+                            :widgets      [{:widget-code      ?
+                                            :widget-type-code wtc}]
+                            :widget-types [{:widget-type-code wtc
+                                            :description      ?}]}])]
+           (is= (spyx-pretty results)
+             [{:description   "Resistance Infiltrator"
+               :widget-code   "Model-101"
+               :producer-code "Cyberdyne"
+               :wtc           "t800"}
+              {:description   "Resistance Infiltrator"
+               :widget-code   "Model-102"
+               :producer-code "Cyberdyne"
+               :wtc           "t800"}
+              {:description   "Mimetic polyalloy"
+               :widget-code   "Model-201"
+               :producer-code "Cyberdyne"
+               :wtc           "t1000"}
+              {:description   "Boom!"
+               :widget-code   "Dynamite"
+               :producer-code "ACME"
+               :wtc           "c40"}]))))
 
      ))
-
-
-
-
-
-
 
 
 

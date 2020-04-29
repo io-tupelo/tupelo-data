@@ -369,7 +369,7 @@
      ; #todo need to handle sets
      (s/defn ^:no-doc eid->edn-impl :- s/Any
        [eid-rec :- TagVal]
-       (let [eav-matches (index/prefix-match-index [eid-rec] (grab :idx-eav @*tdb*))
+       (let [eav-matches (index/prefix-match->index [eid-rec] (grab :idx-eav @*tdb*))
              result-map  (apply glue
                            (forv [[match-eid match-attr match-val] eav-matches]
                              ; (spyx [match-eid match-attr match-val])
@@ -420,13 +420,13 @@
         (let [[e a v] triple
               known-flgs    (mapv #(boolean->binary (t/not-nil? %)) triple)
               found-entries (cond
-                              (= known-flgs [1 0 0]) (map-eav->eav (index/prefix-match-seq [e] (grab :idx-eav db)))
-                              (= known-flgs [0 1 0]) (map-ave->eav (index/prefix-match-seq [a] (grab :idx-ave db)))
-                              (= known-flgs [0 0 1]) (map-vea->eav (index/prefix-match-seq [v] (grab :idx-vea db)))
-                              (= known-flgs [0 1 1]) (map-ave->eav (index/prefix-match-seq [a v] (grab :idx-ave db)))
-                              (= known-flgs [1 0 1]) (map-vea->eav (index/prefix-match-seq [v e] (grab :idx-vea db)))
-                              (= known-flgs [1 1 0]) (map-eav->eav (index/prefix-match-seq [e a] (grab :idx-eav db)))
-                              (= known-flgs [1 1 1]) (map-eav->eav (index/prefix-match-seq [e a v] (grab :idx-eav db)))
+                              (= known-flgs [1 0 0]) (map-eav->eav (index/prefix-match->seq [e] (grab :idx-eav db)))
+                              (= known-flgs [0 1 0]) (map-ave->eav (index/prefix-match->seq [a] (grab :idx-ave db)))
+                              (= known-flgs [0 0 1]) (map-vea->eav (index/prefix-match->seq [v] (grab :idx-vea db)))
+                              (= known-flgs [0 1 1]) (map-ave->eav (index/prefix-match->seq [a v] (grab :idx-ave db)))
+                              (= known-flgs [1 0 1]) (map-vea->eav (index/prefix-match->seq [v e] (grab :idx-vea db)))
+                              (= known-flgs [1 1 0]) (map-eav->eav (index/prefix-match->seq [e a] (grab :idx-eav db)))
+                              (= known-flgs [1 1 1]) (map-eav->eav (index/prefix-match->seq [e a v] (grab :idx-eav db)))
                               (= known-flgs [0 0 0]) (map-eav->eav (seq (grab :idx-eav db))) ; everything matches
                               :else (throw (ex-info "invalid known-flags" (vals->map triple known-flgs))))]
           found-entries)))
@@ -515,7 +515,7 @@
      (s/defn query-triples+preds
        [qspec-list :- [tsk/Triple]
         pred-master :- tsk/List]
-       (spyx :query-triples+preds pred-master)
+       ; (spyx :query-triples+preds pred-master)
        (let [query-results-tagged (query-triples->tagged qspec-list)
              ; >>                   (spyx-pretty query-results-tagged)
              query-results-kept   (keep-if (fn [query-result]
@@ -689,7 +689,7 @@
 
      (defn ^:no-doc query->tagged
        [query-specs]
-       (spyx-pretty :query->wrapped-fn-enter query-specs)
+       ; (spyx-pretty :query->wrapped-fn-enter query-specs)
        (exclude-reserved-identifiers query-specs)
        (let [maps-in      (keep-if map? query-specs)
              triple-forms (keep-if search-triple-form? query-specs)

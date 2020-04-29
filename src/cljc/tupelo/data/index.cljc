@@ -105,13 +105,13 @@
       (s/validate SortedSetType (grab :larger result)))
     result))
 
-(s/defn prefix-match-index :- SortedSetType
+(s/defn prefix-match->index :- SortedSetType
   "Return the `:matches` values found via `split-key-prefix`."
   [match-val :- LexicalValType
    lex-set :- SortedSetType]
   (t/grab :matches (split-key-prefix match-val lex-set )))
 
-(s/defn prefix-match-seq :- [tsk/Triple]
+(s/defn prefix-match->seq :- [tsk/Triple]
   "Return the `:matches` values found via `split-key-prefix` as a seq."
   [match-val :- LexicalValType
    lex-set :- SortedSetType]
@@ -138,7 +138,7 @@
   (disj index entry))
 
 ;-----------------------------------------------------------------------------
-; #todo keep these?  tupelo.set/add  tupelo.set/remove
+; #todo keep these?  maybe => tupelo.set/add  tupelo.set/remove (synonyms)
 ;(s/defn set-add-eid :- tsk/Set
 ;  [set-in :- tsk/Set
 ;   eid-in :- EidType]
