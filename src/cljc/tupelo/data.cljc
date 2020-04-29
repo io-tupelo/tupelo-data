@@ -516,13 +516,13 @@
         pred-master :- tsk/List]
        (spyx :query-triples+preds pred-master)
        (let [query-results-tagged (query-triples->tagged qspec-list)
-             >>                   (spyx-pretty query-results-tagged)
-             query-results-kept   (with-cum-vector
-                                    (doseq [query-result query-results-tagged]
-                                      ; (spyx-pretty query-result)
-                                      (let [keep-result (eval-with-tagged-params query-result [pred-master])]
-                                        (when (spyx keep-result)
-                                          (cum-vector-append query-result)))))]
+             ; >>                   (spyx-pretty query-results-tagged)
+             query-results-kept   (keep-if (fn [query-result]
+                                             ; (spyx-pretty query-result)
+                                             (let [keep-result (eval-with-tagged-params query-result [pred-master])]
+                                               ; (spyx keep-result)
+                                               keep-result))
+                                    query-results-tagged)]
          ; (spyx-pretty query-results-tagged-kept)
          query-results-kept))
 
@@ -602,7 +602,7 @@
      (defn ^:no-doc query-maps->triples-impl
        [qmaps]
        (with-spy-indent
-         (newline)
+         ; (newline)
          ;(spyq :query-maps->triples)
          ;(spyx qmaps)
          (doseq [qmap qmaps]
@@ -677,14 +677,14 @@
 
      (s/defn fn-form? :- s/Bool
        [arg :- s/Any]
-       (spyx :fn-form?--enter arg)
-       (spy :fn-form?--result
-         (and (list? arg)
-           (let [elem0 (xfirst arg)]
-             (and (symbol? elem0)
-               (let [eval-result (eval elem0)]
-                 (spyxx eval-result)
-                 (fn? eval-result)))))))
+       ; (spyx :fn-form?--enter arg)
+       ; (spy :fn-form?--result)
+       (and (list? arg)
+         (let [elem0 (xfirst arg)]
+           (and (symbol? elem0)
+             (let [eval-result (eval elem0)]
+               ; (spyxx eval-result)
+               (fn? eval-result))))))
 
      (defn ^:no-doc query-maps->tagged
        [query-specs]
@@ -697,9 +697,9 @@
              ;>>           (spyx-pretty maps-in)
              ;>>           (spyx triple-forms)
              ;>>           (spyx pred-forms)
-             pred-master  (spyx `(clojure.core/every? tupelo.core/truthy?
-                                   [true ; sentinal in case of empty list
-                                    ~@pred-forms]))
+             pred-master   `(clojure.core/every? tupelo.core/truthy?
+                                    [true ; sentinal in case of empty list
+                                     ~@pred-forms])
              ; >> (spyx pred-master)
 
              triples-proc (forv [triple-form triple-forms]
