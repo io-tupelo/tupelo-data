@@ -36,6 +36,8 @@
                      :employees []}]}
      {:customer-id 2}]))
 
+(defn tv [t v] (td/->TagVal t v))
+
 ;-----------------------------------------------------------------------------
 (def users-and-accesses {:people [{:name "jimmy" :id 1}
                                   {:name "joel" :id 2}
@@ -76,6 +78,12 @@
 
      ;-----------------------------------------------------------------------------
      (dotest
+       (is= true (spyx (and true)))
+       (is= [true] (spyx (cons true [])))
+       (is= true (spyx (every? t/truthy? (cons true [])))) )
+
+
+     (dotest
        (let [tv     (td/->TagVal :a 1)
              tv-str (with-out-str (println tv))]
          (is= {:tag :a :val 1} (unlazy tv))
@@ -100,6 +108,8 @@
 
        (is= (td/quote-template-impl (quote {:a 1 :b (unquote (+ 2 3))}))
          {:a 1, :b 5})
+       (is= (td/quote-template-impl (quote [a b (unquote (+ 2 3))]))
+         (quote [a b 5]))
        (is= (td/quote-template {:a 1 :b (unquote (+ 2 3))})
          {:a 1, :b 5})
        (is= (td/quote-template {:a 1 :b (unquote (vec (range 3)))})
@@ -900,8 +910,6 @@
                root-hid (td/add-edn edn-val)]
            (is= edn-val (td/eid->edn root-hid)))))
 
-     (defn tv [t v] (td/->TagVal t v))
-
      (dotest
        (td/eid-count-reset)
        (td/with-tdb (td/new-tdb)
@@ -1360,21 +1368,42 @@
      (comment ; <<comment>>
        )  ; <<comment>>
 
-     (dotest ; -focus
-         (td/eid-count-reset)
-         (td/with-tdb (td/new-tdb)
-           (let [root-eid (td/add-edn users-and-accesses)]
+     (dotest
+       (let [query-result {(tv :param :tmp-eid-36493) (tv :eid 1003)
+                           (tv :param :name)          "jimmy"
+                           (tv :param :date)          "12-25-1900"
+                           (tv :param :zip-acc)       "11201"
+                           (tv :param :id)            42
+                           (tv :param :zip-pref)      "11201"}
+             result       (td/eval-with-tagged-params query-result
+                            (quote [(println :name-3 name)
+                                    (println :id-4 id)
+                                    (+ 42 7)]))]
+         (is= result 49) ))
 
-             ; ***** this is the big one! *****
-             (let [results (td/query-maps
-                             [{:people [{:name ? :id id}]
-                               :addrs  {id [{:zip zip-pref :pref true}]}
-                               :visits {id [{:date ? :geo-loc {:zip zip-acc}}]}}
-                              (not= zip-acc zip-pref)
-                              ])]
-               (spyx-pretty results)
-               ))))
+     (dotest-focus
+       (td/eid-count-reset)
+       (td/with-tdb (td/new-tdb)
+         (let [root-eid (td/add-edn users-and-accesses)]
+
+           ; ***** this is the big one! *****
+           (let [results (td/query-maps
+                           [{:people [{:name ? :id id}]
+                             :addrs  {id [{:zip zip-pref :pref true}]}
+                             :visits {id [{:date ? :geo-loc {:zip zip-acc}}]}}
+                            (not= zip-acc zip-pref)
+                            ])]
+             (spyx-pretty results)
+             ))))
+
 
      ))
+
+
+
+
+
+
+
 
 

@@ -498,23 +498,30 @@
                              (untag-query-result result-tagged))]
          results-plain))
 
+     (defn eval-with-tagged-params
+       [tagged-map forms] ; from tagged param => (possibly-tagged) value
+       ;(spyx-pretty tagged-map)
+       ;(spyx-pretty forms)
+       (let [sym-val-pairs (apply glue
+                             (forv [[kk vv] tagged-map]
+                               [(t/kw->sym (untagged kk))
+                                (untagged vv)]))]
+         ; (spyx-pretty sym-val-pairs)
+         (eval
+           `(let ~sym-val-pairs
+              ~@forms))))
 
      (s/defn query-triples+preds
        [qspec-list :- [tsk/Triple]
-        pred-list :- [tsk/Fn]]
+        pred-master :- tsk/List]
+       (spyx :query-triples+preds pred-master)
        (let [query-results-tagged (query-triples->tagged qspec-list)
-             ; >>                 (spyx-pretty query-results-tagged)
-             keep-result?         (fn fn-keep-result? [query-result]
-                                    (let [keep-flags (forv [pred pred-list]
-                                                       (pred query-result))
-                                          all-keep   (every? t/truthy? keep-flags)]
-                                      all-keep))
+             >>                   (spyx-pretty query-results-tagged)
              query-results-kept   (with-cum-vector
                                     (doseq [query-result query-results-tagged]
                                       ; (spyx-pretty query-result)
-                                      (let [query-result-plain (untag-query-result query-result)
-                                            keep-result        (keep-result? query-result-plain)]
-                                        (when keep-result
+                                      (let [keep-result (eval-with-tagged-params query-result [pred-master])]
+                                        (when (spyx keep-result)
                                           (cum-vector-append query-result)))))]
          ; (spyx-pretty query-results-tagged-kept)
          query-results-kept))
@@ -681,7 +688,7 @@
 
      (defn ^:no-doc query-maps->tagged
        [query-specs]
-       ; (spyx-pretty :query-maps->wrapped-fn-enter query-specs)
+       (spyx-pretty :query-maps->wrapped-fn-enter query-specs)
        (exclude-reserved-identifiers query-specs)
        (let [maps-in      (keep-if map? query-specs)
              triple-forms (keep-if search-triple-form? query-specs)
@@ -690,30 +697,26 @@
              ;>>           (spyx-pretty maps-in)
              ;>>           (spyx triple-forms)
              ;>>           (spyx pred-forms)
-             pred-fns     (forv [pred-form pred-forms]
-                            (fn [arg]
-                              (newline)
-                              (println :pred-fn arg)
-                              (newline)
-                              (tupelo.core/with-map-vals arg [zip-acc zip-pref]
-                                (not= zip-acc zip-pref))))
+             pred-master  (spyx `(clojure.core/every? tupelo.core/truthy?
+                                   [true ; sentinal in case of empty list
+                                    ~@pred-forms]))
+             ; >> (spyx pred-master)
 
              triples-proc (forv [triple-form triple-forms]
-                            (spyx triple-form)
+                            ; (spyx triple-form)
                             (let [form-to-eval (cons
                                                  (quote tupelo.data/search-triple)
                                                  (rest triple-form))
-                                  >>           (spyx form-to-eval)
+                                  ; >>           (spyx form-to-eval)
                                   form-result  (eval form-to-eval)]
-                              (spyx form-result)
+                              ; (spyx form-result)
                               form-result))]
 
          (let [map-triples    (query-maps->triples maps-in)
                search-triples (glue map-triples triples-proc)]
-           ; (spyx-pretty
            (let [unfiltered-results (query-triples+preds
                                       search-triples
-                                      pred-fns)
+                                      pred-master)
                  ; >>                 (spyx unfiltered-results)
                  filtered-results   (query-results-filter-tmp-attr-mapentry
                                       (query-results-filter-tmp-eid-mapentry
