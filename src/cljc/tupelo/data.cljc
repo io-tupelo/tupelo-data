@@ -10,9 +10,9 @@
   ; #?(:clj (:use tupelo.core)) ; #todo remove for cljs
   #?(:clj (:require
             [tupelo.core :as t :refer [spy spyx spyxx spyx-pretty with-spy-indent
-                                       grab glue map-entry indexed only only2
-                                       it-> forv vals->map fetch-in let-spy xfirst xsecond xthird xlast xrest
-                                       keep-if drop-if append prepend
+                                       grab glue map-entry indexed only only2 xfirst xsecond xthird xlast xrest
+                                       it-> forv vals->map fetch-in let-spy
+                                       keep-if drop-if append prepend ->sym ->kw kw->sym
                                        ]]
             [tupelo.data.index :as index]
             [tupelo.lexical :as lex]
@@ -143,8 +143,26 @@
        [form]
        (quote-template-impl form))
 
+     ;-----------------------------------------------------------------------------
+     (defn construct-impl
+       [template]
+       ;(spyx template)
+       ;(spy :impl-out)
+       (t/walk-with-parents template
+         {:leave (fn [parents item]
+                   (t/with-nil-default item
+                     (when (= (->sym :?) item)
+                       (let [ancestors  (vec (reverse parents))
+                             mv-ent     (xfirst ancestors)
+                             me         (xsecond ancestors)
+                             me-key     (xfirst me)
+                             me-key-sym (kw->sym me-key)]
+                         me-key-sym))))}) )
+     (defmacro construct
+       [template] (construct-impl template))
+
+     ;-----------------------------------------------------------------------------
      (do  ; #todo => tupelo.core
-       ;-----------------------------------------------------------------------------
        (def ^:dynamic *cumulative-val*
          "A dynamic Var pointing to an `atom`. Used by `with-cum-val` to accumulate state,
          such as in a vector or map.  Typically manipulated via helper functions such as
@@ -495,22 +513,35 @@
      (s/defn query-triples :- [tsk/KeyMap]
        [qspec-list :- [tsk/Triple]]
        (let [results-tagged (query-triples->tagged qspec-list)
-             results-plain (forv [result-tagged results-tagged]
-                             (untag-query-result result-tagged))]
+             results-plain  (forv [result-tagged results-tagged]
+                              (untag-query-result result-tagged))]
          results-plain))
 
-     (defn eval-with-tagged-params
-       [tagged-map forms] ; from tagged param => (possibly-tagged) value
-       ;(spyx-pretty tagged-map)
+     (s/defn eval-with-env-map :- s/Any
+       [env-map :- tsk/KeyMap
+        & forms] ; from tagged param => (possibly-tagged) value
+       ;(spyx-pretty env-map)
        ;(spyx-pretty forms)
        (let [sym-val-pairs (apply glue
-                             (forv [[kk vv] tagged-map]
-                               [(t/kw->sym (untagged kk))
-                                (untagged vv)]))]
+                             (forv [[kk vv] env-map]
+                               [(kw->sym kk) vv]))]
          ; (spyx-pretty sym-val-pairs)
          (eval
            `(let ~sym-val-pairs
               ~@forms))))
+
+     (s/defn tagged-params->env-map :- tsk/KeyMap
+       [tagged-map :- {TagVal s/Any}] ; from tagged param => (possibly-tagged) value
+       ;(spyx-pretty tagged-map)
+       (let [env-map (apply glue
+                       (forv [[kk vv] tagged-map]
+                         {(untagged kk) (untagged vv)}))]
+         env-map))
+
+     (defn eval-with-tagged-params
+       [tagged-map forms] ; from tagged param => (possibly-tagged) value
+       (let [env-map (tagged-params->env-map tagged-map)]
+         (apply eval-with-env-map env-map forms))) ; #todo unify rest params on forms!!!
 
      (s/defn query-triples+preds
        [qspec-list :- [tsk/Triple]
@@ -586,7 +617,7 @@
        (t/with-nil-default vv
          (when (and (keyword? kk)
                  (= (quote ?) vv))
-           (let [kk-sym (t/kw->sym kk)]
+           (let [kk-sym (kw->sym kk)]
              (when (contains? (deref *autosyms-seen*) kk-sym)
                (throw (ex-info "Duplicate autosym found:" (vals->map kk kk-sym))))
              (swap! *autosyms-seen* conj kk-sym)

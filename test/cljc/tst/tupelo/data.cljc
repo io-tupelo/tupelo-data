@@ -10,7 +10,7 @@
   #?(:clj (:require
             [tupelo.test :refer [define-fixture deftest dotest dotest-focus is isnt is= isnt= is-set= is-nonblank= testing throws?]]
             [tupelo.core :as t :refer [spy spyx spyxx spy-pretty spyx-pretty unlazy let-spy
-                                       only only2 forv glue grab nl keep-if drop-if ->sym
+                                       only only2 forv glue grab nl keep-if drop-if ->sym xfirst xsecond xthird
                                        ]]
             [tupelo.data :as td :refer [with-tdb new-tdb eid-count-reset lookup query-triples query-triples->tagged boolean->binary search-triple
                                         *tdb* <tag <val tag-param tag-eid tag-idx
@@ -1394,21 +1394,9 @@
                              :visits {id [{:date ? :geo-loc {:zip zip-acc}}]}}
                             (not= zip-acc zip-pref)])]
              (is= results
-               [{:name     "jimmy",
-                 :date     "12-31-1900",
-                 :zip-acc  "00666",
-                 :id       1,
-                 :zip-pref "11201"}
-                {:name     "joel",
-                 :date     "1-1-1970",
-                 :zip-acc  "12345",
-                 :id       2,
-                 :zip-pref "11753"}
-                {:name     "tim",
-                 :date     "4-4-4444",
-                 :zip-acc  "54221",
-                 :id       3,
-                 :zip-pref "11456"}])))))
+               [{:name "jimmy" :date "12-31-1900" :zip-acc "00666" :id 1 :zip-pref "11201"}
+                {:name "joel" :date "1-1-1970" :zip-acc "12345" :id 2 :zip-pref "11753"}
+                {:name "tim" :date "4-4-4444" :zip-acc "54221" :id 3 :zip-pref "11456"}])))))
 
      (dotest
        (td/eid-count-reset)
@@ -1420,25 +1408,46 @@
                                             :widget-type-code wtc}]
                             :widget-types [{:widget-type-code wtc
                                             :description      ?}]}])]
-           (is= (spyx-pretty results)
-             [{:description   "Resistance Infiltrator"
-               :widget-code   "Model-101"
-               :producer-code "Cyberdyne"
-               :wtc           "t800"}
-              {:description   "Resistance Infiltrator"
-               :widget-code   "Model-102"
-               :producer-code "Cyberdyne"
-               :wtc           "t800"}
-              {:description   "Mimetic polyalloy"
-               :widget-code   "Model-201"
-               :producer-code "Cyberdyne"
-               :wtc           "t1000"}
-              {:description   "Boom!"
-               :widget-code   "Dynamite"
-               :producer-code "ACME"
-               :wtc           "c40"}]))))
+           (is= results
+             [{:description "Resistance Infiltrator" :widget-code "Model-101" :producer-code "Cyberdyne" :wtc "t800"}
+              {:description "Resistance Infiltrator" :widget-code "Model-102" :producer-code "Cyberdyne" :wtc "t800"}
+              {:description "Mimetic polyalloy" :widget-code "Model-201" :producer-code "Cyberdyne" :wtc "t1000"}
+              {:description "Boom!" :widget-code "Dynamite" :producer-code "ACME" :wtc "c40"}]))))
+
+     (comment
+       (def a-1400 1401)
+       (def b-1400 1402)
+       (dotest
+         (let [a 1
+               b (inc a)]
+           (println (quote [a b]))
+           (println '{:out [~a ~b]}) ; ***** doesn't work *****
+           (println `{:out [~a ~b]})
+           ; (println (td/quote-template {:out (unquote [a b])})) ; ***** fails due to locals *****
+           (println (td/quote-template {:out (unquote [a-1400 b-1400])})) ; globals are OK
+           (println (td/quote-template {:a 1 :b (unquote (+ 2 3))})) ; global function works too
+           (newline)
+           (let [env {:a 1 :b 2}]
+             (println :with-env
+               (td/eval-with-env-map env
+                 (quote [a b])))))))
+
+     (dotest
+       (let [env {:a 1 :b 2}]
+         (t/with-map-vals env [a b]
+           (is= {:likes {:a a :b b}} ; normal
+             {:likes {:a 1, :b 2}})
+           (is= (td/construct-impl (quote {:likes {:a ? :b ?}}))
+             (quote {:likes {:a a, :b b}}))
+           (is= (td/construct {:likes {:a ? :b ?}})
+             {:likes {:a 1, :b 2}}))))
+
+
+
+
+
+
+
 
      ))
-
-
 
