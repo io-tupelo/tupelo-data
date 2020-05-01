@@ -107,8 +107,8 @@
          (is= :a (td/<tag tv))
          (is= 1 (td/<val tv))
          (is= "<:a 1>" (str/trim tv-str))
-         (is (td/tagged? tv))
-         (isnt (td/tagged? 1))
+         (is (td/tagval? tv))
+         (isnt (td/tagval? 1))
          (is= 1 (td/untagged tv))
          (is= 1 (td/untagged 1)))
 
@@ -147,11 +147,10 @@
        (is= (td/quote-template [1 (unquote-splicing (t/thru 2 4)) 5])
          [1 2 3 4 5])
        (is= (td/quote-template [1 (unquote (t/thru 2 4)) 5])
-         [1 [2 3 4] 5])
-       )
+         [1 [2 3 4] 5]) )
 
 
-     (dotest
+       (dotest
        (is= 3 (eval (quote (+ 1 2)))))
 
      (dotest ; #todo => tupelo.core
@@ -169,7 +168,7 @@
        (isnt (td/only2? [{:a 1 :b 2}]))
        (isnt (td/only2? [#{:stuff :more}])))
 
-     (dotest ; #todo => tupelo.core
+       (dotest ; #todo => tupelo.core
        (is= 5 (td/with-cum-val 0
                 (doseq [ii (t/thru 5)]
                   (td/cum-val-set-it ii))))
@@ -267,7 +266,7 @@
             [1 {:eid 2}]
             [1 {:eid 3}]])))
 
-     (dotest
+       (dotest
        (td/with-tdb (td/new-tdb)
          (td/eid-count-reset)
          (is= (deref *tdb*)
@@ -335,7 +334,7 @@
                           [2 {:eid 1001} {:idx 1}]}} )
            (is= edn-val (td/eid->edn root-eid)))))
 
-     (dotest
+       (dotest
        (with-tdb (new-tdb)
          (eid-count-reset)
          (let [edn-val  {:a 1 :b 2 :c [10 11 12]}
@@ -432,7 +431,7 @@
            (is= (td/tagval-walk-compact (lookup [(td/tag-eid 1005) :b nil]))
              [[{:eid 1005} :b 2]]))))
 
-     (dotest
+       (dotest
        (with-tdb (new-tdb)
          (eid-count-reset)
          (let [edn-val  {:a 1 :b 2}
@@ -504,7 +503,7 @@
           (td/->SearchParam y)
           (td/->SearchParam z)]))
 
-     (dotest
+       (dotest
        (with-tdb (new-tdb)
          (eid-count-reset)
          (let [edn-val  {:a 1
@@ -594,7 +593,7 @@
        (is= (td/search-triple 123 :color "Joey")
          [(td/tag-eid 123) :color "Joey"]))
 
-     (dotest
+       (dotest
        (with-tdb (new-tdb)
          (eid-count-reset)
          (let [edn-val     {:a {:b 2}}
@@ -646,12 +645,12 @@
        (throws? (td/query->triples (quote [{:eid ? :map y}
                                                 {:eid ? :a a}]))))
 
-     (dotest
+       (dotest
        (is (td/param-tmp-eid? (tag-param :tmp-eid-99999)))
        (is (td/tmp-attr-kw? :tmp-attr-99999)))
 
      ;---------------------------------------------------------------------------------------------------
-     (def edn-val (glue (sorted-map)
+     (def nested-edn-val (glue (sorted-map)
                     {:num     5
                      :map     {:a 1 :b 2}
                      :hashmap {:a 21 :b 22}
@@ -663,9 +662,9 @@
      (dotest
        (td/with-tdb (td/new-tdb)
          (td/eid-count-reset)
-         (let [root-hid (td/add-edn edn-val)]
+         (let [root-hid (td/add-edn nested-edn-val)]
            ; (spyx-pretty (grab :idx-eav (deref *tdb*)))
-           (is= edn-val (td/eid->edn root-hid))
+           (is= nested-edn-val (td/eid->edn root-hid))
            (comment
              (let [idx-eav (vec (grab :idx-eav @*tdb*))]
                (spyx-pretty (td/tagval-walk-compact idx-eav)))
@@ -696,13 +695,13 @@
              (is= (query-triples [(search-triple e a 7)])
                [{:e 1004, :a 2}])))))
 
-     (dotest
+       (dotest
        (td/with-tdb (td/new-tdb)
          (td/eid-count-reset)
-         (let [root-hid (td/add-edn edn-val)]
+         (let [root-hid (td/add-edn nested-edn-val)]
            ; (spyx-pretty (grab :idx-eav (deref *tdb*)))
-           (is= edn-val (td/eid->edn root-hid))
-           (is= edn-val (td/eid->edn 1001))
+           (is= nested-edn-val (td/eid->edn root-hid))
+           (is= nested-edn-val (td/eid->edn 1001))
            (is= (td/eid->edn 1003) {:a 1 :b 2})
            (comment ; #todo API:  output should look like
              {:x 1001 :y 1002 :a 1})
@@ -714,19 +713,21 @@
              (is= r2 (tag-eid 1004))
              (is= (td/eid->edn (<val r2)) [5 6 7])))))
 
-     (dotest
+       (dotest
        (td/with-tdb (td/new-tdb)
          (td/eid-count-reset)
-         (let [root-hid (td/add-edn edn-val)]
+         (let [root-hid (td/add-edn nested-edn-val)]
            ; (spyx-pretty (grab :idx-eav (deref *tdb*)))
-           (is= edn-val (td/eid->edn root-hid)))))
+           (is= nested-edn-val (td/eid->edn root-hid)))))
 
      (dotest
+       (newline) (println :***************************************************************************************************)
        (td/with-tdb (td/new-tdb)
          (td/eid-count-reset)
-         (let [root-hid (td/add-edn edn-val)]
+         ; (spyx-pretty nested-edn-val)
+         (let [root-hid (td/add-edn nested-edn-val)]
            ; (spyx-pretty (grab :idx-eav (deref *tdb*)))
-           (is= edn-val (td/eid->edn root-hid))
+           (is= nested-edn-val (td/eid->edn root-hid))
 
            (binding [td/*autosyms-seen* (atom #{})]
              (is= (symbol "a") (td/autosym-resolve :a (quote ?)))
@@ -745,8 +746,8 @@
                                           (tag-param :i) 2}])
              [{:e 1003, :i 2}])
 
-           (is= (td/query [{:map          {:a a1}
-                                 :hashmap {:a a2}}])
+           (is= (td/query [{:map     {:a a1}
+                            :hashmap {:a a2}}])
              [{:a1 1
                :a2 21}])
 
@@ -756,9 +757,10 @@
 
            (is= (only (td/query [{:num ?}])) {:num 5})
            (is= (only (td/query [{:eid ? :num ?}])) {:eid 1001, :num 5})
-           (is= (only (td/query [{:eid ? :num num}])) {:eid 1001, :num 5}))))
+           (is= (only (td/query [{:eid ? :num num}])) {:eid 1001, :num 5})
+           )))
 
-     ; #todo need to convert all from compile-time macros to runtime functions
+       ; #todo need to convert all from compile-time macros to runtime functions
      (dotest
        (td/eid-count-reset)
        (td/with-tdb (td/new-tdb)
@@ -1366,9 +1368,6 @@
                  :eid-addrs      1006}]))
            )))
 
-     (comment ; <<comment>>
-       )  ; <<comment>>
-
      (dotest
        (let [query-result {(tv :param :tmp-eid-36493) (tv :eid 1003)
                            (tv :param :name)          "jimmy"
@@ -1414,7 +1413,7 @@
               {:description "Mimetic polyalloy" :widget-code "Model-201" :producer-code "Cyberdyne" :wtc "t1000"}
               {:description "Boom!" :widget-code "Dynamite" :producer-code "ACME" :wtc "c40"}]))))
 
-     (comment
+     (comment ; demo and poc for td/construct
        (def a-1400 1401)
        (def b-1400 1402)
        (dotest
@@ -1441,6 +1440,9 @@
              (quote {:likes {:a a, :b b}}))
            (is= (td/construct {:likes {:a ? :b ?}})
              {:likes {:a 1, :b 2}}))))
+
+     (comment ; <<comment>>
+       )  ; <<comment>>
 
 
 

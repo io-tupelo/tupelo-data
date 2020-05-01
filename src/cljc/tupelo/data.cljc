@@ -80,13 +80,13 @@
        IVal (<val [this] val))
 
      ; ***** fails strangely under lein-test-refresh after 1st file save if define this using Plumatic schema *****
-     (defn tagged? ; :- s/Bool
+     (defn tagval? ; :- s/Bool
        [arg] (= TagVal (type arg)))
 
      (s/defn untagged :- s/Any
        [arg :- s/Any]
        (t/cond-it-> arg
-         (tagged? arg) (<val arg)))
+         (tagval? arg) (<val arg)))
 
      (defmethod print-method TagVal
        [tv ^java.io.Writer writer]
@@ -106,9 +106,25 @@
        (t/walk-with-parents data
          {:leave (fn [-parents- item]
                    (t/cond-it-> item
-                     (or (tagged? item)
+                     (or (tagval? item)
                        (tagval-map? item))
                      {(grab :tag item) (grab :val item)}))}))
+
+     ;-----------------------------------------------------------------------------
+     ; #todo inline all of these?
+     (s/defn tag-param :- TagVal
+       [arg :- s/Any] (->TagVal :param (t/->kw arg)))
+     (s/defn tag-eid :- TagVal
+       [eid :- s/Int] (->TagVal :eid (t/validate int? eid)))
+     (s/defn tag-idx :- TagVal
+       [idx :- s/Int] (->TagVal :idx (t/validate int? idx)))
+
+     ; (defn pair-map? [arg] (and (map? arg) (= 1 (count arg))))
+     (defn tagged-param? [x] (and (= TagVal (type x)) (= :param (<tag x))))
+     (defn tagged-eid? [x] (and (= TagVal (type x)) (= :eid (<tag x))))
+
+     (defn idx-literal? [x] (and (map? x) (= [:idx] (keys x))))
+     (defn idx-literal->tagged [x] (tag-idx (only (vals x))))
 
      ;-----------------------------------------------------------------------------
      (defn unquote-form?
@@ -222,13 +238,22 @@
        ;  [arg] (or (keyword? arg) (int? arg)))
        )
 
+     ; #todo update with other primitive types
      (do  ; keep these in sync
-       (def LeafType (s/maybe ; maybe nil
-                       (s/cond-pre s/Num s/Str s/Keyword))) ; instant, uuid, Time ID (TID) (as strings?)
-       (s/defn leaf-val? :- s/Bool
-         "Returns true iff a value is of leaf type (number, string, keyword, nil)"
-         [arg :- s/Any] (or (nil? arg) (number? arg) (string? arg) (keyword? arg) (boolean? arg)))
-       )
+       (def Primitive (s/maybe ; maybe nil
+                        (s/cond-pre s/Num s/Str s/Keyword s/Bool s/Symbol))) ; instant, uuid, Time ID (TID) (as strings?)
+       (s/defn primitive-data? :- s/Bool
+         "Returns true iff a value is of primitive data type"
+         [arg :- s/Any]
+         (or (nil? arg) (number? arg) (string? arg) (keyword? arg) (boolean? arg)))
+       (s/defn primitive? :- s/Bool
+         "Returns true iff a value is of primitive type (not a collection)"
+         [arg :- s/Any]
+         (or
+           (primitive-data? arg)
+           (and (tagval? arg)
+             (primitive-data? (<val arg)))
+           (symbol? arg))))
 
      ; #todo add tsk/Set
      (do  ; keep these in sync
@@ -245,22 +270,6 @@
      (defn sorted-set-generic
        "Returns a sorted map with a generic comparitor"
        [] (sorted-set-by lex/compare-generic))
-
-     ;-----------------------------------------------------------------------------
-     ; #todo inline all of these?
-     (s/defn tag-param :- TagVal
-       [arg :- s/Any] (->TagVal :param (t/->kw arg)))
-     (s/defn tag-eid :- TagVal
-       [eid :- s/Int] (->TagVal :eid (t/validate int? eid)))
-     (s/defn tag-idx :- TagVal
-       [idx :- s/Int] (->TagVal :idx (t/validate int? idx)))
-
-     ; (defn pair-map? [arg] (and (map? arg) (= 1 (count arg))))
-     (defn tagged-param? [x] (and (= TagVal (type x)) (= :param (<tag x))))
-     (defn tagged-eid? [x] (and (= TagVal (type x)) (= :eid (<tag x))))
-
-     (defn idx-literal? [x] (and (map? x) (= [:idx] (keys x))))
-     (defn idx-literal->tagged [x] (tag-idx (only (vals x))))
 
      ;-----------------------------------------------------------------------------
      (s/defn tmp-eid-prefix-str? :- s/Bool
@@ -372,9 +381,11 @@
              (doseq [[attr-edn val-edn] edn-use]
                ;(spyx [attr-edn val-edn])
                (let [attr-rec attr-edn
-                     val-rec  (if (leaf-val? val-edn)
+                     val-rec  (if (primitive-data? val-edn)
                                 val-edn
                                 (add-edn-impl val-edn))]
+                 (when-not (primitive? attr-rec)
+                   (throw (ex-info "Attribute must be primitive (non-collection) type" (vals->map attr-edn))))
                  (swap! *tdb* update :idx-eav index/add-entry [eid-rec attr-rec val-rec])
                  (swap! *tdb* update :idx-vea index/add-entry [val-rec eid-rec attr-rec])
                  (swap! *tdb* update :idx-ave index/add-entry [attr-rec val-rec eid-rec]))))
@@ -600,7 +611,7 @@
          (= (quote search-triple) (xfirst form))))
 
      (s/defn index-find-leaf :- [TagVal]
-       [target :- LeafType]
+       [target :- Primitive]
        ; (println :index-find-leaf )
        (let [results (query-triples+preds
                        [[(tag-param :e) (tag-param :a) target]]
@@ -634,7 +645,8 @@
      (defn ^:no-doc query->triples-impl
        [qmaps]
        (with-spy-indent
-         ; (newline)
+         ;(newline)
+         ;(spyq :-----------------------------------------------------------------------------)
          ;(spyq :query->triples)
          ;(spyx qmaps)
          (doseq [qmap qmaps]
@@ -646,36 +658,42 @@
                  map-remaining (dissoc qmap :eid)]
              ; (spyx map-remaining)
              (forv [[kk vv] map-remaining]
-               ; (spyx [kk vv])
-               (cond
-                 (sequential? vv) ; (throw (ex-info "not implemented" {:type :sequential :value vv}))
-                 (let [array-val       vv
-                       tmp-eid         (gensym "tmp-eid-")
-                       triple-modified (search-triple-fn [eid-val kk tmp-eid])
-                       ; >>              (spyx triple-modified)
-                       qmaps-modified  (forv [elem array-val]
-                                         {:eid tmp-eid (gensym "tmp-attr-") elem})]
-                   ; (spyx qmaps-modified)
-                   (cum-vector-append triple-modified)
-                   (query->triples-impl qmaps-modified))
+               ;(spyx [kk vv])
+                (cond
+                  (symbol? vv) ; #todo clean up conflict with (primitive-data? ...) below
+                  (do
+                    (let [sym-to-use (autosym-resolve kk vv)
+                          triple     (search-triple-fn [eid-val kk sym-to-use])]
+                      ;(spyx :symbol triple)
+                      (cum-vector-append triple)))
 
-                 (map? vv) (let [tmp-eid         (gensym "tmp-eid-")
-                                 triple-modified (search-triple-fn [eid-val kk tmp-eid])
-                                 ;>>              (spyx triple-modified)
-                                 qmaps-modified  [(glue {:eid tmp-eid} vv)]]
-                             ;(spyx qmaps-modified)
-                             (cum-vector-append triple-modified)
-                             (query->triples-impl qmaps-modified))
-                 (leaf-val? vv) (let [triple (search-triple-fn [eid-val kk vv])]
-                                  ;(spyx triple)
-                                  (cum-vector-append triple))
-                 (symbol? vv) (do
-                                (let [sym-to-use (autosym-resolve kk vv)
-                                      triple     (search-triple-fn [eid-val kk sym-to-use])]
-                                  ;(spyx triple)
-                                  (cum-vector-append triple)))
-                 :else (throw (ex-info "unrecognized value" (vals->map kk vv map-remaining)))
-                 ))))))
+                  (sequential? vv) ; (throw (ex-info "not implemented" {:type :sequential :value vv}))
+                  (let [array-val       vv
+                        tmp-eid         (gensym "tmp-eid-")
+                        triple-modified (search-triple-fn [eid-val kk tmp-eid])
+                        ; >>              (spyx triple-modified)
+                        qmaps-modified  (forv [elem array-val]
+                                          {:eid tmp-eid (gensym "tmp-attr-") elem})]
+                    ; (spyx qmaps-modified)
+                    (cum-vector-append triple-modified)
+                    (query->triples-impl qmaps-modified))
+
+                  (map? vv)
+                  (let [tmp-eid         (gensym "tmp-eid-")
+                        triple-modified (search-triple-fn [eid-val kk tmp-eid])
+                        ; >>              (spyx triple-modified)
+                        qmaps-modified  [(glue {:eid tmp-eid} vv)]]
+                    ;(spyx qmaps-modified)
+                    (cum-vector-append triple-modified)
+                    (query->triples-impl qmaps-modified))
+
+                  (primitive-data? vv)
+                  (let [triple (search-triple-fn [eid-val kk vv])]
+                    ; (spyx triple)
+                    (cum-vector-append triple))
+
+                  :else (throw (ex-info "unrecognized value" (vals->map kk vv map-remaining)))
+                  ))))))
 
      (defn ^:no-doc query->triples
        [qmaps]
@@ -732,28 +750,29 @@
              pred-master   `(clojure.core/every? tupelo.core/truthy?
                                     [true ; sentinal in case of empty list
                                      ~@pred-forms])
-             ; >> (spyx pred-master)
+             ;>> (spyx pred-master)
 
              triples-proc (forv [triple-form triple-forms]
                             ; (spyx triple-form)
                             (let [form-to-eval (cons
                                                  (quote tupelo.data/search-triple)
                                                  (rest triple-form))
-                                  ; >>           (spyx form-to-eval)
+                                  ;>>           (spyx form-to-eval)
                                   form-result  (eval form-to-eval)]
-                              ; (spyx form-result)
+                              ;(spyx form-result)
                               form-result))]
 
          (let [map-triples    (query->triples maps-in)
                search-triples (glue map-triples triples-proc)]
+           ;(spyx-pretty map-triples)
            (let [unfiltered-results (query-triples+preds
                                       search-triples
                                       pred-master)
-                 ; >>                 (spyx unfiltered-results)
+                 ;>>                 (spyx unfiltered-results)
                  filtered-results   (query-results-filter-tmp-attr-mapentry
                                       (query-results-filter-tmp-eid-mapentry
                                         unfiltered-results))]
-             ; (spyx-pretty :query->wrapped-fn-leave filtered-results)
+             ;(spyx-pretty :query->wrapped-fn-leave filtered-results)
              filtered-results))))
 
      (s/defn untag-query-results :- [tsk/KeyMap]
@@ -790,92 +809,6 @@
        [qspecs]
        (query-impl qspecs))
 
-     ;----------------------------------------------------------------------------------------------
-     ;(s/defn index-find-mapentry :- [EidType]
-     ;  [tgt-me :- tsk/MapEntry]
-     ;  (let [[tgt-key tgt-val] (mapentry->kv tgt-me)
-     ;        tgt-prefix       [tgt-val tgt-key]
-     ;        idx-avl-set      (t/validate set? (fetch-in (deref *tdb*) [:idx-map-entry-vk]))
-     ;        matching-entries (grab :matches
-     ;                           (index/split-key-prefix tgt-prefix idx-avl-set))
-     ;        men-hids         (mapv xlast matching-entries)
-     ;        ]
-     ;    men-hids))
-
-     ;(s/defn index-find-submap
-     ;  [target-submap :- tsk/KeyMap]
-     ;  (let [map-hids (apply set/intersection
-     ;                   (forv [tgt-me target-submap]
-     ;                     (set (mapv hid->parent-hid
-     ;                            (index-find-mapentry tgt-me)))))]
-     ;    map-hids))
-
-     ;(s/defn index-find-mapentry-key :- [EidType]
-     ;  [tgt-key :- LeafType]
-     ;  (let [tgt-prefix       [tgt-key]
-     ;        index            (t/validate set? (fetch-in (deref *tdb*) [:idx-map-entry-kv]))
-     ;        matching-entries (grab :matches
-     ;                           (index/split-key-prefix tgt-prefix index))
-     ;        men-hids         (mapv xlast matching-entries)
-     ;        ]
-     ;    men-hids))
-
-     ;(s/defn index-find-arrayentry :- [EidType]
-     ;  [tgt-ae :- tsk/MapEntry] ; {idx elem} as a MapEntry
-     ;  (let [[tgt-idx tgt-elem] (mapentry->kv tgt-ae)
-     ;        tgt-prefix       [tgt-elem tgt-idx]
-     ;        index            (t/validate set? (fetch-in (deref *tdb*) [:idx-array-entry-ei]))
-     ;        matching-entries (grab :matches
-     ;                           (index/split-key-prefix tgt-prefix index))
-     ;        aen-hids         (mapv xlast matching-entries)
-     ;        ]
-     ;    aen-hids))
-
-     ;(s/defn index-find-arrayentry-idx :- [EidType]
-     ;  [tgt-idx :- LeafType]
-     ;  (let [tgt-prefix       [tgt-idx]
-     ;        index            (t/validate set? (fetch-in (deref *tdb*) [:idx-array-entry-ie]))
-     ;        matching-entries (grab :matches
-     ;                           (index/split-key-prefix tgt-prefix index))
-     ;        aen-hids         (mapv xlast matching-entries)
-     ;        ]
-     ;    aen-hids))
-     ;
-     ;(s/defn parent-path-hid :- [EidType]
-     ;  [hid-in :- EidType]
-     ;  (let [node-in (hid->node hid-in)]
-     ;    (loop [result   (cond
-     ;                      (instance? MapEntryNode node-in) [hid-in (me-val-hid node-in)]
-     ;                      (instance? ArrayEntryNode node-in) [hid-in (ae-elem-hid node-in)]
-     ;                      (instance? LeafNode node-in) [hid-in]
-     ;                      :else (throw (ex-info "unrecognized node type" (vals->map hid-in node-in))))
-     ;           hid-curr hid-in]
-     ;      (let [hid-par (parent-hid (hid->node hid-curr))]
-     ;        (if (nil? hid-par)
-     ;          result
-     ;          (if (or
-     ;                (instance? MapEntryNode (hid->node hid-par))
-     ;                (instance? ArrayEntryNode (hid->node hid-par)))
-     ;            (recur (t/prepend hid-par result) hid-par)
-     ;            (recur result hid-par)))))))
-     ;
-     ;(s/defn parent-path-vals
-     ;  [hid-in :- EidType]
-     ;  (let [path-hids        (parent-path-hid hid-in)
-     ;        parent-selectors (forv [path-hid path-hids]
-     ;                           (let [path-node (hid->node path-hid)]
-     ;                             (cond
-     ;                               (instance? MapEntryNode path-node) (me-key path-node)
-     ;                               (instance? ArrayEntryNode path-node) (ae-idx path-node)
-     ;                               (instance? LeafNode path-node) (edn path-node)
-     ;                               :else (throw (ex-info "invalid parent node" (vals->map path-node))))))]
-     ;    parent-selectors))
-
-
-     ;(def idx-prefix-lookup
-     ;  (index/->index [[:e :a :v :idx-eav]
-     ;                  [:v :a :e :idx-vae]
-     ;                  [:a :v :e :idx-ave]]))
 
      ))
 
