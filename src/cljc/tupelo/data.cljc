@@ -407,15 +407,15 @@
 
      ; #todo need to handle sets
      (s/defn ^:no-doc eid->edn-impl :- s/Any
-       [eid-tgt :- TagVal]
-       (let [eav-matches (index/prefix-match->seq [eid-tgt] (grab :idx-eav @*tdb*))
+       [teid :- TagVal]
+       (let [eav-matches (index/prefix-match->seq [teid] (grab :idx-eav @*tdb*))
              result-map  (apply glue
-                           (forv [[-eid- attr val-match] eav-matches]
+                           (forv [[-teid-match- attr val-match] eav-matches]
                              (let [val-edn (t/cond-it-> val-match
                                              (tagged-eid? it) (eid->edn-impl it))]
                                (t/map-entry attr val-edn))))
              ; >> (spyx-pretty result-map)
-             result-out  (let [entity-type (fetch-in @*tdb* [:eid-type eid-tgt])]
+             result-out  (let [entity-type (fetch-in @*tdb* [:eid-type teid])]
                            (cond
                              (= entity-type :map) result-map
                              (= entity-type :set) (into #{} (keys result-map))
