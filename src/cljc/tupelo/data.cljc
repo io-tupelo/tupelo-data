@@ -355,13 +355,13 @@
        "Returns the next integer EID"
        [] (swap! eid-counter inc))
 
-     (s/defn array->idx-map :- {TagVal s/Any}
+     (s/defn array->tagidx-map :- {TagVal s/Any}
        [edn-array :- tsk/List ]
        (apply glue {}
          (forv [[idx val] (indexed edn-array)]
            {(tag-idx idx) val})))
 
-     (s/defn idx-map->array :- tsk/List
+     (s/defn tagidx-map->array :- tsk/List
        [idx-map :- {TagVal s/Any}]
        (let [result (forv [idx (range (count idx-map))]
                       (grab (tag-idx idx) idx-map))]
@@ -380,8 +380,7 @@
                          (map? edn-in) {:entity-type :map :edn-use edn-in}
                          (set? edn-in) {:entity-type :set :edn-use (zipmap edn-in edn-in)}
                          (sequential? edn-in) {:entity-type :array
-                                               :edn-use     (forv [[idx val] (indexed edn-in)]
-                                                              [(tag-idx idx) val])}
+                                               :edn-use     (array->tagidx-map edn-in) }
                          :else (throw (ex-info "unknown value found" (vals->map edn-in))))]
            (t/with-map-vals ctx [entity-type edn-use]
              ;(newline)
@@ -420,11 +419,7 @@
                            (cond
                              (= entity-type :map) result-map
                              (= entity-type :set) (into #{} (keys result-map))
-                             (= entity-type :array) (let [result-keys (mapv <val (keys result-map))
-                                                          result-vals (vec (vals result-map))]
-                                                      ; if array entity, keys should be in 0..N-1 (already sorted by eav index)
-                                                      (assert (= result-keys (range (count result-keys))))
-                                                      result-vals)
+                             (= entity-type :array) (tagidx-map->array result-map)
                              :else (throw (ex-info "invalid entity type found" (vals->map entity-type)))))]
          result-out))
 

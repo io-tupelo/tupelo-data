@@ -15,6 +15,7 @@
             [tupelo.data :as td :refer [with-tdb new-tdb eid-count-reset lookup query-triples query-triples->tagged boolean->binary search-triple
                                         *tdb* <tag <val tag-param tag-eid tag-idx
                                         ]]
+            [criterium.core :as crit]
             [clojure.string :as str]
             [schema.core :as s]
             [tupelo.data.index :as index]
@@ -93,6 +94,9 @@
 #?(:clj
    (do
 
+     (comment ; <<comment>>
+       )  ; <<comment>>
+
      ;-----------------------------------------------------------------------------
      (dotest
        (is= true (and true))
@@ -119,8 +123,8 @@
      ;-----------------------------------------------------------------------------
      (dotest
        (let [arr-1 (vec (range 3))
-             im    (td/array->idx-map arr-1)
-             arr-2 (td/idx-map->array im) ]
+             im    (td/array->tagidx-map arr-1)
+             arr-2 (td/tagidx-map->array im) ]
          (is= (td/tagval-walk-compact im)
            {{:idx 0} 0
             {:idx 1} 1
@@ -132,9 +136,9 @@
              bad {(tag-idx 0) 0
                   ; missing idx=1
                   (tag-idx 2) 2}]
-         (is= (td/idx-map->array ok)
+         (is= (td/tagidx-map->array ok)
            [0 1 2])
-         (throws? (td/idx-map->array bad))) )
+         (throws? (td/tagidx-map->array bad))) )
 
      ;-----------------------------------------------------------------------------
      (def vec234 [2 3 4])
@@ -1459,10 +1463,6 @@
              (quote {:likes {:a a, :b b}}))
            (is= (td/construct {:likes {:a ? :b ?}})
              {:likes {:a 1, :b 2}}))))
-
-     (comment ; <<comment>>
-       )  ; <<comment>>
-
 
 
 

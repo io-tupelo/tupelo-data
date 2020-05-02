@@ -9,6 +9,7 @@
   :deploy-repositories [["clojars" "http://beta.clojars.org/repo/"]]
   :dependencies
   [
+   [criterium "0.4.5"]
    [org.clojure/clojure "1.10.2-alpha1"]
    [org.clojure/clojurescript "1.10.597"]
    [org.clojure/data.avl "0.1.0"]
