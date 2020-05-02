@@ -117,6 +117,26 @@
          (is= (unlazy tva) {:tag :sym, :val (quote a)})))
 
      ;-----------------------------------------------------------------------------
+     (dotest
+       (let [arr-1 (vec (range 3))
+             im    (td/array->idx-map arr-1)
+             arr-2 (td/idx-map->array im) ]
+         (is= (td/tagval-walk-compact im)
+           {{:idx 0} 0
+            {:idx 1} 1
+            {:idx 2} 2})
+         (is= arr-1 arr-2))
+       (let [ok  {(tag-idx 0) 0
+                  (tag-idx 1) 1
+                  (tag-idx 2) 2}
+             bad {(tag-idx 0) 0
+                  ; missing idx=1
+                  (tag-idx 2) 2}]
+         (is= (td/idx-map->array ok)
+           [0 1 2])
+         (throws? (td/idx-map->array bad))) )
+
+     ;-----------------------------------------------------------------------------
      (def vec234 [2 3 4])
 
      (dotest
@@ -721,7 +741,6 @@
            (is= nested-edn-val (td/eid->edn root-hid)))))
 
      (dotest
-       (newline) (println :***************************************************************************************************)
        (td/with-tdb (td/new-tdb)
          (td/eid-count-reset)
          ; (spyx-pretty nested-edn-val)
