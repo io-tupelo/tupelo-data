@@ -1530,6 +1530,16 @@
            (throws? (td/eid->edn e0))
            (is= (td/eid->edn e1) {:w "wilma"}))))
 
+     (dotest
+       (td/eid-count-reset)
+       (td/with-tdb (td/new-tdb)
+         (let [root-eid (td/add-edn {:a 1})]
+           (throws? (td/entity-add-map-entry 9999 [1 2] 2)) ; invalid eid
+           (throws? (td/entity-add-map-entry root-eid [1 2] 2)) ; non-primitive key
+           (throws? (td/entity-add-map-entry root-eid :a 99)) ; duplicate key
+           (td/entity-add-map-entry root-eid :b 2) ; legal add
+           (is= (td/eid->edn root-eid) {:a 1 :b 2}))))
+
 
 
 

@@ -601,15 +601,18 @@
 
      (s/defn entity-add-map-entry
        "Adds a new attr-val pair to an existing map entity."
-       [teid attr-in edn-in] ; #todo add db arg version
+       [eid  :- s/Int
+        attr-in :- Primitive
+        edn-in :- s/Any] ; #todo add db arg version
        (with-spy-indent
-         (let [idx-eav     (grab :idx-eav (deref *tdb*))
+         (let [teid        (tag-eid eid)
+               idx-eav     (grab :idx-eav (deref *tdb*))
                entity-type (fetch-in @*tdb* [:eid-type teid])
                >>          (when (nil? entity-type)
                              (throw (ex-info "entity not found" (vals->map teid))))
                ea-triples  (index/prefix-match->seq [teid attr-in] idx-eav)
-               >>          (when (pos? (count ea-triples))
-                             (throw (ex-info "pre-existing element found" (vals->map teid attr-in ea-triples))))] (
+               >>          (when (not-empty? ea-triples)
+                             (throw (ex-info "pre-existing element found" (vals->map teid attr-in ea-triples))))]
            ;(newline)
            ;(spyx-pretty entity-type)
            ;(spyx-pretty edn-in)
@@ -618,7 +621,7 @@
            (when-not (primitive? attr-in) ; #todo generalize?
              (throw (ex-info "Attribute must be primitive (non-collection) type" (vals->map attr-in edn-in))))
            (db-add-triple [teid (edn->encoded attr-in) (edn->encoded edn-in)])
-           teid))))
+           teid)))
 
      ;(s/defn entity-add-set-elem
      ;  "Adds a new data element to an existing entity."
