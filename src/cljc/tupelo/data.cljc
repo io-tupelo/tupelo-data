@@ -608,7 +608,7 @@
        (fetch-in (deref *tdb*) [:eid-type teid]))
 
      (s/defn ^:no-doc array-entity-rerack
-       [teid] ; #todo make all require db param
+       [teid :- TagVal] ; #todo make all require db param
        (when (not= :array (entity-type teid))
          (throw (ex-info "non-array found" (vals->map teid))))
        (let [idx-eav      (grab :idx-eav (deref *tdb*))

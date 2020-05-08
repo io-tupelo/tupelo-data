@@ -1515,13 +1515,20 @@
        (td/with-tdb (td/new-tdb)
          (let [root-eid (td/add-edn {:a "fred" :b [0 1 2]})]
            ; (spyx-pretty (td/db-pretty @*tdb*))
+           (throws? (td/remove-root-entity 1002))
            (is= (td/eid->edn 1002) [0 1 2])
            (td/remove-entity-elem (tv :eid 1002) (tv :idx 1))
            (is= (td/eid->edn root-eid) {:a "fred", :b [0 2]})
            (td/remove-entity-elem (tv :eid 1001) :b)
-           (is= (td/eid->edn root-eid) {:a "fred"}))))
-
-
+           (is= (td/eid->edn root-eid) {:a "fred"})))
+       (td/eid-count-reset)
+       (td/with-tdb (td/new-tdb)
+         (let [e0 (td/add-edn {:f "fred"})
+               e1 (td/add-edn {:w "wilma"})]
+           (is= (td/eid->edn e0) {:f "fred"})
+           (td/remove-root-entity e0)
+           (throws? (td/eid->edn e0))
+           (is= (td/eid->edn e1) {:w "wilma"}))))
 
 
 
