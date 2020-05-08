@@ -260,10 +260,21 @@
              (primitive-data? (<val arg)))
            (symbol? arg))))
 
+     (s/defn edn->type :- s/Keyword
+       "Given EDN data, returns a keyword indicating its type "
+       [edn :- s/Any]
+       (cond
+         (primitive-data? edn) :primitive ; #todo specialize to :int :float etc
+         (map? edn) :map
+         (set? edn) :set
+         (sequential? edn) :array
+         :else (throw (ex-info "unknown EDN type " (vals->map edn)))))
+
      ; #todo add tsk/Set
      (do  ; keep these in sync
-       (def EntityType (s/cond-pre tsk/Map tsk/Vec))
-       (s/defn entity-like? [arg] (or (map? arg) (set? arg) (sequential? arg))))
+       (def EntityType (s/cond-pre tsk/Map tsk/Set tsk/Vec))
+       (s/defn entity-like?
+         [arg] (t/contains-key? #{:map :set :array} (edn->type arg))))
 
      (def TripleIndex #{tsk/Triple})
 
@@ -413,42 +424,6 @@
          (swap! *tdb* update :idx-vea index/add-entry [v e a])
          (swap! *tdb* update :idx-ave index/add-entry [a v e])))
 
-     (s/defn ^:no-doc add-edn-impl :- TagVal ; EidType ; #todo maybe rename:  load-edn->eid  ???
-       [edn-in :- s/Any]
-       ;(spyq :-----------------------------------------------------------------------------)
-       ;(newline)
-       ;(spyx-pretty edn-in)
-       (with-spy-indent
-         (when-not (entity-like? edn-in)
-           (throw (ex-info "invalid edn-in" (vals->map edn-in))))
-         (let [eid-rec (tag-eid (new-eid))
-               ctx     (cond ; #todo add set
-                         (map? edn-in) {:entity-type :map :edn-use edn-in}
-                         (set? edn-in) {:entity-type :set :edn-use (zipmap edn-in edn-in)}
-                         (sequential? edn-in) {:entity-type :array
-                                               :edn-use     (array->tagidx-map edn-in)}
-                         :else (throw (ex-info "unknown value found" (vals->map edn-in))))]
-           (t/with-map-vals ctx [entity-type edn-use]
-             ;(newline)
-             ;(spyx-pretty entity-type )
-             ;(spyx-pretty edn-use)
-             ; #todo could switch to transients & reduce here in a single swap
-             (swap! *tdb* update :eid-type assoc eid-rec entity-type)
-             (doseq [[attr-edn val-edn] edn-use]
-               ;(spyx [attr-edn val-edn])
-               (let [attr-rec attr-edn
-                     val-rec  (if (primitive-data? val-edn)
-                                val-edn
-                                (add-edn-impl val-edn))]
-                 (when-not (primitive? attr-rec)
-                   (throw (ex-info "Attribute must be primitive (non-collection) type" (vals->map attr-edn))))
-                 (db-add-triple [eid-rec attr-rec val-rec]))))
-           eid-rec)))
-
-     (s/defn add-edn :- s/Int
-       "Add the EDN arg to the indexes, returning the EID"
-       [edn-in :- s/Any] (<val (add-edn-impl edn-in)))
-
      ; #todo need to handle sets
      (s/defn ^:no-doc eid->edn-impl :- s/Any
        [teid :- TagVal]
@@ -460,7 +435,7 @@
                                (let [val-edn (t/cond-it-> val-match
                                                (tagged-eid? it) (eid->edn-impl it))]
                                  (t/map-entry attr val-edn)))))
-             ; >> (spyx-pretty result-map)
+             ; >>          (spyx-pretty result-map)
              result-out  (let [entity-type (fetch-in @*tdb* [:eid-type teid])]
                            (cond
                              (= entity-type :map) result-map
@@ -572,6 +547,48 @@
            (zero? num-keys) the-map
            (= 1 num-keys) (dissoc the-map key-to-clear)
            :else (update-in the-map parent-keys dissoc key-to-clear))))
+
+     ;-----------------------------------------------------------------------------
+     (s/defn ^:no-doc add-edn-impl :- TagVal ; EidType ; #todo maybe rename:  load-edn->eid  ???
+       [edn-in :- s/Any]
+       ;(spyq :-----------------------------------------------------------------------------)
+       ;(newline)
+       ;(spyx-pretty edn-in)
+       (with-spy-indent
+         (when-not (entity-like? edn-in)
+           (throw (ex-info "invalid edn-in" (vals->map edn-in))))
+         (let [teid         (tag-eid (new-eid))
+               entity-type  (edn->type edn-in)
+               edn->encoded (fn [edn]
+                              (if (primitive-data? edn)
+                                edn
+                                (add-edn-impl edn)))]
+           ;(newline)
+           ;(spyx-pretty entity-type)
+           ;(spyx-pretty edn-in)
+           ; #todo could switch to transients & reduce here in a single swap
+           (swap! *tdb* assoc-in [:eid-type teid] entity-type)
+           (cond ; #todo add set
+             (= :map entity-type) (doseq [[k-in v-in] edn-in]
+                                    (when-not (primitive? k-in)
+                                      (throw (ex-info "Attribute must be primitive (non-collection) type" (vals->map k-in v-in edn-in))))
+                                    (db-add-triple [teid (edn->encoded k-in) (edn->encoded v-in)]))
+
+             (= :set entity-type) (doseq [k-in edn-in]
+                                    (when-not (primitive? k-in)
+                                      (throw (ex-info "Attribute must be primitive (non-collection) type" (vals->map k-in edn-in))))
+                                    (let [k (edn->encoded k-in)]
+                                      (db-add-triple [teid k k])))
+
+             (= :array entity-type) (doseq [[idx val] (indexed edn-in)]
+                                      (db-add-triple [teid (tag-idx idx) (edn->encoded val)]))
+
+             :else (throw (ex-info "unknown value found" (vals->map edn-in))))
+           teid)))
+
+     (s/defn add-edn :- s/Int
+       "Add the EDN arg to the indexes, returning the EID"
+       [edn-in :- s/Any] (<val (add-edn-impl edn-in)))
 
 
      ;-----------------------------------------------------------------------------
