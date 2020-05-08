@@ -10,7 +10,7 @@
   ; #?(:clj (:use tupelo.core)) ; #todo remove for cljs
   #?(:clj (:require
             [tupelo.core :as t :refer [spy spyx spyxx spyx-pretty with-spy-indent
-                                       grab glue map-entry indexed only only2 xfirst xsecond xthird xlast xrest
+                                       grab glue map-entry indexed only only2 xfirst xsecond xthird xlast xrest not-empty?
                                        it-> forv vals->map fetch-in let-spy
                                        keep-if drop-if append prepend ->sym ->kw kw->sym
                                        ]]
@@ -21,7 +21,8 @@
 
             [clojure.walk :as walk]
             [schema.core :as s]
-            [clojure.core :as cc]))
+            [clojure.core :as cc]
+            [clojure.set :as set]))
   )
 
 ; #todo Treeify: {k1 v1 k2 v2} =>
@@ -69,6 +70,10 @@
        value)
 
      ; #todo Tupelo Data Language (TDL)
+
+     (s/defn boolean->binary :- s/Int ; #todo => misc
+       "Convert true => 1, false => 0"
+       [arg :- s/Bool] (if arg 1 0))
 
      ;-----------------------------------------------------------------------------
      (defprotocol IVal (<val [this]))
@@ -344,6 +349,28 @@
                           (update it :idx-vea glue (grab :idx-vea db-compact)) )]
          result))
 
+     ;-----------------------------------------------------------------------------
+     (s/defn ^:no-doc eav->eav :- tsk/Triple
+       [triple :- tsk/Triple] triple)
+
+     (s/defn ^:no-doc eav->vea :- tsk/Triple
+       [[e a v] :- tsk/Triple] [v e a])
+     (s/defn ^:no-doc vea->eav :- tsk/Triple
+       [[v e a] :- tsk/Triple] [e a v])
+
+     (s/defn ^:no-doc eav->ave :- tsk/Triple
+       [[e a v] :- tsk/Triple] [a v e])
+     (s/defn ^:no-doc ave->eav :- tsk/Triple
+       [[a v e] :- tsk/Triple] [e a v])
+
+     (s/defn ^:no-doc map-eav->eav :- [tsk/Triple]
+       [triples :- [tsk/Triple]] (vec triples))
+     (s/defn ^:no-doc map-vea->eav :- [tsk/Triple]
+       [triples :- [tsk/Triple]] (mapv vea->eav triples))
+     (s/defn ^:no-doc map-ave->eav :- [tsk/Triple]
+       [triples :- [tsk/Triple]] (mapv ave->eav triples))
+
+     ;-----------------------------------------------------------------------------
      (def ^:no-doc eid-count-base 1000)
      (def ^:no-doc eid-counter (atom eid-count-base))
 
@@ -367,6 +394,25 @@
                       (grab (tag-idx idx) idx-map))]
          result))
 
+     (s/defn ^:no-doc db-contains-triple?
+       [triple-eav]
+       (let [index (grab :idx-eav (deref *tdb*))]
+         (contains? index triple-eav)))
+
+     (s/defn ^:no-doc db-remove-triple
+       [triple-eav]
+       (let [[e a v] triple-eav]
+         (swap! *tdb* update :idx-eav index/remove-entry [e a v])
+         (swap! *tdb* update :idx-vea index/remove-entry [v e a])
+         (swap! *tdb* update :idx-ave index/remove-entry [a v e])))
+
+     (s/defn ^:no-doc db-add-triple
+       [triple-eav]
+       (let [[e a v] triple-eav]
+         (swap! *tdb* update :idx-eav index/add-entry [e a v])
+         (swap! *tdb* update :idx-vea index/add-entry [v e a])
+         (swap! *tdb* update :idx-ave index/add-entry [a v e])))
+
      (s/defn ^:no-doc add-edn-impl :- TagVal ; EidType ; #todo maybe rename:  load-edn->eid  ???
        [edn-in :- s/Any]
        ;(spyq :-----------------------------------------------------------------------------)
@@ -380,7 +426,7 @@
                          (map? edn-in) {:entity-type :map :edn-use edn-in}
                          (set? edn-in) {:entity-type :set :edn-use (zipmap edn-in edn-in)}
                          (sequential? edn-in) {:entity-type :array
-                                               :edn-use     (array->tagidx-map edn-in) }
+                                               :edn-use     (array->tagidx-map edn-in)}
                          :else (throw (ex-info "unknown value found" (vals->map edn-in))))]
            (t/with-map-vals ctx [entity-type edn-use]
              ;(newline)
@@ -396,9 +442,7 @@
                                 (add-edn-impl val-edn))]
                  (when-not (primitive? attr-rec)
                    (throw (ex-info "Attribute must be primitive (non-collection) type" (vals->map attr-edn))))
-                 (swap! *tdb* update :idx-eav index/add-entry [eid-rec attr-rec val-rec])
-                 (swap! *tdb* update :idx-vea index/add-entry [val-rec eid-rec attr-rec])
-                 (swap! *tdb* update :idx-ave index/add-entry [attr-rec val-rec eid-rec]))))
+                 (db-add-triple [eid-rec attr-rec val-rec]))))
            eid-rec)))
 
      (s/defn add-edn :- s/Int
@@ -411,9 +455,11 @@
        (let [eav-matches (index/prefix-match->seq [teid] (grab :idx-eav @*tdb*))
              result-map  (apply glue
                            (forv [[-teid-match- attr val-match] eav-matches]
-                             (let [val-edn (t/cond-it-> val-match
-                                             (tagged-eid? it) (eid->edn-impl it))]
-                               (t/map-entry attr val-edn))))
+                             (do
+                               (assert (= teid -teid-match-))
+                               (let [val-edn (t/cond-it-> val-match
+                                               (tagged-eid? it) (eid->edn-impl it))]
+                                 (t/map-entry attr val-edn)))))
              ; >> (spyx-pretty result-map)
              result-out  (let [entity-type (fetch-in @*tdb* [:eid-type teid])]
                            (cond
@@ -423,24 +469,72 @@
                              :else (throw (ex-info "invalid entity type found" (vals->map entity-type)))))]
          result-out))
 
-     (s/defn eid->edn :- s/Any
+     (s/defn eid->edn :- s/Any ; #todo reimplement in terms of walk-entity ???
        "Returns the EDN subtree rooted at a eid."
        [eid-in :- s/Int]
        (eid->edn-impl (tag-eid eid-in)))
 
-     ;-----------------------------------------------------------------------------
-     (s/defn boolean->binary :- s/Int ; #todo => misc
-       "Convert true => 1, false => 0"
-       [arg :- s/Bool] (if arg 1 0))
 
-     (s/defn ^:no-doc map-eav->eav :- [tsk/Triple]
-       [triples :- [tsk/Triple]] (vec triples))
-     (s/defn ^:no-doc map-vea->eav :- [tsk/Triple]
-       [triples :- [tsk/Triple]] (mapv (fn [[v e a]] [e a v]) triples))
-     (s/defn ^:no-doc map-ave->eav :- [tsk/Triple]
-       [triples :- [tsk/Triple]] (mapv (fn [[a v e]] [e a v]) triples))
+     ;---------------------------------------------------------------------------------------------------
+     (def Interceptor ; #todo tupelo.schema (& tupelo.forest)
+       "Plumatic Schema type name for interceptor type used by `walk-entity`."
+       {(s/required-key :enter) s/Any
+        (s/required-key :leave) s/Any
+        (s/optional-key :id)    s/Keyword})
 
-     ;-----------------------------------------------------------------------------
+     ; #todo need to handle sets
+     (s/defn ^:no-doc walk-entity-impl :- s/Any
+       [teid :- TagVal
+        interceptor :- Interceptor]
+       (with-spy-indent
+         (let [enter-fn    (grab :enter interceptor)
+               leave-fn    (grab :leave interceptor)
+               eav-matches (index/prefix-match->seq [teid] (grab :idx-eav @*tdb*))]
+           (doseq [eav-curr eav-matches]
+             (enter-fn eav-curr)
+             (let [[-e- -a- v] eav-curr]
+               (assert (= teid -e-)) ; #todo temp
+               (when (tagged-eid? v)
+                 (walk-entity-impl v interceptor)))
+             (leave-fn eav-curr)
+             nil))))
+
+     (s/defn walk-entity
+       "Recursively walks a subtree rooted at an entity, applying the supplied `:enter` and ':leave` functions
+        to each node.   Usage:
+
+            (walk-entiry <eid> intc-map)
+
+        where `intc-map` is an interceptor map like:
+
+            { :enter <pre-fn>       ; defaults to `identity`
+              :leave <post-fn> }    ; defaults to `identity`
+
+        Here, `pre-fn` and `post-fn` look like:
+
+            (fn [triple-eav] ...)
+
+        where `eid` specifies the root of the sub-tree being walked. Returns nil."
+       [eid :- EidType
+        intc-map :- tsk/KeyMap]
+       (let [legal-keys   #{:id :enter :leave}
+             counted-keys #{:enter :leave}
+             keys-present (set (keys intc-map))]
+         (let [extra-keys (set/difference keys-present legal-keys)]
+           (when (not-empty? extra-keys)
+             (throw (ex-info "walk-entity: unrecognized keys found:" intc-map))))
+         (let [counted-keys-present (set/intersection counted-keys keys-present)]
+           (when (empty? counted-keys-present)
+             (throw (ex-info "walk-entity: no counted keys found:" intc-map)))))
+       (let [enter-fn              (get intc-map :enter t/noop)
+             leave-fn              (get intc-map :leave t/noop)
+             canonical-interceptor (glue intc-map {:enter enter-fn :leave leave-fn})]
+         (walk-entity-impl (tag-eid eid) canonical-interceptor))
+       nil)
+
+
+
+;-----------------------------------------------------------------------------
      (s/defn lookup :- [tsk/Triple] ; #todo maybe use :unk or :* for unknown?
        "Given a triple of [e a v] values, use the best index to find a matching subset, where
        'nil' represents unknown values. Returns an index in [e a v] format."
@@ -462,6 +556,105 @@
                               :else (throw (ex-info "invalid known-flags" (vals->map triple known-flgs))))]
           found-entries)))
 
+     ;-----------------------------------------------------------------------------
+     (s/defn dissoc-in :- s/Any ; #todo upgrade tupelo.core
+       "A sane version of dissoc-in that will not delete intermediate keys.
+        When invoked as (dissoc-in the-map [:k1 :k2 :k3... :kZ]), acts like
+        (clojure.core/update-in the-map [:k1 :k2 :k3...] dissoc :kZ). That is, only
+        the map entry containing the last key :kZ is removed, and all map entries
+        higher than kZ in the hierarchy are unaffected."
+       [the-map :- tsk/Map
+        keys-vec :- [s/Any]] ; #todo  Primitive?
+       (let [num-keys     (count keys-vec)
+             key-to-clear (last keys-vec)
+             parent-keys  (butlast keys-vec)]
+         (cond
+           (zero? num-keys) the-map
+           (= 1 num-keys) (dissoc the-map key-to-clear)
+           :else (update-in the-map parent-keys dissoc key-to-clear))))
+
+
+     ;-----------------------------------------------------------------------------
+     ; #todo (defn remove-entity [eid] ...)
+     ; #todo (defn update-entity [eid fn] ...)
+     ; #todo (defn update-triple [triple-eav fn] ...)
+     (declare remove-entity)
+
+     (s/defn remove-triple
+       "Recursively removes an EAV triple of data from the db."
+       [triple-eav :- tsk/Triple] ; #todo add db arg version
+       (let [[-e- -a- v] triple-eav]
+         (when-not (db-contains-triple? triple-eav)
+           (throw (ex-info "triple not found" (vals->map triple-eav))))
+         (when (tagged-eid? v)
+           (remove-entity (<val v)))
+         (db-remove-triple triple-eav)))
+
+     (s/defn ^:no-doc remove-entity
+       [eid :- EidType] ; #todo add db arg version
+       (let [idx-eav (grab :idx-eav (deref *tdb*))
+             teid (tag-eid eid)
+             eav-triples (index/prefix-match->seq [teid] idx-eav) ]
+         (when (empty? eav-triples)
+           (throw (ex-info "entity not found" (vals->map eid))))
+         (swap! *tdb* dissoc-in [:eid-type teid])
+         (doseq [triple-eav eav-triples]
+           (remove-triple triple-eav))))
+
+     (s/defn entity-type
+       "Returns the type of an entity"
+       [teid :- TagVal]
+       (assert (= :eid (<tag teid)))
+       (fetch-in (deref *tdb*) [:eid-type teid]))
+
+     (s/defn ^:no-doc array-entity-rerack
+       [teid] ; #todo make all require db param
+       (when (not= :array (entity-type teid))
+         (throw (ex-info "non-array found" (vals->map teid))))
+       (let [idx-eav      (grab :idx-eav (deref *tdb*))
+             triples-orig (index/prefix-match->seq [teid] idx-eav)
+             vals         (mapv xthird triples-orig)
+             triples-new  (forv [[idx val] (indexed vals)]
+                            [teid (tag-idx idx) val])]
+         (doseq [triple triples-orig]
+           (db-remove-triple triple))
+         (doseq [triple triples-new]
+           (db-add-triple triple))))
+
+     (s/defn remove-entity-elem
+       "Recursively removes an element EAV triple of data from the db."
+       [teid a] ; #todo add db arg version
+       (let [idx-eav     (grab :idx-eav (deref *tdb*))
+             eav-triples (index/prefix-match->seq [teid a] idx-eav)
+             >>          (when (< 1 (count eav-triples))
+                           (throw (ex-info "multiple elements found" (vals->map teid a eav-triples))))
+             triple-eav  (only eav-triples)
+             [-e- -a- v] triple-eav]
+         (when (tagged-eid? v)
+           (remove-entity (<val v)))
+         (db-remove-triple triple-eav)
+         (when (= :array (entity-type teid))
+           (array-entity-rerack teid))))
+
+     (s/defn remove-root-entity
+       "Recursively removes an entity from the db."
+       [eid :- EidType] ; #todo add db arg version
+       (let [idx-vea     (grab :idx-vea (deref *tdb*))
+             teid        (tag-eid eid)
+             vea-triples (index/prefix-match->seq [teid] idx-vea)]
+         (when (not-empty? vea-triples)
+           (throw (ex-info "entity not root" (vals->map eid))))
+         (remove-entity eid)))
+
+     ; #todo remove-array-elem
+     ; #todo remove-map-entry
+     ; #todo remove-set-elem
+
+     ; #todo update-array-elem
+     ; #todo update-map-entry
+     ; #todo update-set-elem
+
+     ;-----------------------------------------------------------------------------
      (s/defn apply-env
        [env :- tsk/Map
         elements :- tsk/Vec]
@@ -812,6 +1005,14 @@
        (query-impl qspecs))
 
 
+
+
+
      ))
+
+
+
+
+
 
 

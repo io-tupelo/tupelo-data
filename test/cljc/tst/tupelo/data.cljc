@@ -1462,8 +1462,64 @@
            (is= (td/construct-impl (quote {:likes {:a ? :b ?}}))
              (quote {:likes {:a a, :b b}}))
            (is= (td/construct {:likes {:a ? :b ?}})
-             {:likes {:a 1, :b 2}}))))
+             {:likes {:a a, :b b}}
+             {:likes {:a 1, :b 2}}
+             ))))
 
+     (dotest
+       (td/eid-count-reset)
+       (td/with-tdb (td/new-tdb)
+         (let [root-eid (td/add-edn {:a 1 :b {:c 3 :d [4 5 6]}})
+               str-out  (with-out-str
+                          (td/walk-entity root-eid
+                            {:enter (fn [triple] (spy :enter triple))
+                             :leave (fn [triple] (spy :leave triple))}))]
+           ; (println str-out)
+           (is-nonblank= str-out
+             ":enter => [<:eid 1001> :a 1]
+              :leave => [<:eid 1001> :a 1]
+              :enter => [<:eid 1001> :b <:eid 1002>]
+                :enter => [<:eid 1002> :c 3]
+                :leave => [<:eid 1002> :c 3]
+                :enter => [<:eid 1002> :d <:eid 1003>]
+                  :enter => [<:eid 1003> <:idx 0> 4]
+                  :leave => [<:eid 1003> <:idx 0> 4]
+                  :enter => [<:eid 1003> <:idx 1> 5]
+                  :leave => [<:eid 1003> <:idx 1> 5]
+                  :enter => [<:eid 1003> <:idx 2> 6]
+                  :leave => [<:eid 1003> <:idx 2> 6]
+                :leave => [<:eid 1002> :d <:eid 1003>]
+              :leave => [<:eid 1001> :b <:eid 1002>] ")
+
+           (is= (td/eid->edn root-eid) {:a 1 :b {:c 3 :d [4 5 6]}})
+           (td/remove-triple [(tv :eid 1001) :a 1])
+           (is= (td/eid->edn root-eid) {:b {:c 3, :d [4 5 6]}})
+           (td/remove-triple [(tv :eid 1002) :d (tv :eid 1003)])
+           (is= (td/eid->edn root-eid) {:b {:c 3}}))) )
+
+     (dotest
+       (is= (td/eav->eav [:e :a :v]) [:e :a :v])
+       (is= (td/eav->vea [:e :a :v]) [:v :e :a])
+       (is= (td/vea->eav [:v :e :a]) [:e :a :v])
+       (is= (td/eav->ave [:e :a :v]) [:a :v :e])
+       (is= (td/ave->eav [:a :v :e]) [:e :a :v])
+       (td/eid-count-reset)
+       (td/with-tdb (td/new-tdb)
+         (let [root-eid (td/add-edn {:a "fred" :b [0 1 2] :c #{4 5 6}})]
+           (is= (td/entity-type (tv :eid 1001)) :map)
+           (is= (td/entity-type (tv :eid 1002)) :array)
+           (is= (td/entity-type (tv :eid 1003)) :set) )))
+
+     (dotest
+       (td/eid-count-reset)
+       (td/with-tdb (td/new-tdb)
+         (let [root-eid (td/add-edn {:a "fred" :b [0 1 2]})]
+           ; (spyx-pretty (td/db-pretty @*tdb*))
+           (is= (td/eid->edn 1002) [0 1 2])
+           (td/remove-entity-elem (tv :eid 1002) (tv :idx 1))
+           (is= (td/eid->edn root-eid) {:a "fred", :b [0 2]})
+           (td/remove-entity-elem (tv :eid 1001) :b)
+           (is= (td/eid->edn root-eid) {:a "fred"}))))
 
 
 
@@ -1471,4 +1527,9 @@
 
 
      ))
+
+
+
+
+
 
