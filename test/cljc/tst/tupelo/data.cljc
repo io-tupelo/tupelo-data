@@ -1506,9 +1506,9 @@
        (td/eid-count-reset)
        (td/with-tdb (td/new-tdb)
          (let [root-eid (td/add-edn {:a "fred" :b [0 1 2] :c #{4 5 6}})]
-           (is= (td/entity-type (tv :eid 1001)) :map)
-           (is= (td/entity-type (tv :eid 1002)) :array)
-           (is= (td/entity-type (tv :eid 1003)) :set) )))
+           (is= (td/eid->type (tv :eid 1001)) :map)
+           (is= (td/eid->type (tv :eid 1002)) :array)
+           (is= (td/eid->type (tv :eid 1003)) :set))))
 
      (dotest
        (td/eid-count-reset)
