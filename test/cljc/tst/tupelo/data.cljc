@@ -14,7 +14,7 @@
                                        it-> fetch-in
                                        ]]
             [tupelo.data :as td :refer [with-tdb new-tdb eid-count-reset lookup query-triples query-triples->tagged boolean->binary search-triple
-                                        *tdb* <tag <val tag-param tag-eid tag-idx ->Eid ->Idx Eid? Idx?
+                                        *tdb* <tag <val tag-param tag-idx ->Eid ->Idx Eid? Idx?
                                         ]]
             [clojure.string :as str]
             [schema.core :as s]
@@ -274,7 +274,7 @@
          (is= (vec ss123) [[1 :a] [2 :a] [3 :a]])
          (is= ss13 #{[1 :a] [3 :a]}))
 
-       (is (map? (td/tag-eid 3)))
+       (is (map? (->Eid 3)))
        (is (map? {:a 1}))
        (is (record? (td/tag-idx 3)))
        (isnt (record? {:a 1}))
@@ -285,18 +285,18 @@
        (let [idx (-> (index/empty-index)
 
                    (index/add-entry [1 3])
-                   (index/add-entry [1 (td/tag-eid 3)])
+                   (index/add-entry [1 (->Eid 3)])
                    (index/add-entry [1 1])
-                   (index/add-entry [1 (td/tag-eid 1)])
+                   (index/add-entry [1 (->Eid 1)])
                    (index/add-entry [1 2])
-                   (index/add-entry [1 (td/tag-eid 2)])
+                   (index/add-entry [1 (->Eid 2)])
 
                    (index/add-entry [0 3])
-                   (index/add-entry [0 (td/tag-eid 3)])
+                   (index/add-entry [0 (->Eid 3)])
                    (index/add-entry [0 1])
-                   (index/add-entry [0 (td/tag-eid 1)])
+                   (index/add-entry [0 (->Eid 1)])
                    (index/add-entry [0 2])
-                   (index/add-entry [0 (td/tag-eid 2)]))]
+                   (index/add-entry [0 (->Eid 2)]))]
          (is= (td/tagval-walk-compact (vec idx))
            [[0 1]
             [0 2]
@@ -447,7 +447,7 @@
                           [2 {:eid 1005} :b] [2 {:eid 1002} :a] [1 {:eid 1007} :c]
                           [2 {:eid 1008} :c] [1 {:eid 1001} :a] [1 {:eid 1004} :b]}})
            ;---------------------------------------------------------------------------------------------------
-           (is= (td/tagval-walk-compact (lookup [(td/tag-eid 1003) nil nil]))
+           (is= (td/tagval-walk-compact (lookup [(->Eid 1003) nil nil]))
              [[{:eid 1003} :a 3]])
            (is= (td/tagval-walk-compact (lookup [nil :b nil]))
              [[{:eid 1004} :b 1]
@@ -471,9 +471,9 @@
            ;---------------------------------------------------------------------------------------------------
            (is= (td/tagval-walk-compact (lookup [nil :a 3]))
              [[{:eid 1003} :a 3]])
-           (is= (td/tagval-walk-compact (lookup [(td/tag-eid 1009) nil 3]))
+           (is= (td/tagval-walk-compact (lookup [(->Eid 1009) nil 3]))
              [[{:eid 1009} :c 3]])
-           (is= (td/tagval-walk-compact (lookup [(td/tag-eid 1005) :b nil]))
+           (is= (td/tagval-walk-compact (lookup [(->Eid 1005) :b nil]))
              [[{:eid 1005} :b 2]]))))
 
        (dotest
@@ -640,7 +640,7 @@
          '(tupelo.data/search-triple-fn (quote [a b c])))
 
        (is= (td/search-triple 123 :color "Joey")
-         [(td/tag-eid 123) :color "Joey"]))
+         [(->Eid 123) :color "Joey"]))
 
        (dotest
        (with-tdb (new-tdb)
@@ -759,7 +759,7 @@
                  r2 (only (td/index-find-leaf 7))]
              (is= r1 {:e 1004, :i 2})
              (is= (td/eid->edn 1004) [5 6 7])
-             (is= r2 (tag-eid 1004))
+             (is= r2 (->Eid 1004))
              (is= (td/eid->edn (<val r2)) [5 6 7])))))
 
      (dotest
@@ -787,12 +787,12 @@
            (is= (td/untag-query-results [{(tag-param :a) 1}])
              [{:a 1}])
            (is= (td/tagval-walk-compact
-                  (td/untag-query-results [{(tag-param :x) (tag-eid 1001),
-                                            (tag-param :y) (tag-eid 1002),
+                  (td/untag-query-results [{(tag-param :x) (->Eid 1001),
+                                            (tag-param :y) (->Eid 1002),
                                             (tag-param :a) 1}]))
              [{:x 1001, :y 1002, :a 1}])
            (is= (td/tagval-walk-compact
-                  (td/untag-query-results [{(tag-param :e) (tag-eid 1003)
+                  (td/untag-query-results [{(tag-param :e) (->Eid 1003)
                                             (tag-param :i) 2}]))
              [{:e 1003, :i 2}])
 
