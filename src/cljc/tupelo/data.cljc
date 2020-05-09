@@ -152,25 +152,18 @@
                         (t/cond-it-> item
                           (instance? Eid it) {:eid (<val it)}
                           (instance? Idx it) {:idx (<val it)}
-                          (or (tagval? it)
-                            (tagval-map? it)) {(grab :tag it) (grab :val it)}))
+                          (instance? Key it) {:key (<val it)}
+
+                          (or (tagval? it) ; #todo remove this when conversion finished
+                            (tagval-map? it)) {(grab :tag it) (grab :val it)}
+                          ))
          data))
 
      ;-----------------------------------------------------------------------------
-
      ; #todo inline all of these?
      (s/defn tag-param :- TagVal
        [arg :- s/Any] (->TagVal :param (t/->kw arg)))
 
-     (s/defn tag-eid-orig :- TagVal
-       [eid :- s/Int] (->TagVal :eid (t/validate int? eid)))
-     (s/defn tag-idx-orig :- TagVal
-       [idx :- s/Int] (->TagVal :idx (t/validate int? idx)))
-
-     (s/defn tag-eid [arg] (->Eid arg))
-     (s/defn tag-idx [idx] (->Idx idx))
-
-     ; (defn pair-map? [arg] (and (map? arg) (= 1 (count arg))))
      (defn tagged-param? [x] (and (= TagVal (type x)) (= :param (<tag x))))
      (defn tagged-eid? [x]
        (or (Eid? x)
