@@ -11,7 +11,7 @@
   #?(:clj (:require
             [tupelo.core :as t :refer [spy spyx spyxx spyx-pretty with-spy-indent
                                        grab glue map-entry indexed only only2 xfirst xsecond xthird xlast xrest not-empty?
-                                       it-> forv vals->map fetch-in let-spy
+                                       it-> cond-it-> forv vals->map fetch-in let-spy
                                        keep-if drop-if append prepend ->sym ->kw kw->sym
                                        ]]
             [tupelo.data.index :as index]
@@ -86,6 +86,9 @@
        ITag (<tag [this] tag)
        IVal (<val [this] val))
 
+     (defrecord Param
+       [val]
+       IVal (<val [this] val))
      (defrecord Eid
        [val]
        IVal (<val [this] val))
@@ -93,14 +96,26 @@
        [val]
        IVal (<val [this] val))
 
+     (s/defn Eid? :- s/Bool
+       [arg :- s/Any] (instance? Eid arg))
+     (s/defn Idx? :- s/Bool
+       [arg :- s/Any] (instance? Idx arg))
+
      ; ***** fails strangely under lein-test-refresh after 1st file save if define this using Plumatic schema *****
      (defn tagval? ; :- s/Bool
        [arg] (= TagVal (type arg)))
 
      (s/defn untagged :- s/Any
        [arg :- s/Any]
-       (t/cond-it-> arg
-         (tagval? arg) (<val arg)))
+       (cond
+         (Eid? arg) (<val arg)
+         (tagval? arg) (<val arg)
+         :else arg))
+
+     (defmethod print-method Eid
+       [tv ^java.io.Writer writer]
+       (.write writer
+         (format "<Eid %s>" (<val tv))))
 
      (defmethod print-method TagVal
        [tv ^java.io.Writer writer]
@@ -126,21 +141,26 @@
          data))
 
      ;-----------------------------------------------------------------------------
+
      ; #todo inline all of these?
      (s/defn tag-param :- TagVal
        [arg :- s/Any] (->TagVal :param (t/->kw arg)))
-     (s/defn tag-eid :- TagVal
+
+     (s/defn tag-eid-orig :- TagVal
        [eid :- s/Int] (->TagVal :eid (t/validate int? eid)))
+     (s/defn tag-eid [arg] (->Eid arg))
+
+     (s/defn tag-idx-orig :- TagVal
+       [idx :- s/Int] (->TagVal :idx (t/validate int? idx)))
      (s/defn tag-idx :- TagVal
        [idx :- s/Int] (->TagVal :idx (t/validate int? idx)))
-     (s/defn eid :- Eid
-       [arg :- s/Int] (->Eid (t/validate int? arg)))
-     (s/defn idx :- Idx
-       [arg :- s/Int] (->Idx (t/validate int? arg)))
 
      ; (defn pair-map? [arg] (and (map? arg) (= 1 (count arg))))
      (defn tagged-param? [x] (and (= TagVal (type x)) (= :param (<tag x))))
-     (defn tagged-eid? [x] (and (= TagVal (type x)) (= :eid (<tag x))))
+     (defn tagged-eid? [x]
+       (or (Eid? x)
+         (and (= TagVal (type x))
+           (= :eid (<tag x)))))
 
      (defn idx-literal? [x] (and (map? x) (= [:idx] (keys x))))
      (defn idx-literal->tagged [x] (tag-idx (only (vals x))))
@@ -243,7 +263,7 @@
        (def EidType
          "The Plumatic Schema type name for a pointer to a tdb node (abbrev. for Hex ID)"
          s/Int)
-       ;(s/defn eid? :- s/Bool ; #todo keep?  rename -> validate-eid  ???
+       ;(s/defn eid-data? :- s/Bool ; #todo keep?  rename -> validate-eid  ???
        ;  "Returns true iff the arg type is a legal EID value"
        ;  [arg] (int? arg))
        )
@@ -348,7 +368,7 @@
 
      (def TDB
        "Plumatic Schema type definition for tupelo.data DB"
-       {:eid-type {TagVal s/Keyword}
+       {:eid-type {Eid s/Keyword}
         :idx-eav  #{tsk/Triple}
         :idx-ave  #{tsk/Triple}
         :idx-vea  #{tsk/Triple} })
@@ -385,9 +405,8 @@
 
      (s/defn eid->type
        "Returns the type of an entity"
-       [teid :- TagVal]
-       (assert (= :eid (<tag teid)))
-       (fetch-in (deref *tdb*) [:eid-type teid]))
+       [eid :- Eid]
+       (fetch-in (deref *tdb*) [:eid-type eid]))
 
      ; #todo add tsk/Set
      (do  ; keep these in sync
@@ -424,7 +443,7 @@
        "Reset the eid-count to its initial value"
        [] (reset! eid-counter eid-count-base))
 
-     (s/defn ^:no-doc new-eid :- EidType
+     (s/defn ^:no-doc new-eid :- EidType ; #todo maybe return Eid record???
        "Returns the next integer EID"
        [] (swap! eid-counter inc))
 
@@ -461,16 +480,14 @@
 
      ; #todo need to handle sets
      (s/defn ^:no-doc eid->edn-impl :- s/Any
-       [teid :- TagVal ; Eid
-        ]
-       (spyx teid)
+       [teid :- Eid ]
        (let [eav-matches (index/prefix-match->seq [teid] (grab :idx-eav @*tdb*))
              result-map  (apply glue
                            (forv [[-teid-match- attr val-match] eav-matches]
                              (do
                                (assert (= teid -teid-match-))
                                (let [val-edn (t/cond-it-> val-match
-                                               (tagged-eid? it) (eid->edn-impl it))]
+                                               (Eid? it) (eid->edn-impl it))]
                                  (t/map-entry attr val-edn)))))
              ; >>          (spyx-pretty result-map)
              result-out  (let [entity-type (fetch-in @*tdb* [:eid-type teid])]
@@ -483,9 +500,13 @@
 
      (s/defn eid->edn :- s/Any ; #todo reimplement in terms of walk-entity ???
        "Returns the EDN subtree rooted at a eid."
-       [eid-in :- s/Int]
-       (eid->edn-impl (tag-eid eid-in)))
-
+       [eid-in ; :- (s/pred Eid s/Int) ; #todo fix
+        ]
+       (assert (or (int? eid-in  )
+                 (Eid? eid-in)))
+       (eid->edn-impl ; #todo fix crutch
+         (cond-it-> eid-in
+           (int? it) (->Eid it))))
 
      ;---------------------------------------------------------------------------------------------------
      (def Interceptor ; #todo tupelo.schema (& tupelo.forest)
@@ -496,7 +517,7 @@
 
      ; #todo need to handle sets
      (s/defn ^:no-doc walk-entity-impl :- s/Any
-       [teid :- TagVal
+       [teid :- Eid
         interceptor :- Interceptor]
        (with-spy-indent
          (let [enter-fn    (grab :enter interceptor)
@@ -506,7 +527,7 @@
              (enter-fn eav-curr)
              (let [[-e- -a- v] eav-curr]
                (assert (= teid -e-)) ; #todo temp
-               (when (tagged-eid? v)
+               (when (Eid? v)
                  (walk-entity-impl v interceptor)))
              (leave-fn eav-curr)
              nil))))
@@ -515,7 +536,7 @@
        "Recursively walks a subtree rooted at an entity, applying the supplied `:enter` and ':leave` functions
         to each node.   Usage:
 
-            (walk-entiry <eid> intc-map)
+            (walk-entiry <eid-in> intc-map)
 
         where `intc-map` is an interceptor map like:
 
@@ -526,8 +547,8 @@
 
             (fn [triple-eav] ...)
 
-        where `eid` specifies the root of the sub-tree being walked. Returns nil."
-       [eid :- EidType
+        where `eid-in` specifies the root of the sub-tree being walked. Returns nil."
+       [eid-in :- EidType
         intc-map :- tsk/KeyMap]
        (let [legal-keys   #{:id :enter :leave}
              counted-keys #{:enter :leave}
@@ -541,10 +562,8 @@
        (let [enter-fn              (get intc-map :enter t/noop)
              leave-fn              (get intc-map :leave t/noop)
              canonical-interceptor (glue intc-map {:enter enter-fn :leave leave-fn})]
-         (walk-entity-impl (tag-eid eid) canonical-interceptor))
+         (walk-entity-impl (->Eid eid-in) canonical-interceptor))
        nil)
-
-
 
 ;-----------------------------------------------------------------------------
      (s/defn lookup :- [tsk/Triple] ; #todo maybe use :unk or :* for unknown?
@@ -587,7 +606,7 @@
 
      ;-----------------------------------------------------------------------------
      (s/defn ^:no-doc array-entity-rerack
-       [teid :- TagVal] ; #todo make all require db param
+       [teid :- Eid] ; #todo make all require db param
        (when (not= :array (eid->type teid))
          (throw (ex-info "non-array found" (vals->map teid))))
        (let [idx-eav      (grab :idx-eav (deref *tdb*))
@@ -607,7 +626,7 @@
          edn
          (add-edn-impl edn)))
 
-     (s/defn ^:no-doc add-edn-impl :- TagVal ; EidType ; #todo maybe rename:  load-edn->eid  ???
+     (s/defn ^:no-doc add-edn-impl :- Eid ; #todo maybe rename:  load-edn->eid  ???
        [edn-in :- s/Any]
        ;(spyq :-----------------------------------------------------------------------------)
        ;(newline)
@@ -615,7 +634,7 @@
        (with-spy-indent
          (when-not (entity-like? edn-in)
            (throw (ex-info "invalid edn-in" (vals->map edn-in))))
-         (let [teid         (tag-eid (new-eid))
+         (let [teid         (->Eid (new-eid))
                entity-type  (edn->type edn-in) ]
            ;(newline)
            ;(spyx-pretty entity-type)
@@ -652,7 +671,7 @@
        (when-not (primitive? attr-in) ; #todo generalize?
          (throw (ex-info "Attribute must be primitive (non-collection) type" (vals->map attr-in edn-in))))
        (with-spy-indent
-         (let [teid        (tag-eid eid)
+         (let [teid        (->Eid eid)
                idx-eav     (grab :idx-eav (deref *tdb*))
                entity-type (fetch-in @*tdb* [:eid-type teid])
                >>          (when (nil? entity-type)
@@ -675,7 +694,7 @@
        (when-not (primitive? edn-in) ; #todo generalize?
          (throw (ex-info "Attribute must be primitive (non-collection) type" (vals->map edn-in))))
        (with-spy-indent
-         (let [teid        (tag-eid eid)
+         (let [teid        (->Eid eid)
                idx-eav     (grab :idx-eav (deref *tdb*))
                entity-type (eid->type teid)
                ea-triples  (index/prefix-match->seq [teid edn-in] idx-eav)
@@ -699,7 +718,7 @@
        (when-not (int? idx-in)
          (throw (ex-info "Index must be integer type" (vals->map eid idx-in ))))
        (with-spy-indent
-         (let [teid        (tag-eid eid)
+         (let [teid        (->Eid eid)
                tidx        (tag-idx idx-in)
                idx-eav     (grab :idx-eav (deref *tdb*))
                entity-type (eid->type teid)
@@ -727,26 +746,26 @@
        (let [[-e- -a- v] triple-eav]
          (when-not (db-contains-triple? triple-eav)
            (throw (ex-info "triple not found" (vals->map triple-eav))))
-         (when (tagged-eid? v)
+         (when (Eid? v)
            (remove-entity (<val v)))
          (db-remove-triple triple-eav)))
 
      (s/defn ^:no-doc remove-entity
-       [eid :- EidType] ; #todo add db arg version
-       (let [idx-eav (grab :idx-eav (deref *tdb*))
-             teid (tag-eid eid)
-             eav-triples (index/prefix-match->seq [teid] idx-eav) ]
+       [eid-in :- EidType] ; #todo add db arg version
+       (let [idx-eav     (grab :idx-eav (deref *tdb*))
+             teid        (->Eid eid-in)
+             eav-triples (index/prefix-match->seq [teid] idx-eav)]
          (when (empty? eav-triples)
-           (throw (ex-info "entity not found" (vals->map eid))))
+           (throw (ex-info "entity not found" (vals->map eid-in))))
          (swap! *tdb* dissoc-in [:eid-type teid])
          (doseq [triple-eav eav-triples]
            (remove-triple triple-eav))))
 
      (s/defn remove-entity-elem
        "Recursively removes an element EAV triple of data from the db."
-       [eid  :- EidType
+       [eid-in  :- EidType
         attr :- AttrTypeInput] ; #todo add db arg version
-       (let [teid        (tag-eid eid)
+       (let [teid        (->Eid eid-in)
              tattr       (if (int? attr)
                            (tag-idx attr)
                            attr)
@@ -764,13 +783,13 @@
 
      (s/defn remove-root-entity
        "Recursively removes an entity from the db."
-       [eid :- EidType] ; #todo add db arg version
+       [eid-in :- EidType] ; #todo add db arg version
        (let [idx-vea     (grab :idx-vea (deref *tdb*))
-             teid        (tag-eid eid)
+             teid        (->Eid eid-in)
              vea-triples (index/prefix-match->seq [teid] idx-vea)]
          (when (not-empty? vea-triples)
-           (throw (ex-info "entity not root" (vals->map eid))))
-         (remove-entity eid)))
+           (throw (ex-info "entity not root" (vals->map eid-in))))
+         (remove-entity eid-in)))
 
      ; #todo remove-array-elem
      ; #todo remove-map-entry
@@ -908,7 +927,7 @@
          (let [[e a v] args
                e-out (if (symbol? e)
                        (tag-param e)
-                       (tag-eid e))
+                       (->Eid e))
                a-out (cond
                        (symbol? a) (tag-param a)
                        (idx-literal? a) (idx-literal->tagged a)
@@ -931,7 +950,7 @@
        (and (list? form)
          (= (quote search-triple) (xfirst form))))
 
-     (s/defn index-find-leaf :- [TagVal]
+     (s/defn index-find-leaf :- [Eid]
        [target :- Primitive]
        ; (println :index-find-leaf )
        (let [results (query-triples+preds
@@ -1107,9 +1126,6 @@
 
                    param-raw (<val me-key)
                    val-raw   (untagged me-val) ; me-val might not be a TagVal
-                   ;(cond ; #todo kill this if continues to work
-                   ;  (tagged-eid? me-val) (<val me-val)
-                   ;  :else me-val)
                    ]
                {param-raw val-raw})))))
 
