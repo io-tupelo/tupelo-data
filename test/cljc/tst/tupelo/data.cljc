@@ -14,7 +14,7 @@
                                        it-> fetch-in
                                        ]]
             [tupelo.data :as td :refer [with-tdb new-tdb eid-count-reset lookup query-triples query-triples->tagged boolean->binary search-triple
-                                        *tdb* <tag <val tag-param ->Eid Eid? ->Idx Idx? ->Prim Prim? ->Param Param?
+                                        *tdb* <tag <val ->Eid Eid? ->Idx Idx? ->Prim Prim? ->Param Param?
                                         ]]
             [clojure.string :as str]
             [schema.core :as s]
@@ -550,19 +550,18 @@
                                      [pred1 pred2]))
                [{{:param :x} {:eid 1001}}])))))
 
-       (dotest
-       (let [search-param-x (td/->SearchParam x)]
-         (is= search-param-x (->Param :x))
-         (is= search-param-x (->Param :x))
-         (is= (unlazy search-param-x) {:tag :param, :val :x})
-         (is= :param (<tag search-param-x))
-         (is= :x (<val search-param-x)))
-       (is= (td/search-triple x y z)
-         [(td/->SearchParam x)
-          (td/->SearchParam y)
-          (td/->SearchParam z)]))
+     ;(dotest
+     ;  (let [search-param-x (td/->SearchParam x)]
+     ;    (is= search-param-x (->Param :x))
+     ;    (is= search-param-x (->Param :x))
+     ;    (is= (unlazy search-param-x) {:tag :param, :val :x})
+     ;    (is= :param (<tag search-param-x))
+     ;    (is= :x (<val search-param-x)))
+     ;  (is= (td/search-triple x y z)
+     ;    [(td/->SearchParam x)
+     ;     (td/->SearchParam y)
+     ;     (td/->SearchParam z)]))
 
-     (comment ; <<comment>>
        (dotest
        (with-tdb (new-tdb)
          (eid-count-reset)
@@ -579,19 +578,19 @@
               :idx-vea  #{[1 {:eid 1001} :b]
                           [1 {:eid 1001} :a]}} ))
 
-         (let [search-spec [[(td/->TagVal :param :x) :a 1]]]
+         (let [search-spec [[(->Param :x) :a 1]]]
            (is= (td/walk-compact (query-triples->tagged search-spec))
              [{{:param :x} {:eid 1001}}])
            (is= (td/walk-compact (query-triples search-spec))
              [{:x 1001}]))
 
-         (let [search-spec [[(td/->TagVal :param :x) :b 1]]]
+         (let [search-spec [[(->Param :x) :b 1]]]
            (is= (td/walk-compact (query-triples->tagged search-spec))
              [{{ :param :x} { :eid 1001}}])
            (is= (td/walk-compact (query-triples search-spec))
              [{:x 1001}]))
 
-         (let [search-spec [[(tag-param :x) (td/->TagVal :param :y) 1]]]
+         (let [search-spec [[{:param :x} (->Param :y) 1]]] ; both ways work
            (is= (td/walk-compact (query-triples->tagged search-spec))
              [{{:param :x} {:eid 1001}, {:param :y} :a}
               {{:param :x} {:eid 1001}, {:param :y} :b}])
@@ -599,7 +598,7 @@
              [{:x 1001, :y :a}
               {:x 1001, :y :b}]))))
 
-       (dotest
+     (dotest
        (with-tdb (new-tdb)
          (eid-count-reset)
          (let [edn-val  {:a {:b 2}}
@@ -614,12 +613,12 @@
                           [{:eid 1002} {:eid 1001} :a]}})
            ; (prn :-----------------------------------------------------------------------------)
            ; compound search
-           (is= (td/walk-compact (spyx-pretty (query-triples->tagged [[(tag-param :x) :a (tag-param :y)]
-                                                                      [(tag-param :y) :b 2]])))
+           (is= (td/walk-compact (query-triples->tagged [[{:param :x} :a {:param :y}]
+                                                                       [{:param :y} :b 2]]))
              [{{:param :x} {:eid 1001},
                {:param :y} {:eid 1002}}])
-           (is= (td/walk-compact (query-triples [[(tag-param :x) :a (tag-param :y)]
-                                                        [(tag-param :y) :b 2]]))
+           (is= (td/walk-compact (query-triples [[(->Param :x) :a (->Param :y)]
+                                                 [(->Param :y) :b 2]]))
              [{:x 1001 :y 1002}])
 
            ; (prn :-----------------------------------------------------------------------------)
@@ -630,14 +629,14 @@
                                    [{:param :y} :b 99]]))
            ; (prn :-----------------------------------------------------------------------------)
            ; wildcard search - match all
-           (is= (td/walk-compact (query-triples->tagged [[(tag-param :x) (tag-param :y) (tag-param :z)]]))
+           (is= (td/walk-compact (query-triples->tagged [[{:param :x} {:param :y} {:param :z}]]))
              [{{:param :x} {:eid 1001}
                {:param :y} :a
                {:param :z} {:eid 1002}}
               {{:param :x} {:eid 1002}
                {:param :y} :b
                {:param :z} 2}])
-           (is= (td/walk-compact (query-triples [[(tag-param :x) (tag-param :y) (tag-param :z)]]))
+           (is= (td/walk-compact (query-triples [[(->Param :x) (->Param :y) (->Param :z)]]))
              [{:x 1001, :y :a, :z 1002}
               {:x 1002, :y :b, :z 2}]))))
 
@@ -709,7 +708,7 @@
                                                 {:eid ? :a a}]))))
 
        (dotest
-       (is (td/param-tmp-eid? (tag-param :tmp-eid-99999)))
+       (is (td/param-tmp-eid? (->Param :tmp-eid-99999)))
        (is (td/tmp-attr-kw? :tmp-attr-99999)))
 
        ;---------------------------------------------------------------------------------------------------
@@ -798,16 +797,17 @@
            (throws? (td/exclude-reserved-identifiers {:a {:tmp-eid-123 :x}}))
            (throws? (td/exclude-reserved-identifiers (quote {:a {:x [1 2 3 tmp-eid-123 4 5 6]}})))
 
-           (is= (td/untag-query-results [{(tag-param :a) 1}])
+           (is= (td/untag-query-results [{(->Param :a) 1}])
              [{:a 1}])
            (is= (td/walk-compact
-                  (td/untag-query-results [{(tag-param :x) (->Eid 1001),
-                                            (tag-param :y) (->Eid 1002),
-                                            (tag-param :a) 1}]))
+                  (td/untag-query-results [{(->Param :x) (->Eid 1001),
+                                            (->Param :y) (->Eid 1002),
+                                            (->Param :a) 1}]))
              [{:x 1001, :y 1002, :a 1}])
+
            (is= (td/walk-compact
-                  (td/untag-query-results [{(tag-param :e) (->Eid 1003)
-                                            (tag-param :i) 2}]))
+                  (td/untag-query-results [{(->Param :e) (->Eid 1003)
+                                            (->Param :i) 2}]))
              [{:e 1003, :i 2}])
 
            (is= (td/query [{:map     {:a a1}
@@ -880,7 +880,6 @@
            (is= salary-avg-attending 101000)
            (is= salary-avg-resident 41000)
            (is= salary-avg-volunteer 0))))
-
 
      (dotest
        (td/with-tdb (td/new-tdb)
@@ -1078,7 +1077,7 @@
            (is= (td/eid->edn (grab :eid (only found)))
              {:a 1 :x :first}))))
 
-       (dotest
+     (dotest
        (td/with-tdb (td/new-tdb)
          (let [data     [{:a 1 :b 1 :c 1}
                          {:a 1 :b 2 :c 2}
@@ -1114,7 +1113,7 @@
                [{:a 1, :b 1, :c 1}
                 {:a 1, :b 1, :c 3}])))))
 
-       (dotest
+     (dotest
        (is= (td/seq->idx-map [:a :b :c]) {0 :a, 1 :b, 2 :c})
 
        (td/with-tdb (td/new-tdb)
@@ -1297,7 +1296,7 @@
               {:zip "46203", :city "Townville"}
               {:zip "12345", :city "Cityvillage"}]))))
 
-       (dotest
+     (dotest
        (td/with-tdb (td/new-tdb)
          (let [people   [{:name      "jimmy"
                           :addresses [{:address1  "123 street ave"
@@ -1332,7 +1331,7 @@
              [{:name "jimmy", :address1 "543 Other St"}
               {:name "joel", :address1 "2026 park ave"}]))))
 
-       (dotest
+     (dotest
        (td/eid-count-reset)
        (td/with-tdb (td/new-tdb)
          (let [root-eid (td/add-edn users-and-accesses)]
@@ -1450,12 +1449,12 @@
            )))
 
        (dotest
-       (let [query-result {(tv :param :tmp-eid-36493) (tv :eid 1003)
-                           (tv :param :name)          "jimmy"
-                           (tv :param :date)          "12-25-1900"
-                           (tv :param :zip-acc)       "11201"
-                           (tv :param :id)            42
-                           (tv :param :zip-pref)      "11201"}
+       (let [query-result {(->Param :tmp-eid-36493) (->Eid 1003)
+                           (->Param :name)          "jimmy"
+                           (->Param :date)          "12-25-1900"
+                           (->Param :zip-acc)       "11201"
+                           (->Param :id)            42
+                           (->Param :zip-pref)      "11201"}
              result       (td/eval-with-tagged-params query-result
                             (quote [
                                    ;(println :name-3 name)
@@ -1463,7 +1462,7 @@
                                     (+ 42 7)]))]
          (is= result 49) ))
 
-     (dotest
+       (dotest
        (td/eid-count-reset)
        (td/with-tdb (td/new-tdb)
          (let [root-eid (td/add-edn users-and-accesses)]
@@ -1493,6 +1492,7 @@
               {:description "Resistance Infiltrator" :widget-code "Model-102" :producer-code "Cyberdyne" :wtc "t800"}
               {:description "Mimetic polyalloy" :widget-code "Model-201" :producer-code "Cyberdyne" :wtc "t1000"}
               {:description "Boom!" :widget-code "Dynamite" :producer-code "ACME" :wtc "c40"}]))))
+
 
        (comment ; demo and poc for td/construct
        (def a-1400 1401)
@@ -1524,7 +1524,7 @@
              {:likes {:a 1, :b 2}}
              ))))
 
-     (dotest
+       (dotest
        (td/eid-count-reset)
        (td/with-tdb (td/new-tdb)
          (let [root-eid (td/add-edn {:a 1 :b {:c 3 :d [4 5 6]}})
@@ -1625,6 +1625,8 @@
            (is= (td/eid->edn root-eid) [0 1 3 9 {:a 1, :b #{:c :d}}]) )))
 
 
+
+     (comment ; <<comment>>
 
        )  ; <<comment>>
 

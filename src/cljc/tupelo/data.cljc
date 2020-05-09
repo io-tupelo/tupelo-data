@@ -11,7 +11,7 @@
   #?(:clj (:require
             [tupelo.core :as t :refer [spy spyx spyxx spyx-pretty with-spy-indent
                                        grab glue map-entry indexed only only2 xfirst xsecond xthird xlast xrest not-empty?
-                                       it-> cond-it-> forv vals->map fetch-in let-spy
+                                       it-> cond-it-> forv vals->map fetch-in let-spy sym->kw
                                        keep-if drop-if append prepend ->sym ->kw kw->sym
                                        ]]
             [tupelo.data.index :as index]
@@ -197,9 +197,6 @@
 
      ;-----------------------------------------------------------------------------
      ; #todo inline all of these?
-     (s/defn tag-param :- TagVal
-       [arg :- s/Any] (->TagVal :param (t/->kw arg)))
-
      (defn tagged-param? [x] (and (= TagVal (type x)) (= :param (<tag x))))
      (defn tagged-eid? [x]
        (or (Eid? x)
@@ -378,8 +375,11 @@
      (s/defn ^:no-doc param-tmp-eid? :- s/Bool
        "Returns true iff arg is a map that looks like {:param :tmp-eid-99999}"
        [arg]
-       (and (tagged-param? arg)
-         (tmp-eid-kw? (<val arg))))
+       (or
+         (and (Param? arg)
+           (tmp-eid-kw? (<val arg)) )
+         (and (tagged-param? arg) ; #todo remove this
+           (tmp-eid-kw? (<val arg)))))
 
      ;-----------------------------------------------------------------------------
      (s/defn ^:no-doc tmp-attr-prefix-str? :- s/Bool
@@ -396,8 +396,12 @@
 
      (s/defn ^:no-doc tmp-attr-param? :- s/Bool
        "Returns true iff arg is a map that looks like {:param :tmp-attr-99999}"
-       [arg] (and (tagged-param? arg)
-               (tmp-attr-kw? (<val arg))))
+       [arg]
+       (or
+         (and (Param? arg)
+             (tmp-attr-kw? (<val arg)))
+         (and (tagged-param? arg) ; #todo remove this
+           (tmp-attr-kw? (<val arg)))))
 
      ;-----------------------------------------------------------------------------
      (def ^:dynamic ^:no-doc *tdb* nil)
@@ -887,7 +891,7 @@
                (let [env-next (glue env env-frame)]
                  (query-triples-impl query-result env-next qspec-rest)))))))
 
-     (s/defn untag-query-result :- tsk/KeyMap
+     (s/defn untag-query-result :- s/Any ; #todo fix, was tsk/KeyMap
        [resmap :- tsk/Map]
        ; (newline) (spyx :unwrap-query-result-enter resmap)
        (let [result (apply glue
@@ -905,7 +909,7 @@
          ; (spyx-pretty :query-triples--results @query-results)
          @query-results))
 
-     (s/defn query-triples :- [tsk/KeyMap]
+     (s/defn query-triples :- s/Any ; #todo fix, was [tsk/KeyMap]
        [qspec-list :- [tsk/Triple]]
        (let [results-tagged (query-triples->tagged qspec-list)
              results-plain  (forv [result-tagged results-tagged]
@@ -953,16 +957,14 @@
          ; (spyx-pretty query-results-tagged-kept)
          query-results-kept))
 
-     (s/defn ^:no-doc ->SearchParam-fn :- Param
-       [arg :- (s/cond-pre s/Keyword s/Symbol)]
-       (->Param (t/->kw arg)))
-
-     (defn ^:no-doc ->SearchParam-impl
-       [arg] `(->SearchParam-fn (quote ~arg)))
-
-     (defmacro ->SearchParam
-       [arg]
-       (->SearchParam-impl arg))
+     ;(s/defn ^:no-doc ->SearchParam-fn :- Param
+     ;  [arg :- (s/cond-pre s/Keyword s/Symbol)]
+     ;  (->Param (t/->kw arg)))
+     ;(defn ^:no-doc ->SearchParam-impl
+     ;  [arg] `(->SearchParam-fn (quote ~arg)))
+     ;(defmacro ->SearchParam
+     ;  [arg]
+     ;  (->SearchParam-impl arg))
 
      (s/defn ^:no-doc search-triple-fn
        [args :- tsk/Triple]
@@ -970,17 +972,17 @@
        (with-spy-indent
          (let [[e a v] args
                e-out (if (symbol? e)
-                       (tag-param e)
+                       (->Param (sym->kw e))
                        (->Eid e))
                ; #todo IMPORTANT! have a conflict for map with int keys {1 :a 2 :b}
                ; #todo need to wrap like (->Key 5) or (->Idx 5)
                a-out (cond
-                       (symbol? a) (tag-param a)
+                       (symbol? a) (->Param (sym->kw a))
                        (int? a) (->Idx a)
                        (tagmap? a) (tagmap-reader a)
                        :else a)
                v-out (if (symbol? v)
-                       (tag-param v)
+                       (->Param (sym->kw v))
                        v)]
            [e-out a-out v-out])))
 
@@ -999,12 +1001,12 @@
 
      (s/defn index-find-leaf :- [Eid]
        [target :- Primitive]
-       ; (println :index-find-leaf )
+       ; (println :index-find-leaf target )
        (let [results (query-triples+preds
-                       [[(tag-param :e) (tag-param :a) target]]
+                       [[(->Param :e) (->Param :a) target]]
                        []) ; no preds
              ; >> (spyx-pretty results)
-             eids    (mapv #(t/fetch % (tag-param :e)) results)]
+             eids    (mapv #(t/fetch % (->Param :e)) results)]
          eids))
 
      (def ^:no-doc ^:dynamic *autosyms-seen* nil)
@@ -1032,10 +1034,11 @@
      (defn ^:no-doc query->triples-impl
        [qmaps]
        (with-spy-indent
-         ;(newline)
-         ;(spyq :-----------------------------------------------------------------------------)
-         ;(spyq :query->triples)
-         ;(spyx qmaps)
+         (when false
+           (newline)
+           (spyq :-----------------------------------------------------------------------------)
+           (spyq :query->triples)
+           (spyx qmaps))
          (doseq [qmap qmaps]
            ; (spyx-pretty qmap)
            (s/validate tsk/Map qmap)
@@ -1045,13 +1048,13 @@
                  map-remaining (dissoc qmap :eid)]
              ; (spyx map-remaining)
              (forv [[kk vv] map-remaining]
-               ;(spyx [kk vv])
+               ; (spyx [kk vv])
                 (cond
                   (symbol? vv) ; #todo clean up conflict with (primitive-data? ...) below
                   (do
                     (let [sym-to-use (autosym-resolve kk vv)
                           triple     (search-triple-fn [eid-val kk sym-to-use])]
-                      ;(spyx :symbol triple)
+                      ; (spyx :symbol triple)
                       (cum-vector-append triple)))
 
                   (sequential? vv) ; (throw (ex-info "not implemented" {:type :sequential :value vv}))
@@ -1070,13 +1073,13 @@
                         triple-modified (search-triple-fn [eid-val kk tmp-eid])
                         ; >>              (spyx triple-modified)
                         qmaps-modified  [(glue {:eid tmp-eid} vv)]]
-                    ;(spyx qmaps-modified)
+                    ; (spyx qmaps-modified)
                     (cum-vector-append triple-modified)
                     (query->triples-impl qmaps-modified))
 
                   (primitive-data? vv)
                   (let [triple (search-triple-fn [eid-val kk vv])]
-                    ; (spyx triple)
+                     ; (spyx triple)
                     (cum-vector-append triple))
 
                   :else (throw (ex-info "unrecognized value" (vals->map kk vv map-remaining)))
@@ -1137,40 +1140,39 @@
              pred-master   `(clojure.core/every? tupelo.core/truthy?
                                     [true ; sentinal in case of empty list
                                      ~@pred-forms])
-             ;>> (spyx pred-master)
+             ; >> (spyx pred-master)
 
              triples-proc (forv [triple-form triple-forms]
                             ; (spyx triple-form)
                             (let [form-to-eval (cons
                                                  (quote tupelo.data/search-triple)
                                                  (rest triple-form))
-                                  ;>>           (spyx form-to-eval)
+                                  ; >>           (spyx form-to-eval)
                                   form-result  (eval form-to-eval)]
-                              ;(spyx form-result)
+                              ; (spyx form-result)
                               form-result))]
 
          (let [map-triples    (query->triples maps-in)
                search-triples (glue map-triples triples-proc)]
-           ;(spyx-pretty map-triples)
+           ; (spyx-pretty map-triples)
            (let [unfiltered-results (query-triples+preds
                                       search-triples
                                       pred-master)
-                 ;>>                 (spyx unfiltered-results)
+                 ; >>                 (spyx unfiltered-results)
                  filtered-results   (query-results-filter-tmp-attr-mapentry
                                       (query-results-filter-tmp-eid-mapentry
                                         unfiltered-results))]
-             ;(spyx-pretty :query->wrapped-fn-leave filtered-results)
+             ; (spyx-pretty :query->wrapped-fn-leave filtered-results)
              filtered-results))))
 
-     (s/defn untag-query-results :- [tsk/KeyMap]
+     (s/defn untag-query-results :- s/Any ; #todo fix, was [tsk/KeyMap]
        [query-result-maps]
        (forv [result-map query-result-maps]
          (apply glue
            (forv [mapentry result-map]
              (let [[me-key me-val] mapentry
-                   ; >> (spyxx me-key)
-                   ; >> (spyxx me-val)
-
+                   ; >> (spyx me-key)
+                   ; >> (spyx me-val)
                    param-raw (<val me-key)
                    val-raw   (untagged me-val) ; me-val might not be a TagVal
                    ]
