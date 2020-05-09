@@ -550,18 +550,6 @@
                                      [pred1 pred2]))
                [{{:param :x} {:eid 1001}}])))))
 
-     ;(dotest
-     ;  (let [search-param-x (td/->SearchParam x)]
-     ;    (is= search-param-x (->Param :x))
-     ;    (is= search-param-x (->Param :x))
-     ;    (is= (unlazy search-param-x) {:tag :param, :val :x})
-     ;    (is= :param (<tag search-param-x))
-     ;    (is= :x (<val search-param-x)))
-     ;  (is= (td/search-triple x y z)
-     ;    [(td/->SearchParam x)
-     ;     (td/->SearchParam y)
-     ;     (td/->SearchParam z)]))
-
        (dotest
        (with-tdb (new-tdb)
          (eid-count-reset)

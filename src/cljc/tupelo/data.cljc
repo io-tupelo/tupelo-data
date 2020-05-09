@@ -957,15 +957,6 @@
          ; (spyx-pretty query-results-tagged-kept)
          query-results-kept))
 
-     ;(s/defn ^:no-doc ->SearchParam-fn :- Param
-     ;  [arg :- (s/cond-pre s/Keyword s/Symbol)]
-     ;  (->Param (t/->kw arg)))
-     ;(defn ^:no-doc ->SearchParam-impl
-     ;  [arg] `(->SearchParam-fn (quote ~arg)))
-     ;(defmacro ->SearchParam
-     ;  [arg]
-     ;  (->SearchParam-impl arg))
-
      (s/defn ^:no-doc search-triple-fn
        [args :- tsk/Triple]
        ; (assert (= 3 (count args)))
