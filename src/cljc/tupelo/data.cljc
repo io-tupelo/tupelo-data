@@ -76,7 +76,6 @@
        "Convert true => 1, false => 0"
        [arg :- s/Bool] (if arg 1 0))
 
-
      ;-----------------------------------------------------------------------------
      (defprotocol IVal (<val [this]))
      (defprotocol ITag (<tag [this]))
@@ -86,29 +85,37 @@
        ITag (<tag [this] tag)
        IVal (<val [this] val))
 
-     (defrecord Param
-       [param]
-       IVal (<val [this] param))
+     ; ***** fails strangely under lein-test-refresh after 1st file save if define this using Plumatic schema *****
+     (defn tagval? ; :- s/Bool
+       [arg] (= TagVal (type arg)))
+
+     (defmethod print-method TagVal
+       [tv ^java.io.Writer writer]
+       (.write writer
+         (format "<%s %s>" (<tag tv) (<val tv))))
+
+     ;-----------------------------------------------------------------------------
      (defrecord Eid
        [eid]
        IVal (<val [this] eid))
      (defrecord Idx
        [idx]
        IVal (<val [this] idx))
-     (defrecord Key
-       [key]
-       IVal (<val [this] key))
+     (defrecord Prim
+       [prim]
+       IVal (<val [this] prim))
+     (defrecord Param
+       [param]
+       IVal (<val [this] param))
 
      (s/defn Eid? :- s/Bool
        [arg :- s/Any] (instance? Eid arg))
      (s/defn Idx? :- s/Bool
        [arg :- s/Any] (instance? Idx arg))
-     (s/defn Key? :- s/Bool
-       [arg :- s/Any] (instance? Key arg))
-
-     ; ***** fails strangely under lein-test-refresh after 1st file save if define this using Plumatic schema *****
-     (defn tagval? ; :- s/Bool
-       [arg] (= TagVal (type arg)))
+     (s/defn Prim? :- s/Bool
+       [arg :- s/Any] (instance? Prim arg))
+     (s/defn Param? :- s/Bool
+       [arg :- s/Any] (instance? Param arg))
 
      (s/defn untagged :- s/Any
        [arg :- s/Any]
@@ -128,23 +135,48 @@
        (.write writer
          (format "<Idx %s>" (<val tv))))
 
-     (defmethod print-method Key
+     (defmethod print-method Prim
        [tv ^java.io.Writer writer]
        (.write writer
-         (format "<Key %s>" (<val tv))))
+         (format "<Prim %s>" (<val tv))))
 
-     (defmethod print-method TagVal
+     (defmethod print-method Param
        [tv ^java.io.Writer writer]
        (.write writer
-         (format "<%s %s>" (<tag tv) (<val tv))))
+         (format "<Param %s>" (<val tv))))
 
-     (s/defn tagval-map? :- s/Bool
-       "Returns true iff arg is a map that looks like a TagVal record:  {:tag :something :val 42}"
+     ; #todo data-readers for #td/eid #td/idx #td/prim #td/param
+
+     ;-----------------------------------------------------------------------------
+     (s/defn tagmap? :- s/Bool
+       "Returns true iff arg is a map that looks like:  {:some-tag <some-primative>}"
        [item]
        (and (map? item)
-         (= #{:tag :val} (set (keys item)))))
+         (= 1 (count item))
+         (keyword? (only (keys item)))))
 
-     (defn tagval-walk-compact
+     (s/defn tagmap-reader
+       [x :- tsk/KeyMap]
+       (let [tag   (key (only x))
+             value (val (only x))]
+         (cond
+           (= tag :eid) (->Eid value)
+           (= tag :idx) (->Idx value)
+           (= tag :prim) (->Prim value)
+           (= tag :param) (->Param value)
+           :else (throw (ex-info "invalid tag value" (vals->map tag value))))))
+
+     (defn walk-tagmap-reader
+       "Walks a data structure, converting any tagmap record like
+         {:eid 42}  =>  (->Eid 42)"
+       [data]
+       (walk/postwalk (fn [it]
+                        (if (tagmap? it)
+                          (tagmap-reader it)
+                          it))
+         data))
+
+     (defn walk-compact
        "Walks a data structure, converting any TagVal record like
          {:tag :something :val 42}  =>  {:something 42}"
        [data]
@@ -152,12 +184,16 @@
                         (t/cond-it-> item
                           (instance? Eid it) {:eid (<val it)}
                           (instance? Idx it) {:idx (<val it)}
-                          (instance? Key it) {:key (<val it)}
-
-                          (or (tagval? it) ; #todo remove this when conversion finished
-                            (tagval-map? it)) {(grab :tag it) (grab :val it)}
-                          ))
+                          (instance? Prim it) {:prim (<val it)}
+                          (instance? Param it) {:param (<val it)}))
          data))
+
+     ;-----------------------------------------------------------------------------
+     (s/defn tagval-map? :- s/Bool
+       "Returns true iff arg is a map that looks like a TagVal record:  {:tag :something :val 42}"
+       [item]
+       (and (map? item)
+         (= #{:tag :val} (set (keys item)))))
 
      ;-----------------------------------------------------------------------------
      ; #todo inline all of these?
@@ -169,9 +205,6 @@
        (or (Eid? x)
          (and (= TagVal (type x))
            (= :eid (<tag x)))))
-
-     (defn idx-literal? [x] (and (map? x) (= [:idx] (keys x))))
-     (defn idx-literal->tagged [x] (->Idx (only (vals x))))
 
      ;-----------------------------------------------------------------------------
      (defn unquote-form?
@@ -393,7 +426,7 @@
      (s/defn db-pretty :- tsk/KeyMap
        "Returns a pretty version of the DB"
        [db :- TDB]
-       (let [db-compact (tagval-walk-compact db) ; returns plain maps & sets instead of sorted or index
+       (let [db-compact (walk-compact db) ; returns plain maps & sets instead of sorted or index
              result     (it-> (new-tdb)
                           (update it :eid-type glue (grab :eid-type db-compact))
                           (update it :idx-eav glue (grab :idx-eav db-compact))
@@ -819,11 +852,12 @@
      (s/defn ^:no-doc query-triples-impl :- s/Any
        [query-result env qspec-list]
        (t/with-spy-indent
-         ;(println :---------------------------------------------------------------------------------------------------)
-         ;(spyx-pretty env)
-         ;(spyx-pretty qspec-list)
-         ;(spyx-pretty @query-result)
-         ;(newline)
+         (when false
+           (println :---------------------------------------------------------------------------------------------------)
+           (spyx-pretty env)
+           (spyx-pretty qspec-list)
+           (spyx-pretty @query-result)
+           (newline))
          (if (empty? qspec-list)
            (swap! query-result t/append env)
            (let [qspec-curr         (xfirst qspec-list)
@@ -833,7 +867,7 @@
                  ;>>                 (spyx qspec-curr-env)
 
                  {idxs-param :idxs-true
-                  idxs-other :idxs-false} (vec/pred-index tagged-param? qspec-curr-env)
+                  idxs-other :idxs-false} (vec/pred-index Param? qspec-curr-env)
                  qspec-lookup       (vec/set-lax qspec-curr-env idxs-param nil)
                  ;>>                 (spyx idxs-param)
                  ;>>                 (spyx idxs-other)
@@ -843,10 +877,11 @@
                  found-triples      (lookup qspec-lookup)
                  param-frames-found (mapv #(vec/get % idxs-param) found-triples)
                  env-frames-found   (mapv #(zipmap params %) param-frames-found)]
-             ;(spyx params)
-             ;(spyx-pretty found-triples)
-             ;(spyx-pretty param-frames-found)
-             ;(spyx-pretty env-frames-found)
+             (when false
+               (spyx params)
+               (spyx-pretty found-triples)
+               (spyx-pretty param-frames-found)
+               (spyx-pretty env-frames-found))
 
              (forv [env-frame env-frames-found]
                (let [env-next (glue env env-frame)]
@@ -863,8 +898,9 @@
          result))
 
      (s/defn query-triples->tagged
-       [qspec-list :- [tsk/Triple]]
-       (let [query-results (atom [])]
+       [qspec-list-in :- [tsk/Triple]]
+       (let [qspec-list    (walk-tagmap-reader qspec-list-in)
+             query-results (atom [])]
          (query-triples-impl query-results {} qspec-list)
          ; (spyx-pretty :query-triples--results @query-results)
          @query-results))
@@ -877,21 +913,21 @@
          results-plain))
 
      (s/defn eval-with-env-map :- s/Any
-       [env-map :- tsk/KeyMap
+       [env-map :- s/Any ; {Param s/Any} :#todo ???
         & forms] ; from tagged param => (possibly-tagged) value
        ;(spyx-pretty env-map)
        ;(spyx-pretty forms)
        (let [sym-val-pairs (apply glue
                              (forv [[kk vv] env-map]
-                               [(kw->sym kk) vv]))]
+                               [(kw->sym (<val kk)) vv]))]
          ; (spyx-pretty sym-val-pairs)
          (eval
            `(let ~sym-val-pairs
               ~@forms))))
 
-     (s/defn tagged-params->env-map :- tsk/KeyMap
-       [tagged-map :- {TagVal s/Any}] ; from tagged param => (possibly-tagged) value
-       ;(spyx-pretty tagged-map)
+     (s/defn tagged-params->env-map :- s/Any ; #todo was tsk/KeyMap, should be ???
+       [tagged-map :- {Param s/Any}] ; from tagged param => (possibly-tagged) value
+       ; (spyx-pretty tagged-map)
        (let [env-map (apply glue
                        (forv [[kk vv] tagged-map]
                          {(untagged kk) (untagged vv)}))]
@@ -917,9 +953,9 @@
          ; (spyx-pretty query-results-tagged-kept)
          query-results-kept))
 
-     (s/defn ^:no-doc ->SearchParam-fn
+     (s/defn ^:no-doc ->SearchParam-fn :- Param
        [arg :- (s/cond-pre s/Keyword s/Symbol)]
-       (->TagVal :param (t/->kw arg)))
+       (->Param (t/->kw arg)))
 
      (defn ^:no-doc ->SearchParam-impl
        [arg] `(->SearchParam-fn (quote ~arg)))
@@ -941,7 +977,7 @@
                a-out (cond
                        (symbol? a) (tag-param a)
                        (int? a) (->Idx a)
-                       (idx-literal? a) (idx-literal->tagged a)
+                       (tagmap? a) (tagmap-reader a)
                        :else a)
                v-out (if (symbol? v)
                        (tag-param v)
