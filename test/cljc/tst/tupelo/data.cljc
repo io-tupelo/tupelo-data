@@ -13,13 +13,13 @@
                                        only only2 forv glue grab nl keep-if drop-if ->sym xfirst xsecond xthird
                                        ]]
             [tupelo.data :as td :refer [with-tdb new-tdb eid-count-reset lookup query-triples query-triples->tagged boolean->binary search-triple
-                                        *tdb* <tag <val tag-param tag-eid tag-idx
+                                        *tdb* <tag <val tag-param tag-eid tag-idx eid idx
                                         ]]
-            [criterium.core :as crit]
             [clojure.string :as str]
             [schema.core :as s]
             [tupelo.data.index :as index]
-            )))
+            ))
+  (:import [tupelo.data Eid Idx]))
 
 ; #todo fix for cljs
 
@@ -117,8 +117,7 @@
        (is= [true] (cons true []))
        (is= true (every? t/truthy? (cons true []))) )
 
-
-     (dotest
+     (dotest-focus
        (let [tv     (td/->TagVal :a 1)
              tv-str (with-out-str (println tv))]
          (is= {:tag :a :val 1} (unlazy tv))
@@ -133,6 +132,18 @@
        (let [sa  (t/->sym :a)
              tva (td/->TagVal :sym sa)]
          (is= (unlazy tva) {:tag :sym, :val (quote a)})))
+
+     (dotest-focus
+       (let [eid5 (eid 5)]
+         (is= 5 (<val eid5))
+         (is= (type eid5) tupelo.data.Eid)
+         (is= (instance? Eid eid5) true)
+         (is= (td/tagval-walk-compact eid5) {:eid 5}))
+       (let [idx5 (idx 5)]
+         (is= 5 (<val idx5))
+         (is= (type idx5) tupelo.data.Idx)
+         (is= (instance? Idx idx5) true)
+         (is= (td/tagval-walk-compact idx5) {:idx 5})) )
 
      ;-----------------------------------------------------------------------------
      (dotest

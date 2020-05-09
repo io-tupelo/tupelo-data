@@ -89,6 +89,9 @@
      (defrecord Eid
        [val]
        IVal (<val [this] val))
+     (defrecord Idx
+       [val]
+       IVal (<val [this] val))
 
      ; ***** fails strangely under lein-test-refresh after 1st file save if define this using Plumatic schema *****
      (defn tagval? ; :- s/Bool
@@ -114,12 +117,13 @@
        "Walks a data structure, converting any TagVal record like
          {:tag :something :val 42}  =>  {:something 42}"
        [data]
-       (t/walk-with-parents data
-         {:leave (fn [-parents- item]
-                   (t/cond-it-> item
-                     (or (tagval? item)
-                       (tagval-map? item))
-                     {(grab :tag item) (grab :val item)}))}))
+       (walk/postwalk (fn [item]
+                        (t/cond-it-> item
+                          (instance? Eid it) {:eid (<val it)}
+                          (instance? Idx it) {:idx (<val it)}
+                          (or (tagval? it)
+                            (tagval-map? it)) {(grab :tag it) (grab :val it)}))
+         data))
 
      ;-----------------------------------------------------------------------------
      ; #todo inline all of these?
@@ -130,7 +134,9 @@
      (s/defn tag-idx :- TagVal
        [idx :- s/Int] (->TagVal :idx (t/validate int? idx)))
      (s/defn eid :- Eid
-       [eid :- s/Int] (->Eid (t/validate int? eid)))
+       [arg :- s/Int] (->Eid (t/validate int? arg)))
+     (s/defn idx :- Idx
+       [arg :- s/Int] (->Idx (t/validate int? arg)))
 
      ; (defn pair-map? [arg] (and (map? arg) (= 1 (count arg))))
      (defn tagged-param? [x] (and (= TagVal (type x)) (= :param (<tag x))))
