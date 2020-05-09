@@ -87,19 +87,24 @@
        IVal (<val [this] val))
 
      (defrecord Param
-       [val]
-       IVal (<val [this] val))
+       [param]
+       IVal (<val [this] param))
      (defrecord Eid
-       [val]
-       IVal (<val [this] val))
+       [eid]
+       IVal (<val [this] eid))
      (defrecord Idx
-       [val]
-       IVal (<val [this] val))
+       [idx]
+       IVal (<val [this] idx))
+     (defrecord Key
+       [key]
+       IVal (<val [this] key))
 
      (s/defn Eid? :- s/Bool
        [arg :- s/Any] (instance? Eid arg))
      (s/defn Idx? :- s/Bool
        [arg :- s/Any] (instance? Idx arg))
+     (s/defn Key? :- s/Bool
+       [arg :- s/Any] (instance? Key arg))
 
      ; ***** fails strangely under lein-test-refresh after 1st file save if define this using Plumatic schema *****
      (defn tagval? ; :- s/Bool
@@ -109,6 +114,7 @@
        [arg :- s/Any]
        (cond
          (Eid? arg) (<val arg)
+         (Idx? arg) (<val arg)
          (tagval? arg) (<val arg)
          :else arg))
 
@@ -116,6 +122,16 @@
        [tv ^java.io.Writer writer]
        (.write writer
          (format "<Eid %s>" (<val tv))))
+
+     (defmethod print-method Idx
+       [tv ^java.io.Writer writer]
+       (.write writer
+         (format "<Idx %s>" (<val tv))))
+
+     (defmethod print-method Key
+       [tv ^java.io.Writer writer]
+       (.write writer
+         (format "<Key %s>" (<val tv))))
 
      (defmethod print-method TagVal
        [tv ^java.io.Writer writer]
@@ -148,12 +164,11 @@
 
      (s/defn tag-eid-orig :- TagVal
        [eid :- s/Int] (->TagVal :eid (t/validate int? eid)))
-     (s/defn tag-eid [arg] (->Eid arg))
-
      (s/defn tag-idx-orig :- TagVal
        [idx :- s/Int] (->TagVal :idx (t/validate int? idx)))
-     (s/defn tag-idx :- TagVal
-       [idx :- s/Int] (->TagVal :idx (t/validate int? idx)))
+
+     (s/defn tag-eid [arg] (->Eid arg))
+     (s/defn tag-idx [idx] (->Idx idx))
 
      ; (defn pair-map? [arg] (and (map? arg) (= 1 (count arg))))
      (defn tagged-param? [x] (and (= TagVal (type x)) (= :param (<tag x))))
@@ -163,7 +178,7 @@
            (= :eid (<tag x)))))
 
      (defn idx-literal? [x] (and (map? x) (= [:idx] (keys x))))
-     (defn idx-literal->tagged [x] (tag-idx (only (vals x))))
+     (defn idx-literal->tagged [x] (->Idx (only (vals x))))
 
      ;-----------------------------------------------------------------------------
      (defn unquote-form?
@@ -447,16 +462,16 @@
        "Returns the next integer EID"
        [] (swap! eid-counter inc))
 
-     (s/defn array->tagidx-map :- {TagVal s/Any}
+     (s/defn array->tagidx-map :- {Idx s/Any}
        [edn-array :- tsk/List ]
        (apply glue {}
          (forv [[idx val] (indexed edn-array)]
-           {(tag-idx idx) val})))
+           {(->Idx idx) val})))
 
      (s/defn tagidx-map->array :- tsk/List
-       [idx-map :- {TagVal s/Any}]
+       [idx-map :- {Idx s/Any}]
        (let [result (forv [idx (range (count idx-map))]
-                      (grab (tag-idx idx) idx-map))]
+                      (grab (->Idx idx) idx-map))]
          result))
 
      (s/defn ^:no-doc db-contains-triple?
@@ -613,7 +628,7 @@
              triples-orig (index/prefix-match->seq [teid] idx-eav)
              vals         (mapv xthird triples-orig)
              triples-new  (forv [[idx val] (indexed vals)]
-                            [teid (tag-idx idx) val])]
+                            [teid (->Idx idx) val])]
          (doseq [triple triples-orig]
            (db-remove-triple triple))
          (doseq [triple triples-new]
@@ -654,7 +669,7 @@
                                       (db-add-triple [teid k k])))
 
              (= :array entity-type) (doseq [[idx val] (indexed edn-in)]
-                                      (db-add-triple [teid (tag-idx idx) (edn->encoded val)]))
+                                      (db-add-triple [teid (->Idx idx) (edn->encoded val)]))
 
              :else (throw (ex-info "unknown value found" (vals->map edn-in))))
            teid)))
@@ -719,7 +734,7 @@
          (throw (ex-info "Index must be integer type" (vals->map eid idx-in ))))
        (with-spy-indent
          (let [teid        (->Eid eid)
-               tidx        (tag-idx idx-in)
+               tidx        (->Idx idx-in)
                idx-eav     (grab :idx-eav (deref *tdb*))
                entity-type (eid->type teid)
                ea-triples  (index/prefix-match->seq [teid tidx] idx-eav)
@@ -767,7 +782,7 @@
         attr :- AttrTypeInput] ; #todo add db arg version
        (let [teid        (->Eid eid-in)
              tattr       (if (int? attr)
-                           (tag-idx attr)
+                           (->Idx attr)
                            attr)
              idx-eav     (grab :idx-eav (deref *tdb*))
              eav-triples (index/prefix-match->seq [teid tattr] idx-eav)
@@ -928,8 +943,11 @@
                e-out (if (symbol? e)
                        (tag-param e)
                        (->Eid e))
+               ; #todo IMPORTANT! have a conflict for map with int keys {1 :a 2 :b}
+               ; #todo need to wrap like (->Key 5) or (->Idx 5)
                a-out (cond
                        (symbol? a) (tag-param a)
+                       (int? a) (->Idx a)
                        (idx-literal? a) (idx-literal->tagged a)
                        :else a)
                v-out (if (symbol? v)

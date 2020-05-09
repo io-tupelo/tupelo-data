@@ -14,7 +14,7 @@
                                        it-> fetch-in
                                        ]]
             [tupelo.data :as td :refer [with-tdb new-tdb eid-count-reset lookup query-triples query-triples->tagged boolean->binary search-triple
-                                        *tdb* <tag <val tag-param tag-idx ->Eid ->Idx Eid? Idx?
+                                        *tdb* <tag <val tag-param ->Eid ->Idx Eid? Idx?
                                         ]]
             [clojure.string :as str]
             [schema.core :as s]
@@ -155,12 +155,12 @@
             {:idx 1} 1
             {:idx 2} 2})
          (is= arr-1 arr-2))
-       (let [ok  {(tag-idx 0) 0
-                  (tag-idx 1) 1
-                  (tag-idx 2) 2}
-             bad {(tag-idx 0) 0
+       (let [ok  {(->Idx 0) 0
+                  (->Idx 1) 1
+                  (->Idx 2) 2}
+             bad {(->Idx 0) 0
                   ; missing idx=1
-                  (tag-idx 2) 2}]
+                  (->Idx 2) 2}]
          (is= (td/tagidx-map->array ok)
            [0 1 2])
          (throws? (td/tagidx-map->array bad))) )
@@ -202,7 +202,7 @@
        (dotest
        (is= 3 (eval (quote (+ 1 2)))))
 
-     (dotest ; #todo => tupelo.core
+       (dotest ; #todo => tupelo.core
        (is (td/only? [1]))
        (is (td/only? {:a 1}))
        (is (td/only? #{:stuff}))
@@ -239,7 +239,7 @@
           2 12
           3 13}))
 
-     (dotest ; #todo => tupelo.core
+       (dotest ; #todo => tupelo.core
        (is= (td/with-cum-vector
               (dotimes [ii 5]
                 (td/cum-vector-append ii)))
@@ -276,7 +276,7 @@
 
        (is (map? (->Eid 3)))
        (is (map? {:a 1}))
-       (is (record? (td/tag-idx 3)))
+       (is (record? (->Idx 3)))
        (isnt (record? {:a 1}))
 
        ; Leaf and entity-id records sort separately in the index. Eid sorts first since the type name
@@ -910,13 +910,13 @@
                           [4 {:idx 2} {:eid 1003}] [5 {:idx 2} {:eid 1004}]
                           [6 {:idx 3} {:eid 1004}]}})
 
-           (let [st    (td/search-triple-fn [(quote ?) (tag-idx 1) 2])
+           (let [st    (td/search-triple-fn [(quote ?) (->Idx 1) 2])
                  ; >> (spyx st)
                  found (td/query-triples [st])]
              (is= (td/eid->edn root-eid) {:aa [1 2 3]
                                           :bb [2 3 4]
                                           :cc [3 4 5 6]})
-             (is= (td/eid->edn  (val (t/only2 found)))
+             (is= (td/eid->edn (val (t/only2 found)))
                [1 2 3]))
 
            (let [found    (td/query-triples [(td/search-triple eid idx 3)])
@@ -929,20 +929,20 @@
            (is= [1 2 3]
              (it-> (td/query-triples [(td/search-triple eid {:idx 2} 3)])
                (only it)
-               (fetch-in it [:eid ])
+               (fetch-in it [:eid])
                (td/eid->edn it)))
            (is= [2 3 4]
-             (it-> (td/query-triples [(td/search-triple eid {:idx 1} 3)])
+             (it-> (td/query-triples [(td/search-triple eid 1 3)]) ; raw integer is like idx-literal (macro quotes forms!)
                (only it)
-               (fetch-in it [:eid ])
+               (fetch-in it [:eid])
                (td/eid->edn it)))
            (is= [3 4 5 6]
              (it-> (td/query-triples [(td/search-triple eid {:idx 0} 3)])
                (only it)
-               (fetch-in it [:eid] )
+               (fetch-in it [:eid])
                (td/eid->edn it))))))
 
-     (dotest
+       (dotest
        (td/with-tdb (td/new-tdb)
          (let [edn-val  {:a 1 :b 2}
                root-eid (td/add-edn edn-val)]
@@ -991,7 +991,7 @@
                root-hid (td/add-edn edn-val)]
            (is= edn-val (td/eid->edn root-hid)))))
 
-     (dotest
+       (dotest
        (td/eid-count-reset)
        (td/with-tdb (td/new-tdb)
          (let [data     {:a [{:b 2}
@@ -1064,7 +1064,7 @@
            (is= (td/eid->edn (grab :eid (only found)))
              {:a 1 :x :first}))))
 
-     (dotest
+       (dotest
        (td/with-tdb (td/new-tdb)
          (let [data     [{:a 1 :b 1 :c 1}
                          {:a 1 :b 2 :c 2}
@@ -1283,7 +1283,7 @@
               {:zip "46203", :city "Townville"}
               {:zip "12345", :city "Cityvillage"}]))))
 
-     (dotest
+       (dotest
        (td/with-tdb (td/new-tdb)
          (let [people   [{:name      "jimmy"
                           :addresses [{:address1  "123 street ave"
@@ -1318,7 +1318,7 @@
              [{:name "jimmy", :address1 "543 Other St"}
               {:name "joel", :address1 "2026 park ave"}]))))
 
-     (dotest
+       (dotest
        (td/eid-count-reset)
        (td/with-tdb (td/new-tdb)
          (let [root-eid (td/add-edn users-and-accesses)]
@@ -1480,7 +1480,7 @@
               {:description "Mimetic polyalloy" :widget-code "Model-201" :producer-code "Cyberdyne" :wtc "t1000"}
               {:description "Boom!" :widget-code "Dynamite" :producer-code "ACME" :wtc "c40"}]))))
 
-     (comment ; demo and poc for td/construct
+       (comment ; demo and poc for td/construct
        (def a-1400 1401)
        (def b-1400 1402)
        (dotest
@@ -1526,12 +1526,12 @@
                 :enter => [<Eid 1002> :c 3]
                 :leave => [<Eid 1002> :c 3]
                 :enter => [<Eid 1002> :d <Eid 1003>]
-                  :enter => [<Eid 1003> <:idx 0> 4]
-                  :leave => [<Eid 1003> <:idx 0> 4]
-                  :enter => [<Eid 1003> <:idx 1> 5]
-                  :leave => [<Eid 1003> <:idx 1> 5]
-                  :enter => [<Eid 1003> <:idx 2> 6]
-                  :leave => [<Eid 1003> <:idx 2> 6]
+                  :enter => [<Eid 1003> <Idx 0> 4]
+                  :leave => [<Eid 1003> <Idx 0> 4]
+                  :enter => [<Eid 1003> <Idx 1> 5]
+                  :leave => [<Eid 1003> <Idx 1> 5]
+                  :enter => [<Eid 1003> <Idx 2> 6]
+                  :leave => [<Eid 1003> <Idx 2> 6]
                 :leave => [<Eid 1002> :d <Eid 1003>]
               :leave => [<Eid 1001> :b <Eid 1002>] ")
            (is= (td/eid->edn root-eid) {:a 1 :b {:c 3 :d [4 5 6]}})
@@ -1609,8 +1609,6 @@
 
            (td/entity-add-array-elem root-eid 99 {:a 1 :b #{:c :d}}) ; legal add
            (is= (td/eid->edn root-eid) [0 1 3 9 {:a 1, :b #{:c :d}}]) )))
-
-
 
 
 
