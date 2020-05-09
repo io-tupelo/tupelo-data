@@ -25,6 +25,8 @@
 
 #?(:cljs (enable-console-print!))
 
+; #todo  need example of transform non-prim keys for map/set into canonical DS
+
 ;-----------------------------------------------------------------------------
 (comment  ; #todo be able to process this data & delete unwise users
   (def age-of-wisdom 30)
@@ -96,6 +98,18 @@
 
      (comment ; <<comment>>
        )  ; <<comment>>
+
+     ;-----------------------------------------------------------------------------
+     (dotest
+       (is= "356a192b7913b04c54574d18c28d46e6395428ab" (td/edn->sha 1))
+       (is= "e8dc057d3346e56aed7cf252185dbe1fa6454411" (td/edn->sha 1.0))
+       (is= "a4839edbf020b8c1ac398fa119979fc5384f52d4" (td/edn->sha :a))
+       (is= "7b3ce68b6c2f7d67dae4210eeb83be69f978e2a8" (td/edn->sha "a"))
+       (is= "86f7e437faa5a7fce15d1ddcb9eaeaea377667b8" (td/edn->sha (quote a)))
+       (is= "aad1409b889ef360dad475dc32649f26d9df142a" (td/edn->sha [1 2]))
+       (is= "6d780b01458b623aa5f77db71ac9a02ff1d5ecda" (td/edn->sha [1 2 3]))
+       (is= "6d78b62f48aafe38bbbb2a977f0d578109c0c8e2" (td/edn->sha {:a 1, :b 2}))
+       (is= "c071ca0471e2ed68a46db1db4c8cf84c2a1c7806" (td/edn->sha #{1 2 :b :a})))
 
      ;-----------------------------------------------------------------------------
      (dotest
@@ -1517,9 +1531,9 @@
            ; (spyx-pretty (td/db-pretty @*tdb*))
            (throws? (td/remove-root-entity 1002))
            (is= (td/eid->edn 1002) [0 1 2])
-           (td/remove-entity-elem (tv :eid 1002) (tv :idx 1))
+           (td/remove-entity-elem  1002 1)
            (is= (td/eid->edn root-eid) {:a "fred", :b [0 2]})
-           (td/remove-entity-elem (tv :eid 1001) :b)
+           (td/remove-entity-elem 1001 :b)
            (is= (td/eid->edn root-eid) {:a "fred"})))
        (td/eid-count-reset)
        (td/with-tdb (td/new-tdb)

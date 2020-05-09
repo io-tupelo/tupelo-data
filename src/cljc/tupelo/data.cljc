@@ -16,6 +16,7 @@
                                        ]]
             [tupelo.data.index :as index]
             [tupelo.lexical :as lex]
+            [tupelo.misc :as misc]
             [tupelo.schema :as tsk]
             [tupelo.vec :as vec]
 
@@ -75,6 +76,7 @@
        "Convert true => 1, false => 0"
        [arg :- s/Bool] (if arg 1 0))
 
+
      ;-----------------------------------------------------------------------------
      (defprotocol IVal (<val [this]))
      (defprotocol ITag (<tag [this]))
@@ -82,6 +84,10 @@
      (defrecord TagVal
        [tag val]
        ITag (<tag [this] tag)
+       IVal (<val [this] val))
+
+     (defrecord Eid
+       [val]
        IVal (<val [this] val))
 
      ; ***** fails strangely under lein-test-refresh after 1st file save if define this using Plumatic schema *****
@@ -123,6 +129,8 @@
        [eid :- s/Int] (->TagVal :eid (t/validate int? eid)))
      (s/defn tag-idx :- TagVal
        [idx :- s/Int] (->TagVal :idx (t/validate int? idx)))
+     (s/defn eid :- Eid
+       [eid :- s/Int] (->Eid (t/validate int? eid)))
 
      ; (defn pair-map? [arg] (and (map? arg) (= 1 (count arg))))
      (defn tagged-param? [x] (and (= TagVal (type x)) (= :param (<tag x))))
@@ -235,9 +243,12 @@
        )
 
      (do  ; keep these in sync
-       (def AttrType
+       (def AttrTypeInput
          "The Plumatic Schema type name for an attribute"
          (s/cond-pre s/Keyword s/Int))
+       (def AttrType
+         "The Plumatic Schema type name for an attribute"
+         (s/cond-pre s/Keyword TagVal))
        ;(s/defn attr? :- s/Bool ; #todo keep?
        ;  "Returns true iff the arg type is a legal attribute value"
        ;  [arg] (or (keyword? arg) (int? arg)))
@@ -263,13 +274,25 @@
      (def TripleIndex #{tsk/Triple})
 
      ;-----------------------------------------------------------------------------
-     ; #todo => tupelo.ocre
-     (defn sorted-map-generic
-       "Returns a sorted map with a generic comparitor"
-       [] (sorted-map-by lex/compare-generic))
-     (defn sorted-set-generic
-       "Returns a sorted map with a generic comparitor"
-       [] (sorted-set-by lex/compare-generic))
+     ; #todo => tupelo.misc
+     (defn normalized-sorted ; #todo need tests & docs. Use for datomic Entity?
+       "Walks EDN data, converting all collections to vector, sorted-map-generic, or sorted-set-generic"
+       [edn-data]
+       (let [unlazy-item (fn [item]
+                           (cond
+                             (sequential? item) (vec item)
+                             (map? item) (t/->sorted-map-generic item)
+                             (set? item) (t/->sorted-set-generic item)
+                             :else item))
+             result      (walk/postwalk unlazy-item edn-data)]
+         result))
+
+     (s/defn edn->sha :- s/Str
+       "Converts EDN data into a normalized SHA-1 string"
+       [edn-data]
+       (misc/str->sha
+         (pr-str
+           (normalized-sorted edn-data))))
 
      ;-----------------------------------------------------------------------------
      (s/defn tmp-eid-prefix-str? :- s/Bool
@@ -328,7 +351,7 @@
        "Returns a new, empty db."
        []
        (into (sorted-map)
-         {:eid-type (sorted-map-generic) ; source type of entity (:map :array :set)
+         {:eid-type (t/sorted-map-generic) ; source type of entity (:map :array :set)
           :idx-eav  (index/empty-index)
           :idx-ave  (index/empty-index)
           :idx-vea  (index/empty-index) }))
@@ -432,7 +455,9 @@
 
      ; #todo need to handle sets
      (s/defn ^:no-doc eid->edn-impl :- s/Any
-       [teid :- TagVal]
+       [teid :- TagVal ; Eid
+        ]
+       (spyx teid)
        (let [eav-matches (index/prefix-match->seq [teid] (grab :idx-eav @*tdb*))
              result-map  (apply glue
                            (forv [[-teid-match- attr val-match] eav-matches]
@@ -713,11 +738,16 @@
 
      (s/defn remove-entity-elem
        "Recursively removes an element EAV triple of data from the db."
-       [teid a] ; #todo add db arg version
-       (let [idx-eav     (grab :idx-eav (deref *tdb*))
-             eav-triples (index/prefix-match->seq [teid a] idx-eav)
+       [eid  :- EidType
+        attr :- AttrTypeInput] ; #todo add db arg version
+       (let [teid        (tag-eid eid)
+             tattr       (if (int? attr)
+                           (tag-idx attr)
+                           attr)
+             idx-eav     (grab :idx-eav (deref *tdb*))
+             eav-triples (index/prefix-match->seq [teid tattr] idx-eav)
              >>          (when (< 1 (count eav-triples))
-                           (throw (ex-info "multiple elements found" (vals->map teid a eav-triples))))
+                           (throw (ex-info "multiple elements found" (vals->map teid tattr eav-triples))))
              triple-eav  (only eav-triples)
              [-e- -a- v] triple-eav]
          (when (tagged-eid? v)
