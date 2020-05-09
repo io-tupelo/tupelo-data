@@ -1538,15 +1538,18 @@
            (throws? (td/entity-add-map-entry root-eid [1 2] 2)) ; non-primitive key
            (throws? (td/entity-add-map-entry root-eid :a 99)) ; duplicate key
            (td/entity-add-map-entry root-eid :b 2) ; legal add
-           (is= (td/eid->edn root-eid) {:a 1 :b 2}))))
+           (is= (td/eid->edn root-eid) {:a 1 :b 2})
+
+           (td/entity-add-map-entry root-eid :c {:d 4 :e [5 6 7]})
+           (is= (td/eid->edn root-eid) {:a 1, :b 2, :c {:d 4, :e [5 6 7]}}))))
 
      (dotest
        (td/eid-count-reset)
        (td/with-tdb (td/new-tdb)
          (let [root-eid (td/add-edn #{:a :b})]
-           (throws? (td/entity-add-set-elem 9999  2)) ; invalid eid
-           (throws? (td/entity-add-set-elem root-eid [1 2] )) ; non-primitive key
-           (throws? (td/entity-add-set-elem root-eid :a )) ; duplicate key
+           (throws? (td/entity-add-set-elem 9999 2)) ; invalid eid
+           (throws? (td/entity-add-set-elem root-eid [1 2])) ; non-primitive key
+           (throws? (td/entity-add-set-elem root-eid :a)) ; duplicate key
            (td/entity-add-set-elem root-eid :c) ; legal add
            (is= (td/eid->edn root-eid) #{:a :b :c}))))
 
@@ -1559,10 +1562,10 @@
            (throws? (td/entity-add-array-elem root-eid 0 99)) ; duplicate key
            (td/entity-add-array-elem root-eid 3 3) ; legal add
            (td/entity-add-array-elem root-eid 9 9) ; legal add
-           (is= (td/eid->edn root-eid) [0 1 3 9]))))
+           (is= (td/eid->edn root-eid) [0 1 3 9])
 
-
-
+           (td/entity-add-array-elem root-eid 99 {:a 1 :b #{:c :d}}) ; legal add
+           (is= (td/eid->edn root-eid) [0 1 3 9 {:a 1, :b #{:c :d}}]) )))
 
      ))
 
