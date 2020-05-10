@@ -122,6 +122,8 @@
        (cond
          (Eid? arg) (<val arg)
          (Idx? arg) (<val arg)
+         (Prim? arg) (<val arg)
+         ; (Param? arg) (<val arg) ; #todo enable this???
          (tagval? arg) (<val arg)
          :else arg))
 
@@ -335,6 +337,11 @@
              (primitive-data? (<val arg)))
            (symbol? arg))))
 
+     (defn ^:no-doc wrap-primitive ; #todo remove this crutch???
+       [item]
+       (cond-it-> item
+         (primitive-data? it) (->Prim it)) )
+
      (def TripleIndex #{tsk/Triple})
 
      ;-----------------------------------------------------------------------------
@@ -525,23 +532,33 @@
 
      ; #todo need to handle sets
      (s/defn ^:no-doc eid->edn-impl :- s/Any
-       [teid :- Eid ]
-       (let [eav-matches (index/prefix-match->seq [teid] (grab :idx-eav @*tdb*))
-             result-map  (apply glue
-                           (forv [[-teid-match- attr val-match] eav-matches]
-                             (do
-                               (assert (= teid -teid-match-))
-                               (let [val-edn (t/cond-it-> val-match
-                                               (Eid? it) (eid->edn-impl it))]
-                                 (t/map-entry attr val-edn)))))
-             ; >>          (spyx-pretty result-map)
-             result-out  (let [entity-type (fetch-in @*tdb* [:eid-type teid])]
-                           (cond
-                             (= entity-type :map) result-map
-                             (= entity-type :set) (into #{} (keys result-map))
-                             (= entity-type :array) (tagidx-map->array result-map)
-                             :else (throw (ex-info "invalid entity type found" (vals->map entity-type)))))]
-         result-out))
+       [teid :- Eid]
+       (newline)
+       (with-spy-indent
+         (let [eav-matches (index/prefix-match->seq [teid] (grab :idx-eav @*tdb*))
+               >>          (spyx-pretty eav-matches)
+               result-map  (apply glue
+                             (forv [[-teid-match- attr-match val-match] eav-matches]
+                               (do
+                                 ; (assert (= teid -teid-match-))
+                                 (let [attr-edn (t/cond-it-> attr-match
+                                                  (Eid? it) (eid->edn-impl it)
+                                                  (Prim? it) (<val it))
+                                       val-edn  (t/cond-it-> val-match
+                                                  (Eid? it) (eid->edn-impl it)
+                                                  (Prim? it) (<val it))
+                                       result   (t/map-entry attr-edn val-edn)]
+                                   (spyx attr-edn)
+                                   (spyx val-edn)
+                                   (spyx result)))))
+               >>          (spyx-pretty result-map)
+               result-out  (let [entity-type (fetch-in @*tdb* [:eid-type teid])]
+                             (cond
+                               (= entity-type :map) result-map
+                               (= entity-type :set) (into #{} (keys result-map))
+                               (= entity-type :array) (tagidx-map->array result-map)
+                               :else (throw (ex-info "invalid entity type found" (vals->map entity-type)))))]
+           result-out)))
 
      (s/defn eid->edn :- s/Any ; #todo reimplement in terms of walk-entity ???
        "Returns the EDN subtree rooted at a eid."
@@ -665,10 +682,11 @@
            (db-add-triple triple))))
 
      (declare add-edn-impl)
+
      (defn ^:no-doc edn->encoded
        [edn]
        (if (primitive-data? edn)
-         edn
+         (->Prim edn)
          (add-edn-impl edn)))
 
      (s/defn ^:no-doc add-edn-impl :- Eid ; #todo maybe rename:  load-edn->eid  ???
@@ -706,7 +724,7 @@
 
      (s/defn add-edn :- s/Int
        "Add the EDN arg to the indexes, returning the EID"
-       [edn-in :- s/Any] (<val (add-edn-impl edn-in)))
+       [edn-in :- tsk/Collection] (<val (add-edn-impl edn-in)))
 
      (s/defn entity-add-map-entry
        "Adds a new attr-val pair to an existing map entity."
@@ -717,19 +735,20 @@
          (throw (ex-info "Attribute must be primitive (non-collection) type" (vals->map attr-in edn-in))))
        (with-spy-indent
          (let [teid        (->Eid eid)
+               attr (wrap-primitive attr-in)
                idx-eav     (grab :idx-eav (deref *tdb*))
                entity-type (fetch-in @*tdb* [:eid-type teid])
                >>          (when (nil? entity-type)
                              (throw (ex-info "entity not found" (vals->map teid))))
-               ea-triples  (index/prefix-match->seq [teid attr-in] idx-eav)
+               ea-triples  (index/prefix-match->seq [teid attr] idx-eav)
                >>          (when (not-empty? ea-triples)
                              (throw (ex-info "pre-existing element found" (vals->map teid attr-in ea-triples))))]
-           ;(newline)
-           ;(spyx-pretty entity-type)
-           ;(spyx-pretty edn-in)
+           (newline)
+           (spyx-pretty entity-type)
+           (spyx-pretty edn-in)
            (when-not (= :map entity-type)
              (throw (ex-info "non map type found" (vals->map teid entity-type))))
-           (db-add-triple [teid (edn->encoded attr-in) (edn->encoded edn-in)])
+           (db-add-triple [teid (edn->encoded attr) (edn->encoded edn-in)])
            teid)))
 
      (s/defn entity-add-set-elem
@@ -788,12 +807,16 @@
      (s/defn remove-triple
        "Recursively removes an EAV triple of data from the db."
        [triple-eav :- tsk/Triple] ; #todo add db arg version
-       (let [[-e- -a- v] triple-eav]
-         (when-not (db-contains-triple? triple-eav)
-           (throw (ex-info "triple not found" (vals->map triple-eav))))
+       (let [[-e- a-in v-in] triple-eav
+             a              (wrap-primitive a-in)
+             v              (wrap-primitive v-in)
+             triple-wrapped [-e- a v]]
+         ; (spyx-pretty triple-wrapped)
+         (when-not (db-contains-triple? triple-wrapped)
+           (throw (ex-info "triple not found" (vals->map triple-wrapped))))
          (when (Eid? v)
            (remove-entity (<val v)))
-         (db-remove-triple triple-eav)))
+         (db-remove-triple triple-wrapped)))
 
      (s/defn ^:no-doc remove-entity
        [eid-in :- EidType] ; #todo add db arg version
@@ -968,13 +991,17 @@
                ; #todo IMPORTANT! have a conflict for map with int keys {1 :a 2 :b}
                ; #todo need to wrap like (->Key 5) or (->Idx 5)
                a-out (cond
+                       ; (Prim? a) a ; #todo remove this???
                        (symbol? a) (->Param (sym->kw a))
                        (int? a) (->Idx a)
+                       (primitive? a) (->Prim a)
                        (tagmap? a) (tagmap-reader a)
                        :else a)
-               v-out (if (symbol? v)
-                       (->Param (sym->kw v))
-                       v)]
+               v-out (cond
+                       ; (Prim? v) v ; #todo remove this???
+                       (symbol? v) (->Param (sym->kw v))
+                       (primitive? v) (->Prim v)
+                       :else v)]
            [e-out a-out v-out])))
 
      (defn ^:no-doc search-triple-impl
@@ -989,16 +1016,6 @@
        [form]
        (and (list? form)
          (= (quote search-triple) (xfirst form))))
-
-     (s/defn index-find-leaf :- [Eid]
-       [target :- Primitive]
-       ; (println :index-find-leaf target )
-       (let [results (query-triples+preds
-                       [[(->Param :e) (->Param :a) target]]
-                       []) ; no preds
-             ; >> (spyx-pretty results)
-             eids    (mapv #(t/fetch % (->Param :e)) results)]
-         eids))
 
      (def ^:no-doc ^:dynamic *autosyms-seen* nil)
 
