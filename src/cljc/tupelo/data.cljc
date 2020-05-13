@@ -750,8 +750,7 @@
                              (add-edn-entity-impl value))
                entity-type (eid->type teid)
                idx-eav     (grab :idx-eav (deref *tdb*))
-               ea-triples  (index/prefix-match->seq [teid value] idx-eav)
-               ]
+               ea-triples  (index/prefix-match->seq [teid tval] idx-eav)]
            (when-not (= :set entity-type)
              (throw (ex-info "non set type found" (vals->map teid entity-type))))
            (when (not-empty? ea-triples)
