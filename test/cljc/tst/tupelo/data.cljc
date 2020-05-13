@@ -360,7 +360,7 @@
          (is= (deref *tdb*)
            {:eid-type {} :idx-eav #{} :idx-vea #{} :idx-ave #{}})
          (let [edn-val  {:a 1}
-               root-eid (td/add-edn-entity edn-val)]
+               root-eid (td/add-entity-edn edn-val)]
            (is= root-eid 1001)
            (is= (td/walk-compact (deref *tdb*))
              {:eid-type {{:eid 1001} :map},
@@ -373,7 +373,7 @@
        (with-tdb (new-tdb)
          (eid-count-reset)
          (let [edn-val  {:a 1 :b 2}
-               root-eid (td/add-edn-entity edn-val)]
+               root-eid (td/add-entity-edn edn-val)]
            (is= 1001 root-eid)
            (is= (td/walk-compact (deref *tdb*))
              {:eid-type {{:eid 1001} :map},
@@ -389,7 +389,7 @@
        (with-tdb (new-tdb)
          (eid-count-reset)
          (let [edn-val  {:a 1 :b 2 :c {:d 4}}
-               root-eid (td/add-edn-entity edn-val)]
+               root-eid (td/add-entity-edn edn-val)]
            (is= 1001 root-eid)
            (is= (td/walk-compact (deref *tdb*))
              {:eid-type {{:eid 1001} :map, {:eid 1002} :map},
@@ -411,7 +411,7 @@
        (with-tdb (new-tdb)
          (eid-count-reset)
          (let [edn-val  [1 2 3]
-               root-eid (td/add-edn-entity edn-val)]
+               root-eid (td/add-entity-edn edn-val)]
            (is= (td/walk-compact (deref *tdb*))
              {:eid-type {{:eid 1001} :array},
               :idx-ave  #{[{:idx 0} {:prim 1} {:eid 1001}] [{:idx 1} {:prim 2} {:eid 1001}]
@@ -427,7 +427,7 @@
        (with-tdb (new-tdb)
          (eid-count-reset)
          (let [edn-val  {:a 1 :b 2 :c [10 11 12]}
-               root-eid (td/add-edn-entity edn-val)]
+               root-eid (td/add-entity-edn edn-val)]
            (is= (td/walk-compact (deref *tdb*))
              {:eid-type {{:eid 1001} :map, {:eid 1002} :array},
               :idx-ave  #{[{:idx 0} {:prim 10} {:eid 1002}] [{:idx 1} {:prim 11} {:eid 1002}]
@@ -460,7 +460,7 @@
                      {:c 2}
                      {:c 3}]]
            (doseq [m data]
-             (td/add-edn-entity m))
+             (td/add-entity-edn m))
            (is= (td/walk-compact @*tdb*) ; #todo error: missing :array
              {:eid-type {{:eid 1001} :map,
                          {:eid 1002} :map,
@@ -532,7 +532,7 @@
        (with-tdb (new-tdb)
          (eid-count-reset)
          (let [edn-val  {:a 1 :b 2}
-               root-eid (td/add-edn-entity edn-val)]
+               root-eid (td/add-entity-edn edn-val)]
            (is= edn-val (td/eid->edn root-eid))
            (is= (td/walk-compact (deref *tdb*))
              {:eid-type {{:eid 1001} :map},
@@ -565,7 +565,7 @@
        (with-tdb (new-tdb)
          (eid-count-reset)
          (let [edn-val  {:a 1 :b 2}
-               root-eid (td/add-edn-entity edn-val)]
+               root-eid (td/add-entity-edn edn-val)]
            (is= edn-val (td/eid->edn root-eid))
            (is= (td/walk-compact (deref *tdb*))
              {:eid-type {{:eid 1001} :map},
@@ -595,7 +595,7 @@
          (eid-count-reset)
          (let [edn-val  {:a 1
                          :b 1}
-               root-eid (td/add-edn-entity edn-val)]
+               root-eid (td/add-entity-edn edn-val)]
            (is= edn-val (td/eid->edn root-eid))
            (is= (td/walk-compact (deref *tdb*))
              {:eid-type {{:eid 1001} :map},
@@ -630,7 +630,7 @@
        (with-tdb (new-tdb)
          (eid-count-reset)
          (let [edn-val  {:a {:b 2}}
-               root-eid (td/add-edn-entity edn-val)]
+               root-eid (td/add-entity-edn edn-val)]
            (is= (td/walk-compact (deref *tdb*))
              {:eid-type {{:eid 1001} :map, {:eid 1002} :map},
               :idx-ave  #{[{:prim :a} {:eid 1002} {:eid 1001}]
@@ -687,7 +687,7 @@
        (with-tdb (new-tdb)
          (eid-count-reset)
          (let [edn-val     {:a {:b 2}}
-               root-eid    (td/add-edn-entity edn-val)
+               root-eid    (td/add-entity-edn edn-val)
                search-spec [(search-triple x :a y)
                             (search-triple y :b 2)]]
            (is= (td/walk-compact (query-triples search-spec))
@@ -696,7 +696,7 @@
        (with-tdb (new-tdb)
          (eid-count-reset)
          (let [edn-val     {:a {:b 2}}
-               root-eid    (td/add-edn-entity edn-val)
+               root-eid    (td/add-entity-edn edn-val)
                search-spec [(search-triple y :b 2)
                             (search-triple x :a y)]]
            (is= (td/walk-compact (query-triples search-spec))
@@ -705,14 +705,14 @@
        (with-tdb (new-tdb)
          (eid-count-reset)
          (let [edn-val     {:a {:b 2}}
-               root-eid    (td/add-edn-entity edn-val)
+               root-eid    (td/add-entity-edn edn-val)
                search-spec [(search-triple x :a y) (search-triple y :b 99)]]
            (is= [] (query-triples search-spec))))
 
        (with-tdb (new-tdb)
          (eid-count-reset)
          (let [edn-val     {:a {:b 2}}
-               root-eid    (td/add-edn-entity edn-val)
+               root-eid    (td/add-entity-edn edn-val)
                search-spec [(search-triple y :b 99) (search-triple x :a y)]]
            (is= [] (query-triples search-spec)))))
 
@@ -753,7 +753,7 @@
      (dotest
        (td/with-tdb (td/new-tdb)
          (td/eid-count-reset)
-         (let [root-hid (td/add-edn-entity nested-edn-val)]
+         (let [root-hid (td/add-entity-edn nested-edn-val)]
            ; (spyx-pretty (grab :idx-eav (deref *tdb*)))
            (is= nested-edn-val (td/eid->edn root-hid))
            (when false
@@ -787,7 +787,7 @@
        (dotest
        (td/with-tdb (td/new-tdb)
          (td/eid-count-reset)
-         (let [root-hid (td/add-edn-entity nested-edn-val)]
+         (let [root-hid (td/add-entity-edn nested-edn-val)]
            ; (spyx-pretty (grab :idx-eav (deref *tdb*)))
            (is= nested-edn-val (td/eid->edn root-hid))
            (is= nested-edn-val (td/eid->edn 1001))
@@ -802,7 +802,7 @@
        (dotest
        (td/with-tdb (td/new-tdb)
          (td/eid-count-reset)
-         (let [root-hid (td/add-edn-entity nested-edn-val)]
+         (let [root-hid (td/add-entity-edn nested-edn-val)]
            ; (spyx-pretty (grab :idx-eav (deref *tdb*)))
            (is= nested-edn-val (td/eid->edn root-hid)))))
 
@@ -810,7 +810,7 @@
        (td/with-tdb (td/new-tdb)
          (td/eid-count-reset)
          ; (spyx-pretty nested-edn-val)
-         (let [root-hid (td/add-edn-entity nested-edn-val)]
+         (let [root-hid (td/add-entity-edn nested-edn-val)]
            ; (spyx-pretty (grab :idx-eav (deref *tdb*)))
            (is= nested-edn-val (td/eid->edn root-hid))
 
@@ -879,7 +879,7 @@
                                                     :last-name  "Davis"
                                                     :salary     0
                                                     :position   :volunteer}}}
-               root-hid             (td/add-edn-entity hospital)
+               root-hid             (td/add-entity-edn hospital)
                nm-sal-all           (td/query [{:first-name ? :salary ?}])
                nm-sal-attending     (td/query [{:first-name ? :salary ? :position :attending}])
                nm-sal-resident      (td/query [{:first-name ? :salary ? :position :resident}])
@@ -911,7 +911,7 @@
          (let [edn-val  {:aa [1 2 3]
                          :bb [2 3 4]
                          :cc [3 4 5 6]}
-               root-eid (td/add-edn-entity edn-val)]
+               root-eid (td/add-entity-edn edn-val)]
            (comment
              (spyx-pretty @*tdb*)
              (spyx-pretty (td/db-pretty (deref td/*tdb*)))
@@ -982,22 +982,22 @@
        (dotest
        (td/with-tdb (td/new-tdb)
          (let [edn-val  {:a 1 :b 2}
-               root-eid (td/add-edn-entity edn-val)]
+               root-eid (td/add-entity-edn edn-val)]
            (is= edn-val (td/eid->edn root-eid))))
 
        (td/with-tdb (td/new-tdb)
          (let [edn-val  [1 2 3]
-               root-eid (td/add-edn-entity edn-val)]
+               root-eid (td/add-entity-edn edn-val)]
            (is= edn-val (td/eid->edn root-eid))))
 
        (td/with-tdb (td/new-tdb)
          (let [edn-val  #{1 2 3}
-               root-eid (td/add-edn-entity edn-val)]
+               root-eid (td/add-entity-edn edn-val)]
            (is= edn-val (td/eid->edn root-eid))))
 
        (td/with-tdb (td/new-tdb)
          (let [edn-val  {:val "hello"}
-               root-eid (td/add-edn-entity edn-val)]
+               root-eid (td/add-entity-edn edn-val)]
            (is= edn-val (td/eid->edn root-eid))))
 
        (td/with-tdb (td/new-tdb)
@@ -1008,24 +1008,24 @@
                          :g :green
                          :h "hotel"
                          :i 1}
-               root-eid (td/add-edn-entity data-val)]
+               root-eid (td/add-entity-edn data-val)]
            (is= data-val (td/eid->edn root-eid)))))
 
      (dotest
        (td/with-tdb (td/new-tdb)
          (let [edn-val    #{1 2 3}
-               root-hid   (td/add-edn-entity edn-val)
+               root-hid   (td/add-entity-edn edn-val)
                ; >> (spyx-pretty (deref td/*tdb*))
                edn-result (td/eid->edn root-hid)]
            (is (set? edn-result)) ; ***** Sets are coerced to vectors! *****
            (is-set= [1 2 3] edn-result)))
        (td/with-tdb (td/new-tdb)
          (let [edn-val  #{:a 1 :b 2}
-               root-hid (td/add-edn-entity edn-val)]
+               root-hid (td/add-entity-edn edn-val)]
            (is= edn-val (td/eid->edn root-hid))))
        (td/with-tdb (td/new-tdb)
          (let [edn-val  {:a 1 :b #{1 2 3}}
-               root-hid (td/add-edn-entity edn-val)]
+               root-hid (td/add-entity-edn edn-val)]
            (is= edn-val (td/eid->edn root-hid)))))
 
        (dotest
@@ -1038,7 +1038,7 @@
                          :g :green
                          :h "hotel"
                          :i 1}
-               root-eid (td/add-edn-entity data)]
+               root-eid (td/add-entity-edn data)]
            (is= 1001 root-eid)
            (let [found (td/query [{:a ?}])]
              (is= (td/eid->edn (val (only2 found)))
@@ -1076,7 +1076,7 @@
                               {:a 5 :b "fifth"}
                               {:a 1 :b 101}
                               {:a 1 :b 102}]
-               root-hid      (td/add-edn-entity data)
+               root-hid      (td/add-entity-edn data)
                found         (td/query [{:eid ? a1 1}])
                eids          (mapv #(grab :eid %) found)
                one-leaf-maps (mapv #(td/eid->edn %) eids)]
@@ -1096,7 +1096,7 @@
                          {:b 2 :x 102}
                          {:c 1 :x 301}
                          {:c 2 :x 302}]
-               root-hid (td/add-edn-entity data)
+               root-hid (td/add-entity-edn data)
                found    (td/query [{:eid ? :a 1}])]
            (is= (td/eid->edn (grab :eid (only found)))
              {:a 1 :x :first}))))
@@ -1109,7 +1109,7 @@
                          {:a 2 :b 2 :c 4}
                          {:a 2 :b 1 :c 5}
                          {:a 2 :b 2 :c 6}]
-               root-hid (td/add-edn-entity data)]
+               root-hid (td/add-entity-edn data)]
            (let [found (td/query [{:eid ? :a 1}])]
              (is-set= (mapv #(td/eid->edn (grab :eid %)) found)
                [{:a 1, :b 1, :c 1}
@@ -1145,7 +1145,7 @@
          (let [data     {:a [{:id [2 22] :color :red}
                              {:id [3 33] :color :yellow}
                              {:id [4 44] :color :blue}]}
-               root-eid (td/add-edn-entity data)]
+               root-eid (td/add-entity-edn data)]
            (is-set= (td/query [{:a [{:color cc}]}])
              [{:cc :red}
               {:cc :blue}
@@ -1156,7 +1156,7 @@
          (let [data     {:a [{:id [2 22] :color :red}
                              {:id [3 33] :color :yellow}
                              {:id [4 44] :color :blue}]}
-               root-eid (td/add-edn-entity data)
+               root-eid (td/add-entity-edn data)
                result   (td/walk-compact (td/query [{:a [{:eid eid-red :color :red}]}]))]
            (is= result ; #todo fix duplicates for array search
              [{:eid-red  1003}
@@ -1175,7 +1175,7 @@
                                  {:ident 3 :flower :daisy}
                                  {:ident 4 :flower :tulip}
                                  ]}}
-               root-hid (td/add-edn-entity data)
+               root-hid (td/add-entity-edn data)
                result   (td/walk-compact (td/query [{:eid ? :a [{:id ?}]}]))]
            (is-set= result
              [{:eid  1001 :id 2}
@@ -1195,7 +1195,7 @@
          (let [data     {:a [{:id 2 :color :red}
                              {:id 3 :color :yellow}
                              {:id 4 :color :blue}]}
-               root-hid (td/add-edn-entity data)]
+               root-hid (td/add-entity-edn data)]
            (is= (td/eid->edn (grab :eid (only (td/query [{:eid ? :color :red}]))))
              {:color :red, :id 2})
            (is= (td/eid->edn (grab :eid (only (td/query [{:eid ? :id 4}]))))
@@ -1213,7 +1213,7 @@
                                  {:ident 3 :flower :daisy}
                                  {:ident 4 :flower :tulip}
                                  ]}}
-               root-hid (td/add-edn-entity data)]
+               root-hid (td/add-entity-edn data)]
            (is= (td/eid->edn (grab :eid (only (td/query [{:eid ?, :id 2}]))))
              {:color :red, :id 2})
            (is= (td/eid->edn (grab :eid (only (td/query [{:eid ?, :ident 2}]))))
@@ -1226,7 +1226,7 @@
        (dotest
        (td/with-tdb (td/new-tdb)
          (let [
-               root-eid         (td/add-edn-entity skynet-widgets)
+               root-eid         (td/add-entity-edn skynet-widgets)
                search-results   (td/query [{:basic-info        {:producer-code ?}
                                                  :widgets      [{:widget-code      ?
                                                                  :widget-type-code wtc}]
@@ -1275,7 +1275,7 @@
                          {:a 2 :b 2 :c 4}
                          {:a 2 :b 1 :c 5}
                          {:a 2 :b 2 :c 6}]
-               root-hid (td/add-edn-entity data)]
+               root-hid (td/add-entity-edn data)]
            (let [found (td/query [{:eid eid :a 1}
                                   (search-triple eid :b 2)])]
              (is-set= (mapv #(td/eid->edn (grab :eid %)) found)
@@ -1309,7 +1309,7 @@
                                  :state    "IN"
                                  :zip      "46203"}]}
 
-               root-eid (td/add-edn-entity person)
+               root-eid (td/add-entity-edn person)
                ]
            (is-set= (distinct (td/query [{:zip ?}]))
              [{:zip "12345"}
@@ -1349,7 +1349,7 @@
                                        :zip       "86753"
                                        :preferred true}]}]
 
-               root-eid (td/add-edn-entity people)
+               root-eid (td/add-entity-edn people)
                results  (td/query [{:name ? :addresses [{:address1 ? :zip "86753"}]}])]
            (is-set= results
              [{:name "jimmy", :address1 "543 Other St"}
@@ -1358,7 +1358,7 @@
      (dotest
        (td/eid-count-reset)
        (td/with-tdb (td/new-tdb)
-         (let [root-eid (td/add-edn-entity users-and-accesses)]
+         (let [root-eid (td/add-entity-edn users-and-accesses)]
            (let [results (td/query [{:people [{:name ? :id id}]}])]
              (is-set= results
                [{:name "jimmy", :id 1}
@@ -1489,7 +1489,7 @@
        (dotest
        (td/eid-count-reset)
        (td/with-tdb (td/new-tdb)
-         (let [root-eid (td/add-edn-entity users-and-accesses)]
+         (let [root-eid (td/add-entity-edn users-and-accesses)]
            ; ***** this is the big one! *****
            (let [results (td/query
                            [{:people [{:name ? :id id}]
@@ -1504,7 +1504,7 @@
        (dotest
        (td/eid-count-reset)
        (td/with-tdb (td/new-tdb)
-         (let [root-eid (td/add-edn-entity skynet-widgets)
+         (let [root-eid (td/add-entity-edn skynet-widgets)
                results  (td/query
                           [{:basic-info   {:producer-code ?}
                             :widgets      [{:widget-code      ?
@@ -1551,7 +1551,7 @@
        (dotest
        (td/eid-count-reset)
        (td/with-tdb (td/new-tdb)
-         (let [root-eid (td/add-edn-entity {:a 1 :b {:c 3 :d [4 5 6]}})
+         (let [root-eid (td/add-entity-edn {:a 1 :b {:c 3 :d [4 5 6]}})
                str-out  (with-out-str
                           (td/walk-entity root-eid
                             {:enter (fn [triple] (spy :enter triple))
@@ -1586,7 +1586,7 @@
        (is= (td/ave->eav [:a :v :e]) [:e :a :v])
        (td/eid-count-reset)
        (td/with-tdb (td/new-tdb)
-         (let [root-eid (td/add-edn-entity {:a "fred" :b [0 1 2] :c #{4 5 6}})]
+         (let [root-eid (td/add-entity-edn {:a "fred" :b [0 1 2] :c #{4 5 6}})]
            (is= (td/eid->type (->Eid 1001)) :map)
            (is= (td/eid->type (->Eid 1002)) :array)
            (is= (td/eid->type (->Eid 1003)) :set))))
@@ -1594,7 +1594,7 @@
      (dotest
        (td/eid-count-reset)
        (td/with-tdb (td/new-tdb)
-         (let [root-eid (td/add-edn-entity {:a "fred" :b [0 1 2]})]
+         (let [root-eid (td/add-entity-edn {:a "fred" :b [0 1 2]})]
            ; (prn dashes) (td/walk-compact (deref *tdb*))
            (throws? (td/remove-root-entity 1002))
            (is= (td/eid->edn 1002) [0 1 2])
@@ -1605,8 +1605,8 @@
            (is= (td/eid->edn root-eid) {:a "fred"})))
        (td/eid-count-reset)
        (td/with-tdb (td/new-tdb)
-         (let [e0 (td/add-edn-entity {:f "fred"})
-               e1 (td/add-edn-entity {:w "wilma"})]
+         (let [e0 (td/add-entity-edn {:f "fred"})
+               e1 (td/add-entity-edn {:w "wilma"})]
            (is= (td/eid->edn e0) {:f "fred"})
            (td/remove-root-entity e0)
            (throws? (td/eid->edn e0))
@@ -1615,7 +1615,7 @@
      (dotest
        (td/eid-count-reset)
        (td/with-tdb (td/new-tdb)
-         (let [root-eid (td/add-edn-entity {:a 1})]
+         (let [root-eid (td/add-entity-edn {:a 1})]
            ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
 
            (td/entity-add-map-entry root-eid :b 2) ; legal add
@@ -1636,7 +1636,7 @@
      (dotest
        (td/eid-count-reset)
        (td/with-tdb (td/new-tdb)
-         (let [root-eid (td/add-edn-entity [0 1])]
+         (let [root-eid (td/add-entity-edn [0 1])]
            ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
            (throws? (td/entity-add-array-elem 9999 9 99)) ; invalid eid
            (throws? (td/entity-add-array-elem root-eid :a 99)) ; non-primitive key
@@ -1654,7 +1654,7 @@
      (dotest
        (td/eid-count-reset)
        (td/with-tdb (td/new-tdb)
-         (let [root-eid (td/add-edn-entity #{:a :b})]
+         (let [root-eid (td/add-entity-edn #{:a :b})]
            ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
            (throws? (td/entity-add-set-elem 9999 2)) ; invalid eid
            (throws? (td/entity-add-set-elem root-eid [1 2])) ; non-primitive key

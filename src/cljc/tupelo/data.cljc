@@ -707,7 +707,7 @@
            :else (update-in the-map parent-keys dissoc key-to-clear))))
 
      ;-----------------------------------------------------------------------------
-     (declare add-edn-entity-impl)
+     (declare add-entity-edn-impl)
 
      (s/defn entity-add-map-entry
        "Adds a new attr-val pair to an existing map entity."
@@ -720,10 +720,10 @@
          (let [teid        (coerce->Eid eid)
                tattr       (if (primitive? attr)
                              (->Prim attr)
-                             (add-edn-entity-impl attr))
+                             (add-entity-edn-impl attr))
                tval        (if (primitive? value)
                              (->Prim value)
-                             (add-edn-entity-impl value))
+                             (add-entity-edn-impl value))
                entity-type (fetch-in @*tdb* [:eid-type teid])
                idx-eav     (grab :idx-eav (deref *tdb*))
                ea-triples  (index/prefix-match->seq [teid tattr] idx-eav)]
@@ -762,7 +762,7 @@
                tidx        (->Idx idx-in)
                tval        (if (primitive? value)
                              (->Prim value)
-                             (add-edn-entity-impl value))
+                             (add-entity-edn-impl value))
                entity-type (eid->type teid)
                idx-eav     (grab :idx-eav (deref *tdb*))
                ea-triples  (index/prefix-match->seq [teid tidx] idx-eav)]
@@ -787,7 +787,7 @@
          (let [teid        (coerce->Eid eid)
                tval        (if (primitive? value)
                              (->Prim value)
-                             (add-edn-entity-impl value))
+                             (add-entity-edn-impl value))
                entity-type (eid->type teid)
                idx-eav     (grab :idx-eav (deref *tdb*))
                ea-triples  (index/prefix-match->seq [teid tval] idx-eav)]
@@ -801,7 +801,7 @@
            (db-add-triple [teid tval tval])
            teid)))
 
-     (s/defn ^:no-doc add-edn-entity-impl :- Eid ; #todo maybe rename:  load-edn->eid  ???
+     (s/defn ^:no-doc add-entity-edn-impl :- Eid ; #todo maybe rename:  load-edn->eid  ???
        [entity-edn :- s/Any]
        ;(spydiv)
        ;(newline)
@@ -834,10 +834,10 @@
              :else (throw (ex-info "unknown value found" (vals->map entity-edn))))
            teid)))
 
-     (s/defn add-edn-entity :- s/Int
+     (s/defn add-entity-edn :- s/Int
        "Add the EDN entity (map, array, or set) to the db, returning the EID"
        [entity-edn :- tsk/Collection]
-       (<val (add-edn-entity-impl entity-edn)))
+       (<val (add-entity-edn-impl entity-edn)))
 
      ;-----------------------------------------------------------------------------
      ; #todo (defn remove-entity [eid] ...)
