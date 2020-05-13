@@ -1591,28 +1591,26 @@
            (is= (td/eid->type (->Eid 1002)) :array)
            (is= (td/eid->type (->Eid 1003)) :set))))
 
-     (comment
-       (dotest-focus
-         (td/eid-count-reset)
-         (td/with-tdb (td/new-tdb)
-           (let [root-eid (td/add-edn-entity {:a "fred" :b [0 1 2]})]
-             (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
-             (throws? (td/remove-root-entity 1002))
-             (is= (td/eid->edn 1002) [0 1 2])
-             (td/entity-remove-array-elem 1002 1)
-             (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
-             (is= (td/eid->edn root-eid) {:a "fred", :b [0 2]})
-             (td/entity-remove-map-entry 1001 :b)
-             (is= (td/eid->edn root-eid) {:a "fred"})))
-         ;(td/eid-count-reset)
-         ;(td/with-tdb (td/new-tdb)
-         ;  (let [e0 (td/add-edn-entity {:f "fred"})
-         ;        e1 (td/add-edn-entity {:w "wilma"})]
-         ;    (is= (td/eid->edn e0) {:f "fred"})
-         ;    (td/remove-root-entity e0)
-         ;    (throws? (td/eid->edn e0))
-         ;    (is= (td/eid->edn e1) {:w "wilma"})))
-         ))
+     (dotest
+       (td/eid-count-reset)
+       (td/with-tdb (td/new-tdb)
+         (let [root-eid (td/add-edn-entity {:a "fred" :b [0 1 2]})]
+           ; (prn dashes) (td/walk-compact (deref *tdb*))
+           (throws? (td/remove-root-entity 1002))
+           (is= (td/eid->edn 1002) [0 1 2])
+           (td/entity-remove-array-elem 1002 1)
+           ; (prn dashes) (td/walk-compact (deref *tdb*))
+           (is= (td/eid->edn root-eid) {:a "fred", :b [0 2]})
+           (td/entity-remove-map-entry 1001 :b)
+           (is= (td/eid->edn root-eid) {:a "fred"})))
+       (td/eid-count-reset)
+       (td/with-tdb (td/new-tdb)
+         (let [e0 (td/add-edn-entity {:f "fred"})
+               e1 (td/add-edn-entity {:w "wilma"})]
+           (is= (td/eid->edn e0) {:f "fred"})
+           (td/remove-root-entity e0)
+           (throws? (td/eid->edn e0))
+           (is= (td/eid->edn e1) {:w "wilma"}))) )
 
      (dotest
        (td/eid-count-reset)
@@ -1638,17 +1636,6 @@
      (dotest
        (td/eid-count-reset)
        (td/with-tdb (td/new-tdb)
-         (let [root-eid (td/add-edn-entity #{:a :b})]
-           ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
-           (throws? (td/entity-add-set-elem 9999 2)) ; invalid eid
-           (throws? (td/entity-add-set-elem root-eid [1 2])) ; non-primitive key
-           (throws? (td/entity-add-set-elem root-eid :a)) ; duplicate key
-           (td/entity-add-set-elem root-eid :c) ; legal add
-           (is= (td/eid->edn root-eid) #{:a :b :c}))))
-
-     (dotest
-       (td/eid-count-reset)
-       (td/with-tdb (td/new-tdb)
          (let [root-eid (td/add-edn-entity [0 1])]
            ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
            (throws? (td/entity-add-array-elem 9999 9 99)) ; invalid eid
@@ -1663,6 +1650,17 @@
            (td/entity-add-array-elem root-eid 99 {:a 1 :b #{:c :d}}) ; legal add
            ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
            (is= (td/eid->edn root-eid) [0 1 3 9 {:a 1, :b #{:c :d}}]))))
+
+     (dotest
+       (td/eid-count-reset)
+       (td/with-tdb (td/new-tdb)
+         (let [root-eid (td/add-edn-entity #{:a :b})]
+           ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
+           (throws? (td/entity-add-set-elem 9999 2)) ; invalid eid
+           (throws? (td/entity-add-set-elem root-eid [1 2])) ; non-primitive key
+           (throws? (td/entity-add-set-elem root-eid :a)) ; duplicate key
+           (td/entity-add-set-elem root-eid :c) ; legal add
+           (is= (td/eid->edn root-eid) #{:a :b :c}))))
 
 
      (comment ; <<comment>>
