@@ -14,7 +14,7 @@
                                        it-> fetch-in
                                        ]]
             [tupelo.data :as td :refer [with-tdb new-tdb eid-count-reset lookup query-triples query-triples->tagged boolean->binary search-triple
-                                        *tdb* <tag <val ->Eid Eid? ->Idx Idx? ->Prim Prim? ->Param Param?
+                                        *tdb* <tag <val ->Eid Eid? ->Idx Idx? ->Prim Prim? ->Param Param? map-plain?
                                         ]]
             [clojure.string :as str]
             [schema.core :as s]
@@ -128,36 +128,65 @@
          (is= 1 (td/untagged tv))
          (is= 1 (td/untagged 1)))
 
+       (let [idx5 (->Idx 5)]
+         (is (map? {:a 1})) ; expected
+         (is (map-plain? (sorted-map))) ; expected
+         (isnt (record? {:a 1})) ; expected
+         (is (record? idx5)) ; expected
+         (is (map? idx5)) ; *** problem ***
+
+         (is (map-plain? {:a 1})) ; solution
+         (isnt (map-plain? idx5))) ;solution
+
+       (let [vv [1 2 3]]
+         (isnt (map? vv))
+         (isnt (map-plain? vv)))
+
        (let [sa  (t/->sym :a)
              tva (td/->TagVal :sym sa)]
          (is= (unlazy tva) {:tag :sym, :val (quote a)})))
 
-       (dotest
+     (dotest
        (let [eid5 (->Eid 5)]
          (is= 5 (<val eid5))
          (is= (type eid5) tupelo.data.Eid)
          (is= (instance? Eid eid5) true)
          (is (Eid? eid5))
-         (is= (td/walk-compact eid5) {:eid 5}))
+         (is= (td/walk-compact eid5) {:eid 5})
+         (is= eid5 (td/coerce->Eid 5))
+         (is= eid5 (td/coerce->Eid eid5))
+         (is= eid5 (td/coerce->Eid {:eid 5}))
+         (throws? (td/coerce->Eid {:idx 5}))
+         (throws? (td/coerce->Eid :a)))
        (let [idx5 (->Idx 5)]
          (is= 5 (<val idx5))
          (is= (type idx5) tupelo.data.Idx)
          (is= (instance? Idx idx5) true)
          (is (Idx? idx5))
-         (is= (td/walk-compact idx5) {:idx 5}))
+         (is= (td/walk-compact idx5) {:idx 5})
+         (is= idx5 (td/coerce->Idx 5))
+         (is= idx5 (td/coerce->Idx idx5))
+         (is= idx5 (td/coerce->Idx {:idx 5}))
+         (throws? (td/coerce->Idx {:eid 5}))
+         (throws? (td/coerce->Idx :a)) )
        (let [prim5 (->Prim 5)]
          (is= 5 (<val prim5))
          (is= (type prim5) tupelo.data.Prim)
          (is= (instance? Prim prim5) true)
          (is (Prim? prim5))
-         (is= (td/walk-compact prim5) {:prim 5}))
+         (is= (td/walk-compact prim5) {:prim 5})
+         (is= prim5 (td/coerce->Prim 5))
+         (is= prim5 (td/coerce->Prim prim5))
+         (is= prim5 (td/coerce->Prim {:prim 5}))
+         (is= (->Prim :a) (td/coerce->Prim :a))
+         (is= (->Prim "abc") (td/coerce->Prim "abc"))
+         (throws? (td/coerce->Prim {:idx 5})))
        (let [param5 (->Param 5)]
          (is= 5 (<val param5))
          (is= (type param5) tupelo.data.Param)
          (is= (instance? Param param5) true)
          (is (Param? param5))
-         (is= (td/walk-compact param5) {:param 5}))
-       )
+         (is= (td/walk-compact param5) {:param 5})))
 
      ;-----------------------------------------------------------------------------
      (dotest
@@ -1562,26 +1591,28 @@
            (is= (td/eid->type (->Eid 1002)) :array)
            (is= (td/eid->type (->Eid 1003)) :set))))
 
-     (dotest
-       (td/eid-count-reset)
-       (td/with-tdb (td/new-tdb)
-         (let [root-eid (td/add-edn-entity {:a "fred" :b [0 1 2]})]
-           ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
-           (throws? (td/remove-root-entity 1002))
-           (is= (td/eid->edn 1002) [0 1 2])
-           (td/remove-entity-elem 1002 (->Idx 1))
-           ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
-           (is= (td/eid->edn root-eid) {:a "fred", :b [0 2]})
-           (td/remove-entity-elem 1001 :b)
-           (is= (td/eid->edn root-eid) {:a "fred"})))
-       (td/eid-count-reset)
-       (td/with-tdb (td/new-tdb)
-         (let [e0 (td/add-edn-entity {:f "fred"})
-               e1 (td/add-edn-entity {:w "wilma"})]
-           (is= (td/eid->edn e0) {:f "fred"})
-           (td/remove-root-entity e0)
-           (throws? (td/eid->edn e0))
-           (is= (td/eid->edn e1) {:w "wilma"}))))
+     (comment
+       (dotest-focus
+         (td/eid-count-reset)
+         (td/with-tdb (td/new-tdb)
+           (let [root-eid (td/add-edn-entity {:a "fred" :b [0 1 2]})]
+             (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
+             (throws? (td/remove-root-entity 1002))
+             (is= (td/eid->edn 1002) [0 1 2])
+             (td/entity-remove-array-elem 1002 1)
+             (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
+             (is= (td/eid->edn root-eid) {:a "fred", :b [0 2]})
+             (td/entity-remove-map-entry 1001 :b)
+             (is= (td/eid->edn root-eid) {:a "fred"})))
+         ;(td/eid-count-reset)
+         ;(td/with-tdb (td/new-tdb)
+         ;  (let [e0 (td/add-edn-entity {:f "fred"})
+         ;        e1 (td/add-edn-entity {:w "wilma"})]
+         ;    (is= (td/eid->edn e0) {:f "fred"})
+         ;    (td/remove-root-entity e0)
+         ;    (throws? (td/eid->edn e0))
+         ;    (is= (td/eid->edn e1) {:w "wilma"})))
+         ))
 
      (dotest
        (td/eid-count-reset)

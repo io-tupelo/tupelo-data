@@ -12,7 +12,7 @@
             [tupelo.core :as t :refer [spy spyx spyxx spyx-pretty with-spy-indent
                                        grab glue map-entry indexed only only2 xfirst xsecond xthird xlast xrest not-empty?
                                        it-> cond-it-> forv vals->map fetch-in let-spy sym->kw
-                                       keep-if drop-if append prepend ->sym ->kw kw->sym
+                                       keep-if drop-if append prepend ->sym ->kw kw->sym validate
                                        ]]
             [tupelo.data.index :as index]
             [tupelo.lexical :as lex]
@@ -151,10 +151,17 @@
      ; #todo data-readers for #td/eid #td/idx #td/prim #td/param
 
      ;-----------------------------------------------------------------------------
+     (s/defn map-plain? :- s/Bool ; #todo => tupelo
+       "Like clojure.core/map?, but returns false for records."
+       [arg :- s/Any]
+       (and (map? arg) (not (record? arg))) )
+
      (s/defn tagmap? :- s/Bool
        "Returns true iff arg is a map that looks like:  {:some-tag <some-primative>}"
        [item]
-       (and (map? item)
+       ; (spyx :tagmap?--enter item )
+       ; (spyx :tagmap?--leave)
+       (and (map-plain? item)
          (= 1 (count item))
          (keyword? (only (keys item)))))
 
@@ -338,10 +345,44 @@
              (primitive-data? (<val arg)))
            (symbol? arg))))
 
-     (defn ^:no-doc wrap-primitive ; #todo remove this crutch???
-       [item]
-       (cond-it-> item
-         (primitive-data? it) (->Prim it)) )
+     (s/defn coerce->Eid :- Eid ; #todo reimplement in terms of walk-entity ???
+       "Coerce any non-Eid input to Eid"
+       [arg ; :- (s/pred Eid s/Int) ; #todo fix
+        ]
+       (cond
+         (Eid? arg) arg
+         (int? arg) (->Eid arg)
+         (tagmap? arg) (validate Eid? (tagmap-reader arg))
+         :else (throw (ex-info "Invalid type found:" (:arg arg :type (type arg))))))
+
+     (s/defn coerce->Idx :- Idx ; #todo reimplement in terms of walk-entity ???
+       "Coerce any non-Idx input to Idx"
+       [arg ; :- (s/pred Eid s/Int) ; #todo fix
+        ]
+       (cond
+         (Idx? arg) arg
+         (int? arg) (->Idx arg)
+         (tagmap? arg) (validate Idx? (tagmap-reader arg))
+         :else (throw (ex-info "Invalid type found:" (:arg arg :type (type arg))))))
+
+     (s/defn coerce->Prim :- Prim ; #todo reimplement in terms of walk-entity ???
+       "Coerce any non-Prim input to Prim"
+       [arg ; :- (s/pred Eid s/Int) ; #todo fix
+        ]
+       (cond
+         (Prim? arg) arg
+         (primitive-data? arg) (->Prim arg)
+         (tagmap? arg) (validate Prim? (tagmap-reader arg))
+         :else (throw (ex-info "Invalid type found:" (:arg arg :type (type arg))))))
+
+     (defn untagged->Prim
+       "Coerce any primitive data or tagmap input to Prim"
+       [arg]
+       ; (spyx :untagged->Prim arg )
+       (cond
+         (primitive-data? arg) (->Prim arg)
+         (tagmap? arg) (validate Prim? (tagmap-reader arg))
+         :else arg)) ; assume already tagged
 
      (def TripleIndex #{tsk/Triple})
 
@@ -353,7 +394,7 @@
        (let [unlazy-item (fn [item]
                            (cond
                              (sequential? item) (vec item)
-                             (map? item) (t/->sorted-map-generic item)
+                             (map-plain? item) (t/->sorted-map-generic item)
                              (set? item) (t/->sorted-set-generic item)
                              :else item))
              result      (walk/postwalk unlazy-item edn-data)]
@@ -451,9 +492,9 @@
        [edn :- s/Any]
        (cond
          (primitive-data? edn) :primitive ; #todo specialize to :int :float etc
-         (map? edn) :map
-         (set? edn) :set
          (sequential? edn) :array
+         (map-plain? edn) :map
+         (set? edn) :set
          :else (throw (ex-info "unknown EDN type " (vals->map edn)))))
 
      (s/defn eid->type
@@ -567,8 +608,7 @@
        (assert (or (int? eid-in  )
                  (Eid? eid-in)))
        (eid->edn-impl ; #todo fix crutch
-         (cond-it-> eid-in
-           (int? it) (->Eid it))))
+         (coerce->Eid eid-in)))
 
      ;---------------------------------------------------------------------------------------------------
      (def Interceptor ; #todo tupelo.schema (& tupelo.forest)
@@ -677,7 +717,7 @@
        (when-not (primitive? attr) ; #todo generalize?
          (throw (ex-info "Attribute must be primitive (non-collection) type" (vals->map attr value))))
        (with-spy-indent
-         (let [teid        (->Eid eid)
+         (let [teid        (coerce->Eid eid)
                tattr       (if (primitive? attr)
                              (->Prim attr)
                              (add-edn-entity-impl attr))
@@ -718,7 +758,7 @@
        (when-not (int? idx-in)
          (throw (ex-info "Index must be integer type" (vals->map eid idx-in))))
        (with-spy-indent
-         (let [teid        (->Eid eid)
+         (let [teid        (coerce->Eid eid)
                tidx        (->Idx idx-in)
                tval        (if (primitive? value)
                              (->Prim value)
@@ -744,7 +784,7 @@
        (when-not (primitive? value) ; #todo generalize?
          (throw (ex-info "Attribute must be primitive (non-collection) type" (vals->map value))))
        (with-spy-indent
-         (let [teid        (->Eid eid)
+         (let [teid        (coerce->Eid eid)
                tval        (if (primitive? value)
                              (->Prim value)
                              (add-edn-entity-impl value))
@@ -808,9 +848,10 @@
      (s/defn remove-triple
        "Recursively removes an EAV triple of data from the db."
        [triple-eav :- tsk/Triple] ; #todo add db arg version
+       ; (spyx :remove-triple triple-eav)
        (let [[-e- a-in v-in] triple-eav
-             a              (wrap-primitive a-in)
-             v              (wrap-primitive v-in)
+             a              (untagged->Prim a-in)
+             v              (untagged->Prim v-in)
              triple-wrapped [-e- a v]]
          ; (spyx-pretty triple-wrapped)
          (when-not (db-contains-triple? triple-wrapped)
@@ -830,23 +871,65 @@
          (doseq [triple-eav eav-triples]
            (remove-triple triple-eav))))
 
-     (s/defn remove-entity-elem
-       "Recursively removes an element EAV triple of data from the db."
-       [eid-in  :- EidType
+     (s/defn entity-remove-map-entry
+       "Recursively removes an attr-val pair from a map entity"
+       [eid ; :- #todo fix
         attr :- s/Any] ; #todo add db arg version
-       (let [teid        (->Eid eid-in)
-             tattr       (wrap-primitive attr)
+       (let [teid        (coerce->Eid eid)
+             tattr       (coerce->Prim attr)
+             entity-type (eid->type teid)
              idx-eav     (grab :idx-eav (deref *tdb*))
              eav-triples (index/prefix-match->seq [teid tattr] idx-eav)
              >>          (when (< 1 (count eav-triples))
                            (throw (ex-info "multiple elements found" (vals->map teid tattr eav-triples))))
              triple-eav  (only eav-triples)
              [-e- -a- v] triple-eav]
+         (when-not (= :map entity-type)
+           (throw (ex-info "non map type found" (vals->map teid entity-type))))
+         (when (tagged-eid? v)
+           (remove-entity (<val v)))
+         (db-remove-triple triple-eav)))
+
+     (s/defn entity-remove-array-elem
+       "Recursively removes an index location from an array entity"
+       [eid ; :- #todo fix
+        idx :- s/Any] ; #todo add db arg version
+       (let [teid        (coerce->Eid eid)
+             tattr       (->Idx idx)
+             entity-type (eid->type teid)
+             idx-eav     (grab :idx-eav (deref *tdb*))
+             eav-triples (index/prefix-match->seq [teid tattr] idx-eav)
+             >>          (when (< 1 (count eav-triples))
+                           (throw (ex-info "multiple elements found" (vals->map teid tattr eav-triples))))
+             triple-eav  (only eav-triples)
+             [-e- -a- v] triple-eav]
+         (when-not (= :array entity-type)
+           (throw (ex-info "non array type found" (vals->map teid entity-type))))
          (when (tagged-eid? v)
            (remove-entity (<val v)))
          (db-remove-triple triple-eav)
-         (when (= :array (eid->type teid))
-           (array-entity-rerack teid))))
+         (array-entity-rerack teid)))
+
+     (s/defn entity-remove-set-entry
+       "Recursively removes an attr-val pair from a set entity"
+       [eid ; :- #todo fix
+        attr :- s/Any] ; #todo add db arg version
+       (let [teid        (coerce->Eid eid)
+             tattr       (coerce->Prim attr)
+             entity-type (eid->type teid)
+             idx-eav     (grab :idx-eav (deref *tdb*))
+             eav-triples (index/prefix-match->seq [teid tattr] idx-eav)
+             >>          (when (< 1 (count eav-triples))
+                           (throw (ex-info "multiple elements found" (vals->map teid tattr eav-triples))))
+             triple-eav  (only eav-triples)
+             [-e- -a- v] triple-eav]
+         (when-not (= :map entity-type)
+           (throw (ex-info "non map type found" (vals->map teid entity-type))))
+         (when (tagged-eid? v)
+           (remove-entity (<val v)))
+         (db-remove-triple triple-eav)))
+
+
 
      (s/defn remove-root-entity
        "Recursively removes an entity from the db."
@@ -1075,7 +1158,7 @@
                     (cum-vector-append triple-modified)
                     (query->triples-impl qmaps-modified))
 
-                  (map? vv)
+                  (map-plain? vv)
                   (let [tmp-eid         (gensym "tmp-eid-")
                         triple-modified (search-triple-fn [eid-val kk tmp-eid])
                         ; >>              (spyx triple-modified)
@@ -1137,7 +1220,7 @@
        [query-specs]
        ; (spyx-pretty :query->wrapped-fn-enter query-specs)
        (exclude-reserved-identifiers query-specs)
-       (let [maps-in      (keep-if map? query-specs)
+       (let [maps-in      (keep-if map-plain? query-specs)
              triple-forms (keep-if search-triple-form? query-specs)
              pred-forms   (keep-if #(and (not (search-triple-form? %))
                                       (fn-form? %)) query-specs)
