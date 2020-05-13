@@ -10,8 +10,8 @@
   #?(:clj (:require
             [tupelo.test :refer [define-fixture deftest dotest dotest-focus is isnt is= isnt= is-set= is-nonblank= testing throws?]]
             [tupelo.core :as t :refer [spy spyx spyxx spy-pretty spyx-pretty unlazy let-spy
-                                       only only2 forv glue grab nl keep-if drop-if ->sym xfirst xsecond xthird
-                                       it-> fetch-in
+                                       only only2 forv glue grab nl keep-if drop-if ->sym xfirst xsecond xthird not-nil?
+                                       it-> fetch-in with-map-vals
                                        ]]
             [tupelo.data :as td :refer [with-tdb new-tdb eid-count-reset lookup query-triples query-triples->tagged boolean->binary search-triple
                                         *tdb* <tag <val ->Eid Eid? ->Idx Idx? ->Prim Prim? ->Param Param? map-plain?
@@ -1598,10 +1598,10 @@
            ; (prn dashes) (td/walk-compact (deref *tdb*))
            (throws? (td/remove-root-entity 1002))
            (is= (td/eid->edn 1002) [0 1 2])
-           (td/entity-remove-array-elem 1002 1)
+           (td/entity-array-elem-remove 1002 1)
            ; (prn dashes) (td/walk-compact (deref *tdb*))
            (is= (td/eid->edn root-eid) {:a "fred", :b [0 2]})
-           (td/entity-remove-map-entry 1001 :b)
+           (td/entity-mapentry-remove 1001 :b)
            (is= (td/eid->edn root-eid) {:a "fred"})))
        (td/eid-count-reset)
        (td/with-tdb (td/new-tdb)
@@ -1618,49 +1618,108 @@
          (let [root-eid (td/add-entity-edn {:a 1})]
            ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
 
-           (td/entity-add-map-entry root-eid :b 2) ; legal add
+           (td/entity-mapentry-add root-eid :b 2) ; legal add
            ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
            (is= (td/eid->edn root-eid) {:a 1 :b 2})
 
-           (throws? (td/entity-add-map-entry 9999 [1 2] 2)) ; invalid eid
-           (throws? (td/entity-add-map-entry root-eid [1 2] 2)) ; non-primitive key
-           (throws? (td/entity-add-map-entry root-eid :a 99)) ; duplicate key
+           (throws? (td/entity-mapentry-add 9999 [1 2] 2)) ; invalid eid
+           (throws? (td/entity-mapentry-add root-eid [1 2] 2)) ; non-primitive key
+           (throws? (td/entity-mapentry-add root-eid :a 99)) ; duplicate key
 
-           (td/entity-add-map-entry root-eid :c {:d 4 :e [5 6 7]})
+           (td/entity-mapentry-add root-eid :c {:d 4 :e [5 6 7]})
            ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
 
            (is= (td/walk-compact (td/eid->edn root-eid))
              {:a 1, :b 2, :c {:d 4, :e [5 6 7]}})
-           )))
+           (td/entity-mapentry-update root-eid :a inc)
+           (is= (td/walk-compact (td/eid->edn root-eid))
+             {:a 2, :b 2, :c {:d 4, :e [5 6 7]}}) )))
 
-     (dotest
+     (dotest-focus
        (td/eid-count-reset)
        (td/with-tdb (td/new-tdb)
          (let [root-eid (td/add-entity-edn [0 1])]
            ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
-           (throws? (td/entity-add-array-elem 9999 9 99)) ; invalid eid
-           (throws? (td/entity-add-array-elem root-eid :a 99)) ; non-primitive key
-           (throws? (td/entity-add-array-elem root-eid 0 99)) ; duplicate key
+           (throws? (td/entity-array-elem-add 9999 9 99)) ; invalid eid
+           (throws? (td/entity-array-elem-add root-eid :a 99)) ; non-primitive key
+           (throws? (td/entity-array-elem-add root-eid 0 99)) ; duplicate key
 
-           (td/entity-add-array-elem root-eid 3 3) ; legal add
-           (td/entity-add-array-elem root-eid 9 9) ; legal add
+           (td/entity-array-elem-add root-eid 3 3) ; legal add
+           (td/entity-array-elem-add root-eid 9 9) ; legal add
            ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
            (is= (td/eid->edn root-eid) [0 1 3 9])
 
-           (td/entity-add-array-elem root-eid 99 {:a 1 :b #{:c :d}}) ; legal add
+           (td/entity-array-elem-add root-eid 99 {:a 1 :b #{:c :d}}) ; legal add
            ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
-           (is= (td/eid->edn root-eid) [0 1 3 9 {:a 1, :b #{:c :d}}]))))
+           (is= (td/eid->edn root-eid) [0 1 3 9 {:a 1, :b #{:c :d}}])
+           (td/entity-array-elem-remove root-eid 1 )
+           (td/entity-array-elem-remove root-eid 0 )
+           ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
+           (is= (td/eid->edn root-eid)
+             [3 9 {:a 1, :b #{:c :d}}])
+           (td/entity-array-elem-update root-eid 0 #(* 14 %))
+           ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
+           (is= (td/eid->edn root-eid)
+             [42 9 {:a 1, :b #{:c :d}}])
+           )))
 
      (dotest
        (td/eid-count-reset)
        (td/with-tdb (td/new-tdb)
          (let [root-eid (td/add-entity-edn #{:a :b})]
            ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
-           (throws? (td/entity-add-set-elem 9999 2)) ; invalid eid
-           (throws? (td/entity-add-set-elem root-eid [1 2])) ; non-primitive key
-           (throws? (td/entity-add-set-elem root-eid :a)) ; duplicate key
-           (td/entity-add-set-elem root-eid :c) ; legal add
-           (is= (td/eid->edn root-eid) #{:a :b :c}))))
+           (throws? (td/entity-set-elem-add 9999 2)) ; invalid eid
+           (throws? (td/entity-set-elem-add root-eid [1 2])) ; non-primitive key
+           (throws? (td/entity-set-elem-add root-eid :a)) ; duplicate key
+           (td/entity-set-elem-add root-eid :c) ; legal add
+           (is= (td/eid->edn root-eid) #{:a :b :c})
+           (td/entity-set-elem-remove root-eid :c)
+           (is= (td/eid->edn root-eid) #{:a :b }) )))
+
+
+     ;---------------------------------------------------------------------------------------------------
+     (def clojutre-2019-power-of-lenses-laurinharju
+       {:employees [{:name "justice ward"
+                     :role :programmer
+                     :salary 86750 }
+                    {:name "geovanni morgan"
+                     :role :service-designer
+                     :salary 73882 }
+                    {:name nil }
+                    {:name ""
+                     :role :programmer
+                     :salary nil}
+                    {:name "raymond richard mathews"
+                     :role :programmer
+                     :salary 45930 } ]} )
+
+     (defn valid-name?
+       [result]
+       (with-map-vals result [name ]
+         (pos? (count (str name)))))
+
+     (defn valid-empl?
+       [result]
+       (with-map-vals result [salary]
+         (and
+           (number? salary)
+           (valid-name? result))))
+
+     (comment
+       (dotest
+         (td/eid-count-reset)
+         (td/with-tdb (td/new-tdb)
+           (let [root-eid     (td/add-entity-edn clojutre-2019-power-of-lenses-laurinharju)
+                 results-name (keep-if valid-name?
+                                (td/query ; don't even need to reference :employees or array
+                                  [{:name ? :role :programmer :salary ?}])) ; #todo allow inline & local functions
+                 results-prog (keep-if valid-empl?
+                                (td/query ; don't even need to reference :employees or array
+                                  [{:name ? :role :programmer :salary ?}])) ; #todo allow inline & local functions
+                 ]
+             (spyx-pretty results-name)
+             (spyx-pretty results-prog)
+             ))))
 
 
      (comment ; <<comment>>
