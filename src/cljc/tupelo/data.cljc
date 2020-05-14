@@ -80,6 +80,7 @@
      ;-----------------------------------------------------------------------------
      (defprotocol IVal (<val [this]))
      (defprotocol ITag (<tag [this]))
+     (defprotocol ITagMap (->tagmap [this]))
 
      (defrecord TagVal
        [tag val]
@@ -98,16 +99,20 @@
      ;-----------------------------------------------------------------------------
      (defrecord Eid
        [eid]
-       IVal (<val [this] eid))
+       IVal (<val [this] eid)
+       ITagMap (->tagmap [this] (vals->map eid)))
      (defrecord Idx
        [idx]
-       IVal (<val [this] idx))
+       IVal (<val [this] idx)
+       ITagMap (->tagmap [this] (vals->map idx)))
      (defrecord Prim
        [prim]
-       IVal (<val [this] prim))
+       IVal (<val [this] prim)
+       ITagMap (->tagmap [this] (vals->map prim)))
      (defrecord Param
        [param]
-       IVal (<val [this] param))
+       IVal (<val [this] param)
+       ITagMap (->tagmap [this] (vals->map param)))
 
      (s/defn Eid? :- s/Bool
        [arg :- s/Any] (instance? Eid arg))
@@ -192,10 +197,7 @@
        [data]
        (walk/postwalk (fn [item]
                         (t/cond-it-> item
-                          (instance? Eid it) {:eid (<val it)}
-                          (instance? Idx it) {:idx (<val it)}
-                          (instance? Prim it) {:prim (<val it)}
-                          (instance? Param it) {:param (<val it)}))
+                          (satisfies? ITagMap it) (->tagmap it)))
          data))
 
      ;-----------------------------------------------------------------------------
@@ -256,7 +258,7 @@
                    (t/with-nil-default item
                      (when (= (->sym :?) item)
                        (let [ancestors  (vec (reverse parents))
-                             mv-ent     (xfirst ancestors)
+                             -mv-ent-   (xfirst ancestors)
                              me         (xsecond ancestors)
                              me-key     (xfirst me)
                              me-key-sym (kw->sym me-key)]

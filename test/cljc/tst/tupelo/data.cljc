@@ -20,7 +20,7 @@
             [schema.core :as s]
             [tupelo.data.index :as index]
             ))
-  (:import [tupelo.data Eid Idx Prim Param]))
+  (:import [tupelo.data Eid Idx Prim Param ITagMap ITag]))
 
 ; #todo fix for cljs
 
@@ -148,6 +148,8 @@
 
      (dotest
        (let [eid5 (->Eid 5)]
+         (is (satisfies? td/ITagMap eid5))
+
          (is= 5 (<val eid5))
          (is= (type eid5) tupelo.data.Eid)
          (is= (instance? Eid eid5) true)
@@ -1395,7 +1397,6 @@
                 {:date "1-1-1970", :zip "12345", :id 2},
                 {:date "4-4-4444", :zip "54221", :id 3}]))
 
-           ; ***** this is the big one! *****
            (let [results (td/query
                            [{:people [{:name ? :id id}]}
                             {:addrs {id [{:zip ? :pref false}]}}
