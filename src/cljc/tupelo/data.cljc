@@ -750,7 +750,7 @@
          (doseq [triple triples-new]
            (db-add-triple triple))))
 
-     (s/defn entity-array-elem-add
+     (s/defn entity-array-idx-add
        "Adds a new idx-val pair to an existing map entity. "
        [eid :- s/Int
         idx-in :- s/Int
@@ -829,7 +829,7 @@
                                     (entity-set-elem-add eid-raw k-in))
 
              (= :array entity-type) (doseq [[idx val] (indexed entity-edn)]
-                                      (entity-array-elem-add eid-raw idx val))
+                                      (entity-array-idx-add eid-raw idx val))
 
              :else (throw (ex-info "unknown value found" (vals->map entity-edn))))
            teid)))
@@ -890,11 +890,11 @@
            (remove-entity (<val v)))
          (db-remove-triple triple-eav)))
 
-     (s/defn entity-array-elem-remove
+     (s/defn entity-array-idx-remove
        "Recursively removes an index location from an array entity"
        ([eid :- s/Int
          idx :- s/Int] ; #todo add db arg version
-        (entity-array-elem-remove {:eid eid :idx idx :rerack true}))
+        (entity-array-idx-remove {:eid eid :idx idx :rerack true}))
        ([ctx :- {:eid s/Int
                  :idx s/Int
                  :rerack s/Bool }]
@@ -950,7 +950,7 @@
      ; #todo update-set-elem
 
      (s/defn entity-mapentry-update
-       "Adds a new attr-val pair to an existing map entity."
+       "Update an attr-val pair in a map entity."
        [eid :- s/Int
         attr :- Primitive
         delta-fn] ; #todo add db arg version
@@ -960,16 +960,29 @@
          (entity-mapentry-remove eid attr)
          (entity-mapentry-add eid attr edn-next)))
 
-     (s/defn entity-array-elem-update
-       "Adds a new attr-val pair to an existing map entity."
+     (s/defn entity-array-idx-update
+       "Update an element in an array entity."
        [eid :- s/Int
         idx :- s/Int
         delta-fn] ; #todo add db arg version
        (assert (fn? delta-fn)) ; #todo can do in Schema?
        (let [edn-value (nth (eid->edn eid) idx)
              edn-next  (delta-fn edn-value)]
-         (entity-array-elem-remove {:eid eid :idx idx :rerack false})
-         (entity-array-elem-add eid idx edn-next)))
+         (entity-array-idx-remove {:eid eid :idx idx :rerack false})
+         (entity-array-idx-add eid idx edn-next)))
+
+     (s/defn entity-set-elem-update
+       "Update a value in a set entity."
+       [eid :- s/Int
+        value :- Primitive
+        delta-fn] ; #todo add db arg version
+       (assert (fn? delta-fn)) ; #todo can do in Schema?
+       (let [edn-set  (eid->edn eid)
+             >>       (when-not (contains? edn-set value)
+                        (throw (ex-info "Set element not found!" (vals->map value))))
+             edn-next (delta-fn value)]
+         (entity-set-elem-remove eid value)
+         (entity-set-elem-add eid edn-next)))
 
      ;-----------------------------------------------------------------------------
      (s/defn apply-env

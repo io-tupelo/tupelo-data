@@ -1598,7 +1598,7 @@
            ; (prn dashes) (td/walk-compact (deref *tdb*))
            (throws? (td/remove-root-entity 1002))
            (is= (td/eid->edn 1002) [0 1 2])
-           (td/entity-array-elem-remove 1002 1)
+           (td/entity-array-idx-remove 1002 1)
            ; (prn dashes) (td/walk-compact (deref *tdb*))
            (is= (td/eid->edn root-eid) {:a "fred", :b [0 2]})
            (td/entity-mapentry-remove 1001 :b)
@@ -1635,29 +1635,29 @@
            (is= (td/walk-compact (td/eid->edn root-eid))
              {:a 2, :b 2, :c {:d 4, :e [5 6 7]}}) )))
 
-     (dotest-focus
+     (dotest
        (td/eid-count-reset)
        (td/with-tdb (td/new-tdb)
          (let [root-eid (td/add-entity-edn [0 1])]
            ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
-           (throws? (td/entity-array-elem-add 9999 9 99)) ; invalid eid
-           (throws? (td/entity-array-elem-add root-eid :a 99)) ; non-primitive key
-           (throws? (td/entity-array-elem-add root-eid 0 99)) ; duplicate key
+           (throws? (td/entity-array-idx-add 9999 9 99)) ; invalid eid
+           (throws? (td/entity-array-idx-add root-eid :a 99)) ; non-primitive key
+           (throws? (td/entity-array-idx-add root-eid 0 99)) ; duplicate key
 
-           (td/entity-array-elem-add root-eid 3 3) ; legal add
-           (td/entity-array-elem-add root-eid 9 9) ; legal add
+           (td/entity-array-idx-add root-eid 3 3) ; legal add
+           (td/entity-array-idx-add root-eid 9 9) ; legal add
            ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
            (is= (td/eid->edn root-eid) [0 1 3 9])
 
-           (td/entity-array-elem-add root-eid 99 {:a 1 :b #{:c :d}}) ; legal add
+           (td/entity-array-idx-add root-eid 99 {:a 1 :b #{:c :d}}) ; legal add
            ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
            (is= (td/eid->edn root-eid) [0 1 3 9 {:a 1, :b #{:c :d}}])
-           (td/entity-array-elem-remove root-eid 1 )
-           (td/entity-array-elem-remove root-eid 0 )
+           (td/entity-array-idx-remove root-eid 1 )
+           (td/entity-array-idx-remove root-eid 0 )
            ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
            (is= (td/eid->edn root-eid)
              [3 9 {:a 1, :b #{:c :d}}])
-           (td/entity-array-elem-update root-eid 0 #(* 14 %))
+           (td/entity-array-idx-update root-eid 0 #(* 14 %))
            ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
            (is= (td/eid->edn root-eid)
              [42 9 {:a 1, :b #{:c :d}}])
@@ -1674,10 +1674,17 @@
            (td/entity-set-elem-add root-eid :c) ; legal add
            (is= (td/eid->edn root-eid) #{:a :b :c})
            (td/entity-set-elem-remove root-eid :c)
-           (is= (td/eid->edn root-eid) #{:a :b }) )))
+           (is= (td/eid->edn root-eid) #{:a :b})
+
+           (td/entity-set-elem-add root-eid 1)
+           (is= (td/eid->edn root-eid) #{:a :b 1})
+           (td/entity-set-elem-update root-eid 1 inc)
+           (is= (td/eid->edn root-eid) #{:a :b 2}))))
+
 
 
      ;---------------------------------------------------------------------------------------------------
+     ; example of search/filter/update paradigm (contrasted to map/filter/reduce)
      (def clojutre-2019-power-of-lenses-laurinharju
        {:employees [{:name "justice ward"
                      :role :programmer
