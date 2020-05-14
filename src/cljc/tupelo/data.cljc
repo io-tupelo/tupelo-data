@@ -405,9 +405,7 @@
      (s/defn edn->sha :- s/Str
        "Converts EDN data into a normalized SHA-1 string"
        [edn-data]
-       (misc/str->sha
-         (pr-str
-           (normalized-sorted edn-data))))
+       (misc/str->sha (pr-str (normalized-sorted edn-data))))
 
      ;-----------------------------------------------------------------------------
      (s/defn tmp-eid-prefix-str? :- s/Bool
