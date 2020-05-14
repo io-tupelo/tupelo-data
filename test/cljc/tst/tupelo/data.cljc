@@ -1699,12 +1699,14 @@
                      :salary 45930 } ]} )
 
      (defn valid-name?
-       [result] (with-map-vals result [name]
-                  (pos? (count (str name)))))
+       [frame] (it-> frame
+                 (grab :name it)
+                 (and (string? it)
+                   (pos? (count it)))))
 
      (defn valid-empl?
-       [result] (with-map-vals result [salary]
-                  (and (number? salary) (valid-name? result))))
+       [frame] (and (valid-name? frame)
+                 (number? (grab :salary frame))))
 
      (s/defn name-cap-fn :- s/Str
        [name :- s/Str]
