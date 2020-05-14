@@ -216,12 +216,12 @@
            (= :eid (<tag x)))))
 
      ;-----------------------------------------------------------------------------
-     (defn unquote-form?
+     (defn unquote-form? ; #todo => `run` or `live` or `unq` or `ins` or `insert`???
        [arg]
        (and (list? arg)
          (= (quote unquote) (first arg))))
 
-     (defn unquote-splicing-form?
+     (defn unquote-splicing-form? ; #todo => `splat` or `splice` or `unq*` ???
        [arg]
        (and (list? arg)
          (= (quote unquote-splicing) (first arg))))
@@ -244,7 +244,7 @@
              :else item))
          form))
 
-     (defmacro quote-template
+     (defmacro quote-template ; #todo maybe => `qtmpl` or `quot` or `qt` or `quoted` or `template`
        [form]
        (quote-template-impl form))
 
