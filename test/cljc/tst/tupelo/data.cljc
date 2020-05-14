@@ -1701,32 +1701,50 @@
                      :salary 45930 } ]} )
 
      (defn valid-name?
-       [result]
-       (with-map-vals result [name ]
-         (pos? (count (str name)))))
+       [result] (with-map-vals result [name]
+                  (pos? (count (str name)))))
 
      (defn valid-empl?
-       [result]
-       (with-map-vals result [salary]
-         (and
-           (number? salary)
-           (valid-name? result))))
+       [result] (with-map-vals result [salary]
+                  (and (number? salary) (valid-name? result))))
 
-     (comment
-       (dotest
-         (td/eid-count-reset)
-         (td/with-tdb (td/new-tdb)
-           (let [root-eid     (td/add-entity-edn clojutre-2019-power-of-lenses-laurinharju)
-                 results-name (keep-if valid-name?
-                                (td/query ; don't even need to reference :employees or array
-                                  [{:name ? :role :programmer :salary ?}])) ; #todo allow inline & local functions
-                 results-prog (keep-if valid-empl?
-                                (td/query ; don't even need to reference :employees or array
-                                  [{:name ? :role :programmer :salary ?}])) ; #todo allow inline & local functions
-                 ]
-             (spyx-pretty results-name)
-             (spyx-pretty results-prog)
-             ))))
+     (s/defn name-cap-fn :- s/Str
+       [name :- s/Str]
+       (str/join \space
+         (forv [word (str/split name #"\s")]
+           (str/capitalize word))))
+
+     ; #todo allow inline & local functions
+     (dotest
+       (td/eid-count-reset)
+       (td/with-tdb (td/new-tdb)
+         (let [root-eid    (td/add-entity-edn clojutre-2019-power-of-lenses-laurinharju)
+               frames-name (keep-if valid-name? (td/query [{:eid ? :name ?}]))] ; don't even need to reference :employees or array
+           (is= frames-name [{:eid 1004, :name "geovanni morgan"}
+                             {:eid 1003, :name "justice ward"}
+                             {:eid 1007, :name "raymond richard mathews"}])
+           (doseq [frame frames-name]
+             (td/entity-mapentry-update (grab :eid frame) :name name-cap-fn))
+           (is= (td/eid->edn root-eid)
+             {:employees
+              [{:name "Justice Ward", :role :programmer, :salary 86750}
+               {:name "Geovanni Morgan", :role :service-designer, :salary 73882}
+               {:name nil}
+               {:name "", :role :programmer, :salary nil}
+               {:name "Raymond Richard Mathews", :role :programmer, :salary 45930}]})
+
+           (let [frames-prog (keep-if valid-empl? ; #todo allow inline & local functions
+                               (td/query [{:eid ? :name ? :role :programmer :salary ?}]))]
+             (is= frames-prog [{:eid 1003, :name "Justice Ward", :salary 86750}
+                               {:eid 1007, :name "Raymond Richard Mathews", :salary 45930}])
+             (doseq [frame frames-name]
+               (td/entity-mapentry-update (grab :eid frame) :salary #(int (* % 1.05))))
+             (is= (td/eid->edn root-eid) {:employees
+                                          [{:name "Justice Ward", :role :programmer, :salary 91087}
+                                           {:name "Geovanni Morgan", :role :service-designer, :salary 77576}
+                                           {:name nil}
+                                           {:name "", :role :programmer, :salary nil}
+                                           {:name "Raymond Richard Mathews", :role :programmer, :salary 48226}]})))))
 
 
      (comment ; <<comment>>
