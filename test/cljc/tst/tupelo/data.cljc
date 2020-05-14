@@ -1681,10 +1681,8 @@
            (td/entity-set-elem-update root-eid 1 inc)
            (is= (td/eid->edn root-eid) #{:a :b 2}))))
 
-
-
      ;---------------------------------------------------------------------------------------------------
-     ; example of search/filter/update paradigm (contrasted to map/filter/reduce)
+     ; example of query/filter/mutate paradigm (contrasted to map/filter/reduce)
      (def clojutre-2019-power-of-lenses-laurinharju
        {:employees [{:name "justice ward"
                      :role :programmer
@@ -1733,7 +1731,7 @@
                {:name "", :role :programmer, :salary nil}
                {:name "Raymond Richard Mathews", :role :programmer, :salary 45930}]})
 
-           (let [frames-prog (keep-if valid-empl? ; #todo allow inline & local functions
+           (let [frames-prog (keep-if valid-empl?
                                (td/query [{:eid ? :name ? :role :programmer :salary ?}]))]
              (is= frames-prog [{:eid 1003, :name "Justice Ward", :salary 86750}
                                {:eid 1007, :name "Raymond Richard Mathews", :salary 45930}])
