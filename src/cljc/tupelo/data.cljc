@@ -466,6 +466,8 @@
         :idx-eav  #{tsk/Triple}
         :idx-ave  #{tsk/Triple}
         :idx-vea  #{tsk/Triple} })
+     ; #todo need add :keypath-eids #{ Eid } to flag any entity contributing to the key of a map or set => no update!
+     ; #todo   i.e. all (possibly composite) keys must be immutable
 
      (s/defn new-tdb :- TDB
        "Returns a new, empty db."
@@ -475,6 +477,16 @@
           :idx-eav  (index/empty-index)
           :idx-ave  (index/empty-index)
           :idx-vea  (index/empty-index) }))
+
+     ;***************************************************************************************************
+     ; NOTE: every Pair [e a] is unique, so the eav index could be a sorted map {[e a] v}. This implies that
+     ;
+     ;   (let [eav-triples (mapv identity idx-eav)
+     ;         ea-pairs    (mapv #(take 2 %) idx-eav)]
+     ;     (assert eav-triples ea-pairs)))
+     ;
+     ; must always be true or an error has occurred. Other indexes must remain #{ <triple> }
+     ;***************************************************************************************************
 
      (s/defn db-pretty :- tsk/KeyMap
        "Returns a pretty version of the DB"
@@ -561,6 +573,11 @@
      (s/defn ^:no-doc db-remove-triple
        [triple-eav]
        (let [[e a v] triple-eav]
+         ; detect missing data
+         (let [found (index/prefix-match->seq [e a] (grab :idx-eav @*tdb*))]
+           (when (not= 1 (count found))
+             (throw (ex-info "Illegal DB state detected" (vals->map triple-eav found)))))
+
          (swap! *tdb* update :idx-eav index/remove-entry [e a v])
          (swap! *tdb* update :idx-vea index/remove-entry [v e a])
          (swap! *tdb* update :idx-ave index/remove-entry [a v e])))
@@ -568,6 +585,11 @@
      (s/defn ^:no-doc db-add-triple
        [triple-eav]
        (let [[e a v] triple-eav]
+         ; detect semantic error
+         (let [found (index/prefix-match->seq [e a] (grab :idx-eav @*tdb*))]
+           (when (pos? (count found))
+             (throw (ex-info "Illegal DB state detected" (vals->map triple-eav found)))))
+
          (swap! *tdb* update :idx-eav index/add-entry [e a v])
          (swap! *tdb* update :idx-vea index/add-entry [v e a])
          (swap! *tdb* update :idx-ave index/add-entry [a v e])))
@@ -840,12 +862,10 @@
        (<val (add-entity-edn-impl entity-edn)))
 
      ;-----------------------------------------------------------------------------
-     ; #todo (defn remove-entity [eid] ...)
-     ; #todo (defn update-entity [eid fn] ...)
      ; #todo (defn update-triple [triple-eav fn] ...)
-     (declare remove-entity)
+     (declare entity-remove-impl)
 
-     (s/defn remove-triple
+     (s/defn remove-triple ; #todo redundant/dangerous?  maybe remove this...?
        "Recursively removes an EAV triple of data from the db."
        [triple-eav :- tsk/Triple] ; #todo add db arg version
        ; (spyx :remove-triple triple-eav)
@@ -854,13 +874,13 @@
              v              (raw->Prim v-in)
              triple-wrapped [-e- a v]]
          ; (spyx-pretty triple-wrapped)
-         (when-not (db-contains-triple? triple-wrapped)
+         (when-not (db-contains-triple? triple-wrapped) ; #todo redundant check - remove?
            (throw (ex-info "triple not found" (vals->map triple-wrapped))))
          (when (Eid? v)
-           (remove-entity (<val v)))
+           (entity-remove-impl (<val v)))
          (db-remove-triple triple-wrapped)))
 
-     (s/defn ^:no-doc remove-entity
+     (s/defn ^:no-doc entity-remove-impl
        [eid-in :- EidType] ; #todo add db arg version
        (let [idx-eav     (grab :idx-eav (deref *tdb*))
              teid        (->Eid eid-in)
@@ -887,7 +907,7 @@
          (when-not (= :map entity-type)
            (throw (ex-info "non map type found" (vals->map teid entity-type))))
          (when (tagged-eid? v)
-           (remove-entity (<val v)))
+           (entity-remove-impl (<val v)))
          (db-remove-triple triple-eav)))
 
      (s/defn entity-array-idx-remove
@@ -911,7 +931,7 @@
             (when-not (= :array entity-type)
               (throw (ex-info "non array type found" (vals->map teid entity-type))))
             (when (tagged-eid? v)
-              (remove-entity (<val v)))
+              (entity-remove-impl (<val v)))
             (db-remove-triple triple-eav)
             (when rerack
               (array-entity-rerack teid))))) )
@@ -932,10 +952,10 @@
          (when-not (= :set entity-type)
            (throw (ex-info "non set type found" (vals->map teid entity-type))))
          (when (tagged-eid? v)
-           (remove-entity (<val v)))
+           (entity-remove-impl (<val v)))
          (db-remove-triple triple-eav)))
 
-     (s/defn remove-root-entity
+     (s/defn entity-remove
        "Recursively removes an entity from the db."
        [eid-in :- EidType] ; #todo add db arg version
        (let [idx-vea     (grab :idx-vea (deref *tdb*))
@@ -943,7 +963,7 @@
              vea-triples (index/prefix-match->seq [teid] idx-vea)]
          (when (not-empty? vea-triples)
            (throw (ex-info "entity not root" (vals->map eid-in))))
-         (remove-entity eid-in)))
+         (entity-remove-impl eid-in)))
 
      ; #todo update-array-elem
      ; #todo update-map-entry

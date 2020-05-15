@@ -112,15 +112,14 @@
   (t/grab :matches (split-key-prefix match-val lex-set )))
 
 (s/defn prefix-match->seq :- [tsk/Triple]
-  "Return the `:matches` values found via `split-key-prefix` as a seq."
+  "Degenerate implementation of `split-key-prefix` that returns only the `:matches` value as a seq."
   [match-val :- LexicalValType
    lex-set :- SortedSetType]
-  (let [[-smaller-set- found-val larger-set] (avl/split-key match-val lex-set)
-        result (if (t/not-nil? found-val)
-                 [found-val]
-                 (let [[matches-seq -larger-seq-] (clojure.core/split-with #(prefix-match? match-val %) larger-set)]
-                   matches-seq))]
-    result))
+  (let [[-smaller-set- found-val larger-set] (avl/split-key match-val lex-set)]
+    (if (t/not-nil? found-val)
+      [found-val]
+      (let [matches-seq (clojure.core/take-while #(prefix-match? match-val %) larger-set)]
+        matches-seq))))
 
 ; #todo add-entry & remove-entry instead of conj/disj  ???
 (s/defn add-entry

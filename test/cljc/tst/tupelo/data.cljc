@@ -1597,7 +1597,7 @@
        (td/with-tdb (td/new-tdb)
          (let [root-eid (td/add-entity-edn {:a "fred" :b [0 1 2]})]
            ; (prn dashes) (td/walk-compact (deref *tdb*))
-           (throws? (td/remove-root-entity 1002))
+           (throws? (td/entity-remove 1002))
            (is= (td/eid->edn 1002) [0 1 2])
            (td/entity-array-idx-remove 1002 1)
            ; (prn dashes) (td/walk-compact (deref *tdb*))
@@ -1609,7 +1609,7 @@
          (let [e0 (td/add-entity-edn {:f "fred"})
                e1 (td/add-entity-edn {:w "wilma"})]
            (is= (td/eid->edn e0) {:f "fred"})
-           (td/remove-root-entity e0)
+           (td/entity-remove e0)
            (throws? (td/eid->edn e0))
            (is= (td/eid->edn e1) {:w "wilma"}))) )
 
