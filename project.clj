@@ -31,6 +31,10 @@
                                     "out"
                                     :target-path]
 
+  ; only needed for test-refresh while using tupelo in checkouts
+  :profiles { :test     {:dependencies [[overtone/at-at "1.2.0"]]}
+             }
+
   :jvm-opts ["-Xms500m" "-Xmx2g"]
   )
 

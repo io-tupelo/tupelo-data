@@ -10,7 +10,7 @@
   ; #?(:clj (:use tupelo.core)) ; #todo remove for cljs
   #?(:clj (:require
             [tupelo.core :as t :refer [spy spyx spyxx spyx-pretty with-spy-indent spyq spydiv
-                                       grab glue map-entry indexed only only2 xfirst xsecond xthird xlast xrest not-empty?
+                                       grab glue map-entry indexed only only2 xfirst xsecond xthird xlast xrest not-empty? map-plain?
                                        it-> cond-it-> forv vals->map fetch-in let-spy sym->kw with-map-vals vals->map
                                        keep-if drop-if append prepend ->sym ->kw kw->sym validate
                                        ]]
@@ -55,11 +55,11 @@
 
 #?(:cljs (enable-console-print!))
 
+; #todo Tupelo Data Language (TDL)
 
 #?(:clj
    (do
 
-     ; #todo Tupelo Data Language (TDL)
 
      ;-----------------------------------------------------------------------------
      (defprotocol IVal (<val [this]))
@@ -140,11 +140,6 @@
      ; #todo data-readers for #td/eid #td/idx #td/prim #td/param
 
      ;-----------------------------------------------------------------------------
-     (s/defn map-plain? :- s/Bool ; #todo => tupelo
-       "Like clojure.core/map?, but returns false for records."
-       [arg :- s/Any]
-       (and (map? arg) (not (record? arg))) )
-
      (s/defn tagmap? :- s/Bool
        "Returns true iff arg is a map that looks like:  {:some-tag <some-primative>}"
        [item]

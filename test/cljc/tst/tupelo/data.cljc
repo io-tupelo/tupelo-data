@@ -11,10 +11,10 @@
             [tupelo.test :refer [define-fixture deftest dotest dotest-focus is isnt is= isnt= is-set= is-nonblank= testing throws?]]
             [tupelo.core :as t :refer [spy spyx spyxx spy-pretty spyx-pretty unlazy let-spy
                                        only only2 forv glue grab nl keep-if drop-if ->sym xfirst xsecond xthird not-nil?
-                                       it-> fetch-in with-map-vals
+                                       it-> fetch-in with-map-vals map-plain?
                                        ]]
             [tupelo.data :as td :refer [with-tdb new-tdb eid-count-reset lookup query-triples query-triples->tagged search-triple
-                                        *tdb* <tag <val ->Eid Eid? ->Idx Idx? ->Prim Prim? ->Param Param? map-plain?
+                                        *tdb* <tag <val ->Eid Eid? ->Idx Idx? ->Prim Prim? ->Param Param?
                                         ]]
             [clojure.string :as str]
             [schema.core :as s]
@@ -130,11 +130,11 @@
 
        (let [idx5 (->Idx 5)]
          (is (map? {:a 1})) ; expected
-         (is (map-plain? (sorted-map))) ; expected
          (isnt (record? {:a 1})) ; expected
          (is (record? idx5)) ; expected
          (is (map? idx5)) ; *** problem ***
 
+         (is (map-plain? (sorted-map))) ; expected
          (is (map-plain? {:a 1})) ; solution
          (isnt (map-plain? idx5))) ;solution
 
