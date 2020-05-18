@@ -12,7 +12,7 @@
             [tupelo.core :as t :refer [spy spyx spyxx spyx-pretty with-spy-indent spyq spydiv
                                        grab glue map-entry indexed only only2 xfirst xsecond xthird xlast xrest not-empty? map-plain?
                                        it-> cond-it-> forv vals->map fetch-in let-spy sym->kw with-map-vals vals->map
-                                       keep-if drop-if append prepend ->sym ->kw kw->sym validate
+                                       keep-if drop-if append prepend ->sym ->kw kw->sym validate dissoc-in
                                        ]]
             [tupelo.data.index :as index]
             [tupelo.lexical :as lex]
@@ -628,23 +628,6 @@
                               (= known-flgs [0 0 0]) (map-eav->eav (seq (grab :idx-eav db))) ; everything matches
                               :else (throw (ex-info "invalid known-flags" (vals->map triple known-flgs))))]
           found-entries)))
-
-     ;-----------------------------------------------------------------------------
-     (s/defn dissoc-in :- s/Any ; #todo upgrade tupelo.core
-       "A sane version of dissoc-in that will not delete intermediate keys.
-        When invoked as (dissoc-in the-map [:k1 :k2 :k3... :kZ]), acts like
-        (clojure.core/update-in the-map [:k1 :k2 :k3...] dissoc :kZ). That is, only
-        the map entry containing the last key :kZ is removed, and all map entries
-        higher than kZ in the hierarchy are unaffected."
-       [the-map :- tsk/Map
-        keys-vec :- [s/Any]] ; #todo  Primitive?
-       (let [num-keys     (count keys-vec)
-             key-to-clear (last keys-vec)
-             parent-keys  (butlast keys-vec)]
-         (cond
-           (zero? num-keys) the-map
-           (= 1 num-keys) (dissoc the-map key-to-clear)
-           :else (update-in the-map parent-keys dissoc key-to-clear))))
 
      ;-----------------------------------------------------------------------------
      (declare add-entity-edn-impl)
