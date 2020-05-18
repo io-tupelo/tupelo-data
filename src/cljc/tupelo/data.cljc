@@ -245,48 +245,6 @@
      (defmacro construct
        [template] (construct-impl template))
 
-     ;-----------------------------------------------------------------------------
-     (do  ; #todo => tupelo.core
-       (def ^:dynamic *cumulative-val*
-         "A dynamic Var pointing to an `atom`. Used by `with-cum-val` to accumulate state,
-         such as in a vector or map.  Typically manipulated via helper functions such as
-         `cum-val-set-it` or `cum-vector-append`. Can also be manipulated directly via `swap!` et al."
-         nil)
-
-       (defmacro cum-val-set-it
-         "Works inside of a `with-cum-val` block to append a new val value."
-         [& forms]
-         `(swap! *cumulative-val*
-            (fn [~'it]
-              ~@forms)))
-
-       (defmacro with-cum-val
-         "Wraps forms containing `cum-val-set-it` calls to accumulate values into a vector."
-         [init-val & forms]
-         `(binding [*cumulative-val* (atom ~init-val)]
-            (do ~@forms)
-            (deref *cumulative-val*)))
-
-       ;-----------------------------------------------------------------------------
-       (s/defn cum-vector-append :- s/Any
-         "Works inside of a `with-cum-vector` block to append a new vector value."
-         [value :- s/Any] (cum-val-set-it (append it value)))
-
-       (defmacro with-cum-vector
-         "Wraps forms containing `cum-vector-append` calls to accumulate values into a vector."
-         [& forms]
-         `(with-cum-val []
-            ~@forms))
-
-       ;-----------------------------------------------------------------------------
-       (s/defn only? :- s/Bool
-         "Returns true iff collection has length=1"
-         [coll :- s/Any] (and (t/has-length? coll 1)))
-       (s/defn only2? :- s/Bool
-         "Returns true iff arg is two nested collections of length=1"
-         [coll :- s/Any] (and (t/has-length? coll 1)
-                           (t/has-length? (first coll) 1))))
-
      ;---------------------------------------------------------------------------------------------------
      (do  ; keep these in sync
        (def EidType
@@ -366,25 +324,6 @@
          :else arg)) ; assume already tagged
 
      (def TripleIndex #{tsk/Triple})
-
-     ;-----------------------------------------------------------------------------
-     ; #todo => tupelo.misc
-     (defn normalized-sorted ; #todo need tests & docs. Use for datomic Entity?
-       "Walks EDN data, converting all collections to vector, sorted-map-generic, or sorted-set-generic"
-       [edn-data]
-       (let [unlazy-item (fn [item]
-                           (cond
-                             (sequential? item) (vec item)
-                             (map-plain? item) (t/->sorted-map-generic item)
-                             (set? item) (t/->sorted-set-generic item)
-                             :else item))
-             result      (walk/postwalk unlazy-item edn-data)]
-         result))
-
-     (s/defn edn->sha :- s/Str
-       "Converts EDN data into a normalized SHA-1 string"
-       [edn-data]
-       (misc/str->sha (pr-str (normalized-sorted edn-data))))
 
      ;-----------------------------------------------------------------------------
      (s/defn tmp-eid-prefix-str? :- s/Bool
@@ -1179,7 +1118,7 @@
                     (let [sym-to-use (autosym-resolve kk vv)
                           triple     (search-triple-fn [eid-val kk sym-to-use])]
                       ; (spyx :symbol triple)
-                      (cum-vector-append triple)))
+                      (t/cum-vector-append triple)))
 
                   (sequential? vv) ; (throw (ex-info "not implemented" {:type :sequential :value vv}))
                   (let [array-val       vv
@@ -1189,7 +1128,7 @@
                         qmaps-modified  (forv [elem array-val]
                                           {:eid tmp-eid (gensym "tmp-attr-") elem})]
                     ; (spyx qmaps-modified)
-                    (cum-vector-append triple-modified)
+                    (t/cum-vector-append triple-modified)
                     (query->triples-impl qmaps-modified))
 
                   (map-plain? vv)
@@ -1198,13 +1137,13 @@
                         ; >>              (spyx triple-modified)
                         qmaps-modified  [(glue {:eid tmp-eid} vv)]]
                     ; (spyx qmaps-modified)
-                    (cum-vector-append triple-modified)
+                    (t/cum-vector-append triple-modified)
                     (query->triples-impl qmaps-modified))
 
                   (primitive-data? vv)
                   (let [triple (search-triple-fn [eid-val kk vv])]
                      ; (spyx triple)
-                    (cum-vector-append triple))
+                    (t/cum-vector-append triple))
 
                   :else (throw (ex-info "unrecognized value" (vals->map kk vv map-remaining)))
                   ))))))
@@ -1212,7 +1151,7 @@
      (defn ^:no-doc query->triples
        [qmaps]
        (binding [*autosyms-seen* (atom #{})]
-         (with-cum-vector
+         (t/with-cum-vector
            (query->triples-impl qmaps))))
 
      (defn ^:no-doc query-results-filter-tmp-attr-mapentry ; #todo make public & optional

@@ -100,18 +100,6 @@
 
      ;-----------------------------------------------------------------------------
      (dotest
-       (is= "356a192b7913b04c54574d18c28d46e6395428ab" (td/edn->sha 1))
-       (is= "e8dc057d3346e56aed7cf252185dbe1fa6454411" (td/edn->sha 1.0))
-       (is= "a4839edbf020b8c1ac398fa119979fc5384f52d4" (td/edn->sha :a))
-       (is= "7b3ce68b6c2f7d67dae4210eeb83be69f978e2a8" (td/edn->sha "a"))
-       (is= "86f7e437faa5a7fce15d1ddcb9eaeaea377667b8" (td/edn->sha (quote a)))
-       (is= "aad1409b889ef360dad475dc32649f26d9df142a" (td/edn->sha [1 2]))
-       (is= "6d780b01458b623aa5f77db71ac9a02ff1d5ecda" (td/edn->sha [1 2 3]))
-       (is= "6d78b62f48aafe38bbbb2a977f0d578109c0c8e2" (td/edn->sha {:a 1, :b 2}))
-       (is= "c071ca0471e2ed68a46db1db4c8cf84c2a1c7806" (td/edn->sha #{1 2 :b :a})))
-
-     ;-----------------------------------------------------------------------------
-     (dotest
        (is= true (and true))
        (is= [true] (cons true []))
        (is= true (every? t/truthy? (cons true []))) )
@@ -246,67 +234,6 @@
 
        (dotest
        (is= 3 (eval (quote (+ 1 2)))))
-
-       (dotest ; #todo => tupelo.core
-       (is (td/only? [1]))
-       (is (td/only? {:a 1}))
-       (is (td/only? #{:stuff}))
-       (isnt (td/only? [1 2]))
-       (isnt (td/only? {:a 1 :b 2}))
-       (isnt (td/only? #{:stuff :more}))
-
-       (is (td/only2? [[1]]))
-       (is (td/only2? #{{:a 1}}))
-       (is (td/only2? #{#{:stuff}}))
-       (isnt (td/only2? [[1 2]]))
-       (isnt (td/only2? [{:a 1 :b 2}]))
-       (isnt (td/only2? [#{:stuff :more}])))
-
-       (dotest ; #todo => tupelo.core
-       (is= 5 (td/with-cum-val 0
-                (doseq [ii (t/thru 5)]
-                  (td/cum-val-set-it ii))))
-       (is= 15 (td/with-cum-val 0
-                 (doseq [ii (t/thru 5)]
-                   (td/cum-val-set-it (+ it ii)))))
-       (is= (td/with-cum-val {}
-              (doseq [ii (t/thru 3)]
-                (td/cum-val-set-it (glue it {ii (+ 10 ii)}))))
-         {0 10
-          1 11
-          2 12
-          3 13})
-       (is= (td/with-cum-val {}
-              (doseq [ii (t/thru 3)]
-                (swap! td/*cumulative-val* assoc ii (+ 10 ii)))) ; can do it "manually" if desired
-         {0 10
-          1 11
-          2 12
-          3 13}))
-
-       (dotest ; #todo => tupelo.core
-       (is= (td/with-cum-vector
-              (dotimes [ii 5]
-                (td/cum-vector-append ii)))
-         [0 1 2 3 4])
-       (let [ff (fn ff-fn [n]
-                  (when (t/nonneg? n)
-                    (td/cum-vector-append n)
-                    (ff-fn (dec n))))]
-         (is= (td/with-cum-vector (ff 5))
-           [5 4 3 2 1 0]))
-       ; It will even work across multiple futures:  https://clojure.org/reference/vars#conveyance
-       (let [N     10
-             randy (fn [n]
-                     (Thread/sleep (int (+ 50 (* 50 (Math/random)))))
-                     (td/cum-vector-append n)
-                     n)
-             nums  (td/with-cum-vector
-                     (let [futures     (forv [ii (range N)]
-                                         (future (randy ii)))
-                           future-vals (forv [future futures] @future)] ; wait for all futures to finish
-                       (is= future-vals (range N))))] ; in order of creation
-         (is-set= nums (range N)))) ; nums is in random order
 
 
        (dotest
