@@ -551,16 +551,10 @@
          (coerce->Eid eid-in)))
 
      ;---------------------------------------------------------------------------------------------------
-     (def Interceptor ; #todo tupelo.schema (& tupelo.forest)
-       "Plumatic Schema type name for interceptor type used by `walk-entity`."
-       {(s/required-key :enter) s/Any
-        (s/required-key :leave) s/Any
-        (s/optional-key :id)    s/Keyword})
-
      ; #todo need to handle sets
      (s/defn ^:no-doc walk-entity-impl :- s/Any
        [teid :- Eid
-        interceptor :- Interceptor]
+        interceptor :- tsk/Interceptor]
        (with-spy-indent
          (let [enter-fn    (grab :enter interceptor)
                leave-fn    (grab :leave interceptor)
