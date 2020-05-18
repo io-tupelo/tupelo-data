@@ -13,7 +13,7 @@
                                        only only2 forv glue grab nl keep-if drop-if ->sym xfirst xsecond xthird not-nil?
                                        it-> fetch-in with-map-vals
                                        ]]
-            [tupelo.data :as td :refer [with-tdb new-tdb eid-count-reset lookup query-triples query-triples->tagged boolean->binary search-triple
+            [tupelo.data :as td :refer [with-tdb new-tdb eid-count-reset lookup query-triples query-triples->tagged search-triple
                                         *tdb* <tag <val ->Eid Eid? ->Idx Idx? ->Prim Prim? ->Param Param? map-plain?
                                         ]]
             [clojure.string :as str]
@@ -669,12 +669,6 @@
            (is= (td/walk-compact (query-triples [[(->Param :x) (->Param :y) (->Param :z)]]))
              [{:x 1001, :y :a, :z 1002}
               {:x 1002, :y :b, :z 2}]))))
-
-       (dotest
-       (is= 1 (boolean->binary true))
-       (is= 0 (boolean->binary false))
-       (throws? (boolean->binary))
-       (throws? (boolean->binary 234)))
 
      (dotest
        (is= (td/search-triple-impl (quote [:a :b :c]))

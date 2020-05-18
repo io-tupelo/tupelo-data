@@ -9,7 +9,7 @@
   (:refer-clojure :exclude [load ->VecNode])
   ; #?(:clj (:use tupelo.core)) ; #todo remove for cljs
   #?(:clj (:require
-            [tupelo.core :as t :refer [spy spyx spyxx spyx-pretty with-spy-indent
+            [tupelo.core :as t :refer [spy spyx spyxx spyx-pretty with-spy-indent spyq spydiv
                                        grab glue map-entry indexed only only2 xfirst xsecond xthird xlast xrest not-empty?
                                        it-> cond-it-> forv vals->map fetch-in let-spy sym->kw with-map-vals vals->map
                                        keep-if drop-if append prepend ->sym ->kw kw->sym validate
@@ -59,23 +59,7 @@
 #?(:clj
    (do
 
-     ; #todo (spyl value) prints:   spy-line-xxxx => value
-     (defn spyq ; #todo => tupelo.core/spy
-       "(spyq <value>) - Spy Quiet
-             This variant is intended for use in very simple situations and is the same as the
-             2-argument arity where <msg-string> defaults to 'spy'.  For example (spy (+ 2 3))
-             prints 'spy => 5' to stdout.  "
-       [value]
-       (when t/*spy-enabled*
-         (println (str (t/spy-indent-spaces) (pr-str value))))
-       value)
-     (defn spydiv [] (spyq :-----------------------------------------------------------------------------))
-
      ; #todo Tupelo Data Language (TDL)
-
-     (s/defn boolean->binary :- s/Int ; #todo => misc
-       "Convert true => 1, false => 0"
-       [arg :- s/Bool] (if arg 1 0))
 
      ;-----------------------------------------------------------------------------
      (defprotocol IVal (<val [this]))
@@ -472,7 +456,7 @@
      (s/defn new-tdb :- TDB
        "Returns a new, empty db."
        []
-       (into (sorted-map)
+       (into (sorted-map) ; #todo add `immutible` field
          {:eid-type (t/sorted-map-generic) ; source type of entity (:map :array :set)
           :idx-eav  (index/empty-index)
           :idx-ave  (index/empty-index)
@@ -698,7 +682,7 @@
        ([db :- TDB
          triple :- tsk/Triple]
         (let [[e a v] triple
-              known-flgs    (mapv #(boolean->binary (t/not-nil? %)) triple)
+              known-flgs    (mapv #(misc/boolean->binary (t/not-nil? %)) triple)
               found-entries (cond
                               (= known-flgs [1 0 0]) (map-eav->eav (index/prefix-match->seq [e] (grab :idx-eav db)))
                               (= known-flgs [0 1 0]) (map-ave->eav (index/prefix-match->seq [a] (grab :idx-ave db)))
