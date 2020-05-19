@@ -904,7 +904,7 @@
       (get env elem)
       elem)))
 
-(s/defn ^:no-doc query-triples-impl :- s/Any
+(s/defn ^:no-doc match-triples-impl :- s/Any
   [query-result env qspec-list]
   (t/with-spy-indent
     (when false
@@ -940,9 +940,9 @@
 
         (forv [env-frame env-frames-found]
           (let [env-next (glue env env-frame)]
-            (query-triples-impl query-result env-next qspec-rest)))))))
+            (match-triples-impl query-result env-next qspec-rest)))))))
 
-(s/defn untag-query-result :- s/Any ; #todo fix, was tsk/KeyMap
+(s/defn untag-match-result :- s/Any ; #todo fix, was tsk/KeyMap
   [resmap :- tsk/Map]
   ; (newline) (spyx :unwrap-query-result-enter resmap)
   (let [result (apply glue
@@ -952,19 +952,19 @@
     ; (newline) (spyx :unwrap-query-result-leave result)
     result))
 
-(s/defn query-triples->tagged
+(s/defn match-triples->tagged
   [qspec-list-in :- [tsk/Triple]]
   (let [qspec-list    (walk-tagmap-reader qspec-list-in)
         query-results (atom [])]
-    (query-triples-impl query-results {} qspec-list)
+    (match-triples-impl query-results {} qspec-list)
     ; (spyx-pretty :query-triples--results @query-results)
     @query-results))
 
-(s/defn query-triples :- s/Any ; #todo fix, was [tsk/KeyMap]
+(s/defn match-triples :- s/Any ; #todo fix, was [tsk/KeyMap]
   [qspec-list :- [tsk/Triple]]
-  (let [results-tagged (query-triples->tagged qspec-list)
+  (let [results-tagged (match-triples->tagged qspec-list)
         results-plain  (forv [result-tagged results-tagged]
-                         (untag-query-result result-tagged))]
+                         (untag-match-result result-tagged))]
     results-plain))
 
 (s/defn eval-with-env-map :- s/Any
@@ -993,11 +993,11 @@
   (let [env-map (tagged-params->env-map tagged-map)]
     (apply eval-with-env-map env-map forms))) ; #todo unify rest params on forms!!!
 
-(s/defn query-triples+preds
+(s/defn match-triples+preds
   [qspec-list :- [tsk/Triple]
    pred-master :- tsk/List]
   ; (spyx :query-triples+preds pred-master)
-  (let [query-results-tagged (query-triples->tagged qspec-list)
+  (let [query-results-tagged (match-triples->tagged qspec-list)
         ; >>                   (spyx-pretty query-results-tagged)
         query-results-kept   (keep-if (fn [query-result]
                                         ; (spyx-pretty query-result)
@@ -1067,7 +1067,7 @@
   [seq-entity :- tsk/List]
   (into {} (indexed seq-entity)))
 
-(defn ^:no-doc query->triples-impl
+(defn ^:no-doc match->triples-impl
   [qmaps]
   (with-spy-indent
     (when false
@@ -1102,7 +1102,7 @@
                                     {:eid tmp-eid (gensym "tmp-attr-") elem})]
               ; (spyx qmaps-modified)
               (t/cum-vector-append triple-modified)
-              (query->triples-impl qmaps-modified))
+              (match->triples-impl qmaps-modified))
 
             (map-plain? vv)
             (let [tmp-eid         (gensym "tmp-eid-")
@@ -1111,7 +1111,7 @@
                   qmaps-modified  [(glue {:eid tmp-eid} vv)]]
               ; (spyx qmaps-modified)
               (t/cum-vector-append triple-modified)
-              (query->triples-impl qmaps-modified))
+              (match->triples-impl qmaps-modified))
 
             (primitive-data? vv)
             (let [triple (search-triple-fn [eid-val kk vv])]
@@ -1121,13 +1121,13 @@
             :else (throw (ex-info "unrecognized value" (vals->map kk vv map-remaining)))
             ))))))
 
-(defn ^:no-doc query->triples
+(defn ^:no-doc match->triples
   [qmaps]
   (binding [*autosyms-seen* (atom #{})]
     (t/with-cum-vector
-      (query->triples-impl qmaps))))
+      (match->triples-impl qmaps))))
 
-(defn ^:no-doc query-results-filter-tmp-attr-mapentry ; #todo make public & optional
+(defn ^:no-doc match-results-filter-tmp-attr-mapentry ; #todo make public & optional
   [query-results]
   (let [results-filtered (forv [qres query-results]
                            (drop-if
@@ -1135,7 +1135,7 @@
                              qres))]
     results-filtered))
 
-(defn ^:no-doc query-results-filter-tmp-eid-mapentry ; #todo make public & optional
+(defn ^:no-doc match-results-filter-tmp-eid-mapentry ; #todo make public & optional
   [query-results]
   (let [results-filtered (forv [qres query-results]
                            (drop-if
@@ -1162,7 +1162,7 @@
           ; (spyxx eval-result)
           (fn? eval-result))))))
 
-(defn ^:no-doc query->tagged
+(defn ^:no-doc match->tagged
   [query-specs]
   ; (spyx-pretty :query->wrapped-fn-enter query-specs)
   (exclude-reserved-identifiers query-specs)
@@ -1188,20 +1188,20 @@
                          ; (spyx form-result)
                          form-result))]
 
-    (let [map-triples    (query->triples maps-in)
+    (let [map-triples    (match->triples maps-in)
           search-triples (glue map-triples triples-proc)]
       ; (spyx-pretty map-triples)
-      (let [unfiltered-results (query-triples+preds
+      (let [unfiltered-results (match-triples+preds
                                  search-triples
                                  pred-master)
             ; >>                 (spyx unfiltered-results)
-            filtered-results   (query-results-filter-tmp-attr-mapentry
-                                 (query-results-filter-tmp-eid-mapentry
+            filtered-results   (match-results-filter-tmp-attr-mapentry
+                                 (match-results-filter-tmp-eid-mapentry
                                    unfiltered-results))]
         ; (spyx-pretty :query->wrapped-fn-leave filtered-results)
         filtered-results))))
 
-(s/defn untag-query-results :- s/Any ; #todo fix, was [tsk/KeyMap]
+(s/defn untag-match-results :- s/Any ; #todo fix, was [tsk/KeyMap]
   [query-result-maps]
   (forv [result-map query-result-maps]
     (apply glue
@@ -1214,22 +1214,22 @@
               ]
           {param-raw val-raw})))))
 
-(defn query-fn
+(defn match-fn
   [args]
   ; #todo need a linter to catch nonsensical qspecs (attr <> keyword for example)
-  (let [unwrapped-query-results (untag-query-results
-                                  (query->tagged args))]
+  (let [unwrapped-query-results (untag-match-results
+                                  (match->tagged args))]
     ; (spyx unwrapped-query-results)
     unwrapped-query-results))
 
-(defn query-impl
+(defn match-impl
   [qspecs]
-  `(query-fn (quote ~qspecs)))
+  `(match-fn (quote ~qspecs)))
 
-(defmacro query
+(defmacro match
   "Will evaluate embedded calls to `(search-triple ...)` "
   [qspecs]
-  (query-impl qspecs))
+  (match-impl qspecs))
 
 
 
