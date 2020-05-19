@@ -6,22 +6,19 @@
 ;   software.
 (ns tupelo.data.index
   (:refer-clojure :exclude [load ->VecNode])
+  (:require
+    [tupelo.lexical :as lex]
+    [tupelo.schema :as tsk]
+    [clojure.data.avl :as avl]
+    [clojure.set :as set]
+    [schema.core :as s]
+    )
   #?(:clj (:require
             [tupelo.core :as t :refer [spy spyx spyxx spyx-pretty grab glue map-entry indexed
                                        forv vals->map fetch-in ]]
-            [tupelo.lexical :as lex]
-            [tupelo.schema :as tsk]
-            [clojure.data.avl :as avl]
-            [clojure.set :as set]
-            [schema.core :as s]
             ))
   #?(:cljs (:require
              [tupelo.core :as t :refer [spy spyx spyxx spyx-pretty grab]] ; #todo :include-macros true
-             [tupelo.lexical :as lex]
-             [tupelo.schema :as tsk]
-             [clojure.data.avl :as avl]
-             [clojure.set :as set]
-             [schema.core :as s]
              ))
   )
 
