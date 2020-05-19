@@ -33,16 +33,14 @@
 
 ; #todo Tupelo Data Language (TDL)
 
-#?(:clj (do
-
 ;---------------------------------------------------------------------------------------------------
 ; index stuff
 (def LexicalValType tsk/Vec)
 (def SortedSetType (class (avl/sorted-set 1 2 3)))
 (def SortedMapType (class (avl/sorted-map :a 1 :b 2 :c 3)))
 
-(def IndexType  SortedSetType )
-(def IndexEntryType  tsk/Vec )
+(def IndexType SortedSetType)
+(def IndexEntryType tsk/Vec)
 
 (s/defn empty-index
   "Returns an empty lexically-sorted index"
@@ -109,7 +107,7 @@
   "Return the `:matches` values found via `split-key-prefix`."
   [match-val :- LexicalValType
    lex-set :- SortedSetType]
-  (t/grab :matches (split-key-prefix match-val lex-set )))
+  (t/grab :matches (split-key-prefix match-val lex-set)))
 
 (s/defn prefix-match->seq :- [tsk/Triple]
   "Degenerate implementation of `split-key-prefix` that returns only the `:matches` value as a seq."
@@ -125,30 +123,16 @@
 (s/defn add-entry
   "Add an entry to the index, returning the modified index"
   [index :- SortedSetType
-   entry :- tsk/Vec ]
+   entry :- tsk/Vec]
   (conj index entry))
 
 (s/defn remove-entry
   "Remove an entry to the index, returning the modified index. Throws if entry not found in index."
   [index :- SortedSetType
-   entry :- tsk/Vec ]
+   entry :- tsk/Vec]
   (when-not (contains? index entry)
-    (throw (ex-info "entry not found in index" (vals->map entry))) )
+    (throw (ex-info "entry not found in index" (vals->map entry))))
   (disj index entry))
 
-;-----------------------------------------------------------------------------
-; #todo keep these?  maybe => tupelo.set/add  tupelo.set/remove (synonyms)
-;(s/defn set-add-eid :- tsk/Set
-;  [set-in :- tsk/Set
-;   eid-in :- EidType]
-;  (conj set-in eid-in))
-;
-;(s/defn set-remove-eid :- tsk/Set
-;  [set-in :- tsk/Set
-;   eid-in :- EidType]
-;  (disj set-in eid-in))
-
-
-))
 
 

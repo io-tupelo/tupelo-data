@@ -102,7 +102,7 @@
      (dotest
        (is= true (and true))
        (is= [true] (cons true []))
-       (is= true (every? t/truthy? (cons true []))) )
+       (is= true (every? t/truthy? (cons true []))))
 
      (dotest
        (let [tv     (td/->TagVal :a 1)
@@ -158,7 +158,7 @@
          (is= idx5 (td/coerce->Idx idx5))
          (is= idx5 (td/coerce->Idx {:idx 5}))
          (throws? (td/coerce->Idx {:eid 5}))
-         (throws? (td/coerce->Idx :a)) )
+         (throws? (td/coerce->Idx :a)))
        (let [prim5 (->Prim 5)]
          (is= 5 (<val prim5))
          (is= (type prim5) tupelo.data.Prim)
@@ -182,7 +182,7 @@
      (dotest
        (let [arr-1 (vec (range 3))
              im    (td/array->tagidx-map arr-1)
-             arr-2 (td/tagidx-map->array im) ]
+             arr-2 (td/tagidx-map->array im)]
          (is= (td/walk-compact im)
            {{:idx 0} 0
             {:idx 1} 1
@@ -196,12 +196,12 @@
                   (->Idx 2) 2}]
          (is= (td/tagidx-map->array ok)
            [0 1 2])
-         (throws? (td/tagidx-map->array bad))) )
+         (throws? (td/tagidx-map->array bad))))
 
-       ;-----------------------------------------------------------------------------
+     ;-----------------------------------------------------------------------------
      (def vec234 [2 3 4])
 
-       (dotest
+     (dotest
        (is (td/unquote-form? (quote (unquote (+ 2 3)))))
        (is (td/unquote-splicing-form? (quote (unquote-splicing (+ 2 3)))))
 
@@ -229,14 +229,14 @@
        (is= (td/quote-template [1 (unquote-splicing (t/thru 2 4)) 5])
          [1 2 3 4 5])
        (is= (td/quote-template [1 (unquote (t/thru 2 4)) 5])
-         [1 [2 3 4] 5]) )
+         [1 [2 3 4] 5]))
 
 
-       (dotest
+     (dotest
        (is= 3 (eval (quote (+ 1 2)))))
 
 
-       (dotest
+     (dotest
        (let [ss123 (t/it-> (index/empty-index)
                      (conj it [1 :a])
                      (conj it [3 :a])
@@ -283,7 +283,7 @@
             [1 {:eid 2}]
             [1 {:eid 3}]])))
 
-       (dotest
+     (dotest
        (td/with-tdb (td/new-tdb)
          (td/eid-count-reset)
          (is= (deref *tdb*)
@@ -314,7 +314,7 @@
                           [{:prim 2} {:eid 1001} {:prim :b}]}})
            (is= edn-val (td/eid->edn root-eid)))))
 
-       (dotest
+     (dotest
        (with-tdb (new-tdb)
          (eid-count-reset)
          (let [edn-val  {:a 1 :b 2 :c {:d 4}}
@@ -336,7 +336,7 @@
                           [{:prim 4} {:eid 1002} {:prim :d}]}})
            (is= edn-val (td/eid->edn root-eid)))))
 
-       (dotest
+     (dotest
        (with-tdb (new-tdb)
          (eid-count-reset)
          (let [edn-val  [1 2 3]
@@ -352,7 +352,7 @@
                           [{:prim 3} {:eid 1001} {:idx 2}]}})
            (is= edn-val (td/eid->edn root-eid)))))
 
-       (dotest
+     (dotest
        (with-tdb (new-tdb)
          (eid-count-reset)
          (let [edn-val  {:a 1 :b 2 :c [10 11 12]}
@@ -376,7 +376,7 @@
            (is= edn-val (td/eid->edn root-eid))
            (is= (td/eid->edn 1002) [10 11 12]))))
 
-       (dotest
+     (dotest
        (with-tdb (new-tdb)
          (eid-count-reset)
          (let [data [{:a 1}
@@ -429,7 +429,7 @@
                           [{:prim 3} {:eid 1009} {:prim :c}]}})
            ;---------------------------------------------------------------------------------------------------
            (is= (td/walk-compact (lookup [(->Eid 1003) nil nil]))
-             [[{:eid 1003} {:prim :a} {:prim 3}]] )
+             [[{:eid 1003} {:prim :a} {:prim 3}]])
            (is= (td/walk-compact (lookup [nil (->Prim :b) nil]))
              [[{:eid 1004} {:prim :b} {:prim 1}]
               [{:eid 1005} {:prim :b} {:prim 2}]
@@ -447,7 +447,7 @@
               [{:eid 1006} {:prim :b} {:prim 3}]
               [{:eid 1007} {:prim :c} {:prim 1}]
               [{:eid 1008} {:prim :c} {:prim 2}]
-              [{:eid 1009} {:prim :c} {:prim 3}]] )
+              [{:eid 1009} {:prim :c} {:prim 3}]])
 
            ;---------------------------------------------------------------------------------------------------
            (is= (td/walk-compact (lookup [nil (->Prim :a) (->Prim 3)]))
@@ -457,7 +457,7 @@
            (is= (td/walk-compact (lookup [(->Eid 1005) (->Prim :b) nil]))
              [[{:eid 1005} {:prim :b} {:prim 2}]]))))
 
-       (dotest
+     (dotest
        (with-tdb (new-tdb)
          (eid-count-reset)
          (let [edn-val  {:a 1 :b 2}
@@ -490,7 +490,7 @@
                [{{:param :x} {:eid 1001}}])
              ))))
 
-       (dotest
+     (dotest
        (with-tdb (new-tdb)
          (eid-count-reset)
          (let [edn-val  {:a 1 :b 2}
@@ -519,7 +519,7 @@
                                      [pred1 pred2]))
                [{{:param :x} {:eid 1001}}])))))
 
-       (dotest
+     (dotest
        (with-tdb (new-tdb)
          (eid-count-reset)
          (let [edn-val  {:a 1
@@ -533,7 +533,7 @@
               :idx-eav  #{[{:eid 1001} {:prim :a} {:prim 1}]
                           [{:eid 1001} {:prim :b} {:prim 1}]},
               :idx-vea  #{[{:prim 1} {:eid 1001} {:prim :a}]
-                          [{:prim 1} {:eid 1001} {:prim :b}]}} ))
+                          [{:prim 1} {:eid 1001} {:prim :b}]}}))
 
          (let [search-spec [[(->Param :x) (->Prim :a) (->Prim 1)]]]
            (is= (td/walk-compact (query-triples->tagged search-spec))
@@ -543,7 +543,7 @@
 
          (let [search-spec [[(->Param :x) (->Prim :b) (->Prim 1)]]]
            (is= (td/walk-compact (query-triples->tagged search-spec))
-             [{{ :param :x} { :eid 1001}}])
+             [{{:param :x} {:eid 1001}}])
            (is= (td/walk-compact (query-triples search-spec))
              [{:x 1001}]))
 
@@ -555,7 +555,7 @@
              [{:x 1001, :y :a}
               {:x 1001, :y :b}]))))
 
-       (dotest
+     (dotest
        (with-tdb (new-tdb)
          (eid-count-reset)
          (let [edn-val  {:a {:b 2}}
@@ -571,9 +571,9 @@
            ; (prn :-----------------------------------------------------------------------------)
            ; compound search
            (is= (td/walk-compact (query-triples->tagged [[{:param :x} (->Prim :a) {:param :y}]
-                                                      [{:param :y} (->Prim :b) (->Prim 2)]]))
+                                                         [{:param :y} (->Prim :b) (->Prim 2)]]))
              [{{:param :x} {:eid 1001}
-               {:param :y} {:eid 1002}}] )
+               {:param :y} {:eid 1002}}])
            (is= (td/walk-compact (query-triples [[(->Param :x) (->Prim :a) (->Param :y)]
                                                  [(->Param :y) (->Prim :b) (->Prim 2)]]))
              [{:x 1001 :y 1002}])
@@ -606,7 +606,7 @@
        (is= (td/search-triple 123 :color "Joey")
          [(->Eid 123) (->Prim :color) (->Prim "Joey")]))
 
-       (dotest
+     (dotest
        (with-tdb (new-tdb)
          (eid-count-reset)
          (let [edn-val     {:a {:b 2}}
@@ -639,9 +639,9 @@
                search-spec [(search-triple y :b 99) (search-triple x :a y)]]
            (is= [] (query-triples search-spec)))))
 
-       (dotest
+     (dotest
        (let [map-triples (td/query->triples (quote [{:eid x :map y}
-                                                         {:eid y :a a}]))]
+                                                    {:eid y :a a}]))]
          (is= (td/walk-compact map-triples)
            [[{:param :x} {:prim :map} {:param :y}]
             [{:param :y} {:prim :a} {:param :a}]]))
@@ -651,27 +651,27 @@
            [[{:param :eid} {:prim :map} {:param :y}]]))
 
        (let [map-triples (td/query->triples (quote [{:eid ? :map y}
-                                                         {:eid y :a a}]))]
+                                                    {:eid y :a a}]))]
          (is= (td/walk-compact map-triples)
            [[{:param :eid} {:prim :map} {:param :y}]
             [{:param :y} {:prim :a} {:param :a}]]))
 
        (throws? (td/query->triples (quote [{:eid ? :map y}
-                                                {:eid ? :a a}]))))
+                                           {:eid ? :a a}]))))
 
-       (dotest
+     (dotest
        (is (td/param-tmp-eid? (->Param :tmp-eid-99999)))
        (is (td/tmp-attr-kw? :tmp-attr-99999)))
 
-       ;---------------------------------------------------------------------------------------------------
+     ;---------------------------------------------------------------------------------------------------
      (def nested-edn-val (glue (sorted-map)
-                    {:num     5
-                     :map     {:a 1 :b 2}
-                     :hashmap {:a 21 :b 22}
-                     :vec     [5 6 7]
-                     ;  :set #{3 4}  ; #todo add sets
-                     :str     "hello"
-                     :kw      :nothing}))
+                           {:num     5
+                            :map     {:a 1 :b 2}
+                            :hashmap {:a 21 :b 22}
+                            :vec     [5 6 7]
+                            ;  :set #{3 4}  ; #todo add sets
+                            :str     "hello"
+                            :kw      :nothing}))
 
      (dotest
        (td/with-tdb (td/new-tdb)
@@ -707,7 +707,7 @@
              (is= (td/walk-compact (query-triples [(search-triple e a 7)]))
                [{:e 1004, :a 2}])))))
 
-       (dotest
+     (dotest
        (td/with-tdb (td/new-tdb)
          (td/eid-count-reset)
          (let [root-hid (td/add-entity-edn nested-edn-val)]
@@ -718,18 +718,18 @@
            (comment ; #todo API:  output should look like
              {:x 1001 :y 1002 :a 1})
 
-           (let [r1 (td/walk-compact (only (td/query-triples [(search-triple e i 7)]))) ]
+           (let [r1 (td/walk-compact (only (td/query-triples [(search-triple e i 7)])))]
              (is= r1 {:e 1004, :i 2})
-             (is= (td/eid->edn 1004) [5 6 7]) ))))
+             (is= (td/eid->edn 1004) [5 6 7])))))
 
-       (dotest
+     (dotest
        (td/with-tdb (td/new-tdb)
          (td/eid-count-reset)
          (let [root-hid (td/add-entity-edn nested-edn-val)]
            ; (spyx-pretty (grab :idx-eav (deref *tdb*)))
            (is= nested-edn-val (td/eid->edn root-hid)))))
 
-       (dotest
+     (dotest
        (td/with-tdb (td/new-tdb)
          (td/eid-count-reset)
          ; (spyx-pretty nested-edn-val)
@@ -770,9 +770,9 @@
            (is= (only (td/walk-compact
                         (td/query [{:eid ? :num ?}]))) {:eid 1001, :num 5})
            (is= (only (td/walk-compact
-                        (td/query [{:eid ? :num num}]))) {:eid 1001, :num 5}) )))
+                        (td/query [{:eid ? :num num}]))) {:eid 1001, :num 5}))))
 
-       ; #todo need to convert all from compile-time macros to runtime functions
+     ; #todo need to convert all from compile-time macros to runtime functions
      (dotest
        (td/eid-count-reset)
        (td/with-tdb (td/new-tdb)
@@ -828,7 +828,7 @@
            (is= salary-avg-resident 41000)
            (is= salary-avg-volunteer 0))))
 
-       (dotest
+     (dotest
        (td/with-tdb (td/new-tdb)
          (td/eid-count-reset)
          (let [edn-val  {:aa [1 2 3]
@@ -902,7 +902,7 @@
                (fetch-in it [:eid])
                (td/eid->edn it))))))
 
-       (dotest
+     (dotest
        (td/with-tdb (td/new-tdb)
          (let [edn-val  {:a 1 :b 2}
                root-eid (td/add-entity-edn edn-val)]
@@ -951,7 +951,7 @@
                root-hid (td/add-entity-edn edn-val)]
            (is= edn-val (td/eid->edn root-hid)))))
 
-       (dotest
+     (dotest
        (td/eid-count-reset)
        (td/with-tdb (td/new-tdb)
          (let [data     {:a [{:b 2}
@@ -987,9 +987,9 @@
                  :e1 1001
                  :e2 1002
                  :e3 1005}])
-             (is= data (td/eid->edn (fetch-in (only found) [:e1 ])))))))
+             (is= data (td/eid->edn (fetch-in (only found) [:e1])))))))
 
-       (dotest
+     (dotest
        (td/with-tdb (td/new-tdb)
          (td/eid-count-reset)
          (let [data          [{:a 1 :b :first}
@@ -1004,9 +1004,9 @@
                eids          (mapv #(grab :eid %) found)
                one-leaf-maps (mapv #(td/eid->edn %) eids)]
            (is-set= (td/walk-compact found)
-             [{:eid  1002 :a1 :a}
-              {:eid  1007 :a1 :a}
-              {:eid  1008 :a1 :a}])
+             [{:eid 1002 :a1 :a}
+              {:eid 1007 :a1 :a}
+              {:eid 1008 :a1 :a}])
            (is-set= one-leaf-maps [{:a 1, :b :first}
                                    {:a 1, :b 101}
                                    {:a 1, :b 102}])))
@@ -1024,7 +1024,7 @@
            (is= (td/eid->edn (grab :eid (only found)))
              {:a 1 :x :first}))))
 
-       (dotest
+     (dotest
        (td/with-tdb (td/new-tdb)
          (let [data     [{:a 1 :b 1 :c 1}
                          {:a 1 :b 2 :c 2}
@@ -1060,7 +1060,7 @@
                [{:a 1, :b 1, :c 1}
                 {:a 1, :b 1, :c 3}])))))
 
-       (dotest
+     (dotest
        (is= (td/seq->idx-map [:a :b :c]) {0 :a, 1 :b, 2 :c})
 
        (td/with-tdb (td/new-tdb)
@@ -1082,11 +1082,11 @@
                root-eid (td/add-entity-edn data)
                result   (td/walk-compact (td/query [{:a [{:eid eid-red :color :red}]}]))]
            (is= result ; #todo fix duplicates for array search
-             [{:eid-red  1003}
-              {:eid-red  1003}
-              {:eid-red  1003}]))))
+             [{:eid-red 1003}
+              {:eid-red 1003}
+              {:eid-red 1003}]))))
 
-       (dotest
+     (dotest
        (td/with-tdb (td/new-tdb)
          (td/eid-count-reset)
          (let [data     {:a [{:id 2 :color :red}
@@ -1101,18 +1101,18 @@
                root-hid (td/add-entity-edn data)
                result   (td/walk-compact (td/query [{:eid ? :a [{:id ?}]}]))]
            (is-set= result
-             [{:eid  1001 :id 2}
-              {:eid  1001 :id 6}
-              {:eid  1001 :id 3}
-              {:eid  1001 :id 4}
-              {:eid  1001 :id 5}])
+             [{:eid 1001 :id 2}
+              {:eid 1001 :id 6}
+              {:eid 1001 :id 3}
+              {:eid 1001 :id 4}
+              {:eid 1001 :id 5}])
 
            (is-set= (td/walk-compact (td/query [{:b {:eid ? :c [{:ident ?}]}}]))
              [{:eid 1008, :ident 2}
               {:eid 1008, :ident 4}
               {:eid 1008, :ident 3}]))))
 
-       (dotest
+     (dotest
        (td/with-tdb (td/new-tdb)
          (td/eid-count-reset)
          (let [data     {:a [{:id 2 :color :red}
@@ -1124,7 +1124,7 @@
            (is= (td/eid->edn (grab :eid (only (td/query [{:eid ? :id 4}]))))
              {:color :blue, :id 4}))))
 
-       (dotest
+     (dotest
        (td/with-tdb (td/new-tdb)
          (td/eid-count-reset)
          (let [data     {:a [{:id 2 :color :red}
@@ -1146,15 +1146,15 @@
            (is= (td/eid->edn (grab :eid (only (td/query [{:eid ?, :color :pink}]))))
              {:color :pink, :id 5}))))
 
-       (dotest
+     (dotest
        (td/with-tdb (td/new-tdb)
          (let [
                root-eid         (td/add-entity-edn skynet-widgets)
-               search-results   (td/query [{:basic-info        {:producer-code ?}
-                                                 :widgets      [{:widget-code      ?
-                                                                 :widget-type-code wtc}]
-                                                 :widget-types [{:widget-type-code wtc
-                                                                 :description      ?}]}])
+               search-results   (td/query [{:basic-info   {:producer-code ?}
+                                            :widgets      [{:widget-code      ?
+                                                            :widget-type-code wtc}]
+                                            :widget-types [{:widget-type-code wtc
+                                                            :description      ?}]}])
                results-filtered (t/walk-with-parents search-results
                                   {:enter (fn [parents item]
                                             (t/cond-it-> item
@@ -1189,7 +1189,7 @@
                                      ["ACME" "Dynamite" "Boom!"]]]
              (is-set= results-normalized normalized-desired)))))
 
-       (dotest
+     (dotest
        (td/eid-count-reset)
        (td/with-tdb (td/new-tdb)
          (let [data     [{:a 1 :b 1 :c 1}
@@ -1211,7 +1211,7 @@
                 {:eid 1004, :b 1, :c 3}
                 {:eid 1003, :b 2, :c 2}])))))
 
-       (dotest
+     (dotest
        (td/with-tdb (td/new-tdb)
          (let [person   {:name "jimmy"
                          :preferred-address
@@ -1394,7 +1394,7 @@
                  :eid-addrs      1006}]))
            )))
 
-       (dotest
+     (dotest
        (let [query-result {(->Param :tmp-eid-36493) (->Eid 1003)
                            (->Param :name)          "jimmy"
                            (->Param :date)          "12-25-1900"
@@ -1403,12 +1403,12 @@
                            (->Param :zip-pref)      "11201"}
              result       (td/eval-with-tagged-params query-result
                             (quote [
-                                   ;(println :name-3 name)
-                                   ;(println :id-4 id)
+                                    ;(println :name-3 name)
+                                    ;(println :id-4 id)
                                     (+ 42 7)]))]
-         (is= result 49) ))
+         (is= result 49)))
 
-       (dotest
+     (dotest
        (td/eid-count-reset)
        (td/with-tdb (td/new-tdb)
          (let [root-eid (td/add-entity-edn users-and-accesses)]
@@ -1423,7 +1423,7 @@
                 {:name "joel" :date "1-1-1970" :zip-acc "12345" :id 2 :zip-pref "11753"}
                 {:name "tim" :date "4-4-4444" :zip-acc "54221" :id 3 :zip-pref "11456"}])))))
 
-       (dotest
+     (dotest
        (td/eid-count-reset)
        (td/with-tdb (td/new-tdb)
          (let [root-eid (td/add-entity-edn skynet-widgets)
@@ -1440,7 +1440,7 @@
               {:description "Boom!" :widget-code "Dynamite" :producer-code "ACME" :wtc "c40"}]))))
 
 
-       (comment ; demo and poc for td/construct
+     (comment ; demo and poc for td/construct
        (def a-1400 1401)
        (def b-1400 1402)
        (dotest
@@ -1470,7 +1470,7 @@
              {:likes {:a 1, :b 2}}
              ))))
 
-       (dotest
+     (dotest
        (td/eid-count-reset)
        (td/with-tdb (td/new-tdb)
          (let [root-eid (td/add-entity-edn {:a 1 :b {:c 3 :d [4 5 6]}})
@@ -1493,14 +1493,14 @@
                   :enter => [<Eid 1003> <Idx 2> <Prim 6>]
                   :leave => [<Eid 1003> <Idx 2> <Prim 6>]
                 :leave => [<Eid 1002> <Prim :d> <Eid 1003>]
-              :leave => [<Eid 1001> <Prim :b> <Eid 1002>]" )
+              :leave => [<Eid 1001> <Prim :b> <Eid 1002>]")
            (is= (td/eid->edn root-eid) {:a 1 :b {:c 3 :d [4 5 6]}})
            (td/remove-triple [(->Eid 1001) :a 1])
            (is= (td/eid->edn root-eid) {:b {:c 3, :d [4 5 6]}})
            (td/remove-triple [(->Eid 1002) :d (->Eid 1003)])
            (is= (td/eid->edn root-eid) {:b {:c 3}}))))
 
-       (dotest
+     (dotest
        (is= (td/eav->eav [:e :a :v]) [:e :a :v])
        (is= (td/eav->vea [:e :a :v]) [:v :e :a])
        (is= (td/vea->eav [:v :e :a]) [:e :a :v])
@@ -1532,7 +1532,7 @@
            (is= (td/eid->edn e0) {:f "fred"})
            (td/entity-remove e0)
            (throws? (td/eid->edn e0))
-           (is= (td/eid->edn e1) {:w "wilma"}))) )
+           (is= (td/eid->edn e1) {:w "wilma"}))))
 
      (dotest
        (td/eid-count-reset)
@@ -1555,7 +1555,7 @@
              {:a 1, :b 2, :c {:d 4, :e [5 6 7]}})
            (td/entity-mapentry-update root-eid :a inc)
            (is= (td/walk-compact (td/eid->edn root-eid))
-             {:a 2, :b 2, :c {:d 4, :e [5 6 7]}}) )))
+             {:a 2, :b 2, :c {:d 4, :e [5 6 7]}}))))
 
      (dotest
        (td/eid-count-reset)
@@ -1574,8 +1574,8 @@
            (td/entity-array-idx-add root-eid 99 {:a 1 :b #{:c :d}}) ; legal add
            ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
            (is= (td/eid->edn root-eid) [0 1 3 9 {:a 1, :b #{:c :d}}])
-           (td/entity-array-idx-remove root-eid 1 )
-           (td/entity-array-idx-remove root-eid 0 )
+           (td/entity-array-idx-remove root-eid 1)
+           (td/entity-array-idx-remove root-eid 0)
            ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
            (is= (td/eid->edn root-eid)
              [3 9 {:a 1, :b #{:c :d}}])
@@ -1606,19 +1606,19 @@
      ;---------------------------------------------------------------------------------------------------
      ; example of query/filter/mutate paradigm (contrasted to map/filter/reduce)
      (def clojutre-2019-power-of-lenses-laurinharju
-       {:employees [{:name "justice ward"
-                     :role :programmer
-                     :salary 86750 }
-                    {:name "geovanni morgan"
-                     :role :service-designer
-                     :salary 73882 }
-                    {:name nil }
-                    {:name ""
-                     :role :programmer
+       {:employees [{:name   "justice ward"
+                     :role   :programmer
+                     :salary 86750}
+                    {:name   "geovanni morgan"
+                     :role   :service-designer
+                     :salary 73882}
+                    {:name nil}
+                    {:name   ""
+                     :role   :programmer
                      :salary nil}
-                    {:name "raymond richard mathews"
-                     :role :programmer
-                     :salary 45930 } ]} )
+                    {:name   "raymond richard mathews"
+                     :role   :programmer
+                     :salary 45930}]})
 
      (defn valid-name?
        [frame] (it-> frame
