@@ -58,6 +58,11 @@
 ; #todo Tupelo Data Language (TDL)
 
 ;-----------------------------------------------------------------------------
+; #todo make cljs version or delete
+;(def SortedSetType (class (avl/sorted-set 1 2 3)))
+;(def SortedMapType (class (avl/sorted-map :a 1 :b 2 :c 3)))
+
+;-----------------------------------------------------------------------------
 (defprotocol IVal (<val [this]))
 (defprotocol ITag (<tag [this]))
 (defprotocol ITagMap (->tagmap [this]))
@@ -386,7 +391,9 @@
 (s/defn new-tdb :- TDB
   "Returns a new, empty db."
   []
-  (into (sorted-map) ; #todo add `immutible` field
+  (into (sorted-map)
+    ; #todo add `immutible` field
+    ; #todo add `metadata` map from [e a v] => KeyMap
     {:eid-type (t/sorted-map-generic) ; source type of entity (:map :array :set)
      :idx-eav  (index/empty-index)
      :idx-ave  (index/empty-index)

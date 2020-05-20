@@ -9,7 +9,6 @@
   (:require
     [clojure.data.avl :as avl]
     [schema.core :as s]
-    [tupelo.data :as td]
     [tupelo.data.index :as index]
     [tupelo.lexical :as lex]
 
@@ -79,8 +78,6 @@
 (dotest
   (let [lex-set (avl/sorted-set 1 2 3)
         lex-map (avl/sorted-map :a 1 :b 2 :c 3)]
-    (s/validate lex/SortedSetType lex-set)
-    (s/validate lex/SortedMapType lex-map)
     (is= #{1 2 3} lex-set)
     (is= {:a 1 :b 2 :c 3} lex-map))
 
