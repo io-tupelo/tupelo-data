@@ -938,15 +938,16 @@
 (s/defn eval-with-env-map :- s/Any
   [env-map :- s/Any ; {Param s/Any} :#todo ???
    & forms] ; from tagged param => (possibly-tagged) value
-  ;(spyx-pretty env-map)
-  ;(spyx-pretty forms)
-  (let [sym-val-pairs (apply glue
-                        (forv [[kk vv] env-map]
-                          [(kw->sym (<val kk)) vv]))]
-    ; (spyx-pretty sym-val-pairs)
-    (eval
-      `(let ~sym-val-pairs
-         ~@forms))))
+  (with-spy-indent
+    (spyx env-map)
+    (let [sym-val-pairs (apply glue
+                          (forv [[kk vv] env-map]
+                            [(kw->sym (<val kk)) vv]))]
+      (spyx-pretty sym-val-pairs)
+      (spyx-pretty forms)
+      (eval
+        `(let ~sym-val-pairs
+           ~@forms)))))
 
 (s/defn tagged-params->env-map :- s/Any ; #todo was tsk/KeyMap, should be ???
   [tagged-map :- {Param s/Any}] ; from tagged param => (possibly-tagged) value
@@ -958,22 +959,26 @@
 
 (defn eval-with-tagged-params
   [tagged-map forms] ; from tagged param => (possibly-tagged) value
-  (let [env-map (tagged-params->env-map tagged-map)]
-    (apply eval-with-env-map env-map forms))) ; #todo unify rest params on forms!!!
+  (with-spy-indent
+    (spyx :eval-with-tagged-params tagged-map)
+    (let [env-map     (tagged-params->env-map tagged-map)
+          >>          (spyx :eval-with-tagged-params env-map)
+          eval-result (apply eval-with-env-map env-map forms)]
+      (spyx :eval-with-tagged-params eval-result)
+      ))) ; #todo unify rest params on forms!!!
 
 (s/defn match-triples+preds
   [qspec-list :- [tsk/Triple]
    pred-master :- tsk/List]
-  ; (spyx :query-triples+preds pred-master)
   (let [query-results-tagged (match-triples->tagged qspec-list)
-        ; >>                   (spyx-pretty query-results-tagged)
+        >>                   (spyx-pretty query-results-tagged)
         query-results-kept   (keep-if (fn [query-result]
-                                        ; (spyx-pretty query-result)
+                                        (spyx-pretty query-result)
                                         (let [keep-result (eval-with-tagged-params query-result [pred-master])]
-                                          ; (spyx keep-result)
+                                          (spyx keep-result)
                                           keep-result))
                                query-results-tagged)]
-    ; (spyx-pretty query-results-tagged-kept)
+    (spyx-pretty query-results-kept)
     query-results-kept))
 
 (s/defn ^:no-doc search-triple-fn
@@ -1156,6 +1161,7 @@
                          ; (spyx form-result)
                          form-result))]
 
+    ; (spyx-pretty triples-proc)
     (let [map-triples    (match->triples maps-in)
           search-triples (glue map-triples triples-proc)]
       ; (spyx-pretty map-triples)

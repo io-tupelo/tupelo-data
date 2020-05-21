@@ -19,7 +19,7 @@
     [schema.core :as s]
     [tupelo.testy :refer [deftest testing is dotest isnt is= isnt= is-set= is-nonblank=
                           throws? throws-not? define-fixture]]
-    [tupelo.core :as t :refer [spy spyx spyxx spy-pretty spyx-pretty unlazy let-spy
+    [tupelo.core :as t :refer [spy spyx spyxx spy-pretty spyx-pretty unlazy let-spy with-spy-indent
                                only only2 forv glue grab nl keep-if drop-if ->sym xfirst xsecond xthird not-nil?
                                it-> fetch-in with-map-vals map-plain?]]
     [tupelo.data :as td :refer [with-tdb new-tdb eid-count-reset lookup match-triples match-triples->tagged search-triple
@@ -107,6 +107,7 @@
   (is= [true] (cons true []))
   (is= true (every? t/truthy? (cons true []))))
 
+(comment ; <<comment>>
 (dotest
   (let [eid5 (->Eid 5)]
     (is (satisfies? ITagMap eid5))
@@ -430,41 +431,72 @@
            (is= (td/walk-compact (lookup [(->Eid 1005) (->Prim :b) nil]))
              [[{:eid 1005} {:prim :b} {:prim 2}]]))))
 
-#?(:clj
+  )       ; <<comment>>
+
+(dotest
+  (with-tdb (new-tdb)
+    (eid-count-reset)
+    (let [edn-val  {:a 1 :b 2}
+          root-eid (td/add-entity-edn edn-val)]
+      (is= edn-val (td/eid->edn root-eid))
+      (is= (td/walk-compact (deref *tdb*))
+        {:eid-type {{:eid 1001} :map},
+         :idx-ave  #{[{:prim :a} {:prim 1} {:eid 1001}]
+                     [{:prim :b} {:prim 2} {:eid 1001}]},
+         :idx-eav  #{[{:eid 1001} {:prim :a} {:prim 1}]
+                     [{:eid 1001} {:prim :b} {:prim 2}]},
+         :idx-vea  #{[{:prim 1} {:eid 1001} {:prim :a}]
+                     [{:prim 2} {:eid 1001} {:prim :b}]}}))
+
+    (let [triple-specs [[{:param :e} {:param :a}  {:param :v}  ]]]
+      (let [pred1 (fn [query-result]
+                    (with-spy-indent
+                      (println "***** pred1 *****")
+                      (let [pv  (->Param :v)
+                            >>  (spyx pv)
+                            val (grab pv query-result)]
+                        (spyx val)
+                        (odd? val))))]
+        ;(is= (td/walk-compact (match-triples->tagged triple-specs))
+        ;  [{{:param :e} {:eid 1001},
+        ;    {:param :a} {:prim :a},
+        ;    {:param :v} {:prim 1}}
+        ;   {{:param :e} {:eid 1001},
+        ;    {:param :a} {:prim :b},
+        ;    {:param :v} {:prim 2}}])
+        ;
+        ;(is= (td/walk-compact (td/match-triples triple-specs))
+        ;  [{:e 1001, :a :a, :v 1}
+        ;   {:e 1001, :a :b, :v 2}] )
+
+        (is= (td/walk-compact (td/match-triples+preds
+                                triple-specs
+                                [pred1 ]))
+          99)
+        ))
+
+    ;(let [triple-specs [[{:param :x} (->Prim :a) (->Prim 1)]]]
+    ;  (let [pred1 (fn [query-result]
+    ;                (t/with-map-vals query-result [x]
+    ;                  (pos? x)))
+    ;        pred2 (fn [query-result]
+    ;                (t/with-map-vals query-result [x]
+    ;                  (int? x)))]
+    ;    (is= (td/walk-compact (match-triples->tagged triple-specs))
+    ;      [{{:param :x} {:eid 1001}}])
+    ;    (is= (td/walk-compact (td/match-triples triple-specs))
+    ;      [{:x 1001}])
+    ;
+    ;    (is= (td/walk-compact (td/match-triples+preds
+    ;                            triple-specs
+    ;                            [pred1 pred2]))
+    ;      [{{:param :x} {:eid 1001}}])
+    ;    ))
+    ))
+
+(comment ; <<comment>>
+  #?(:clj
    (do
-
-     (dotest
-       (with-tdb (new-tdb)
-         (eid-count-reset)
-         (let [edn-val  {:a 1 :b 2}
-               root-eid (td/add-entity-edn edn-val)]
-           (is= edn-val (td/eid->edn root-eid))
-           (is= (td/walk-compact (deref *tdb*))
-             {:eid-type {{:eid 1001} :map},
-              :idx-ave  #{[{:prim :a} {:prim 1} {:eid 1001}]
-                          [{:prim :b} {:prim 2} {:eid 1001}]},
-              :idx-eav  #{[{:eid 1001} {:prim :a} {:prim 1}]
-                          [{:eid 1001} {:prim :b} {:prim 2}]},
-              :idx-vea  #{[{:prim 1} {:eid 1001} {:prim :a}]
-                          [{:prim 2} {:eid 1001} {:prim :b}]}}))
-
-         (let [triple-specs [[{:param :x} (->Prim :a) (->Prim 1)]]]
-           (let [pred1 (fn [query-result]
-                         (t/with-map-vals query-result [x]
-                           (pos? x)))
-                 pred2 (fn [query-result]
-                         (t/with-map-vals query-result [x]
-                           (int? x)))]
-             (is= (td/walk-compact (match-triples->tagged triple-specs))
-               [{{:param :x} {:eid 1001}}])
-             (is= (td/walk-compact (td/match-triples triple-specs))
-               [{:x 1001}])
-
-             (is= (td/walk-compact (td/match-triples+preds
-                                     triple-specs
-                                     [pred1 pred2]))
-               [{{:param :x} {:eid 1001}}])
-             ))))
 
      (dotest
        (with-tdb (new-tdb)
@@ -1644,8 +1676,6 @@
                                            {:name "", :role :programmer, :salary nil}
                                            {:name "Raymond Richard Mathews", :role :programmer, :salary 48226}]})))))
 
-
-     (comment ; <<comment>>
 
        )  ; <<comment>>
 
