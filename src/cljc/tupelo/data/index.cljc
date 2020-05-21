@@ -10,10 +10,10 @@
   (:require
     [clojure.data.avl :as avl]
     [schema.core :as s]
+    [tupelo.schema :as tsk]
+    [tupelo.lexical :as lex]
     [tupelo.core :as t :refer [spy spyx spyxx spyx-pretty grab glue map-entry indexed
                                grab forv vals->map fetch-in ]]
-    [tupelo.lexical :as lex]
-    [tupelo.schema :as tsk]
     ))
 
 ; #todo add indexes
@@ -120,6 +120,5 @@
   (when-not (contains? index entry)
     (throw (ex-info "entry not found in index" (vals->map entry))))
   (disj index entry))
-
 
 
