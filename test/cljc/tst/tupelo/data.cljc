@@ -8,19 +8,18 @@
   tst.tupelo.data
   #?(:clj (:refer-clojure :exclude [load ->VecNode]))
   #?(:clj (:require
+            [clojure.string :as str]
+            [schema.core :as s]
             [tupelo.test :refer [define-fixture deftest dotest dotest-focus is isnt is= isnt= is-set= is-nonblank= testing throws?]]
             [tupelo.core :as t :refer [spy spyx spyxx spy-pretty spyx-pretty unlazy let-spy
                                        only only2 forv glue grab nl keep-if drop-if ->sym xfirst xsecond xthird not-nil?
-                                       it-> fetch-in with-map-vals map-plain?
-                                       ]]
+                                       it-> fetch-in with-map-vals map-plain? ]]
             [tupelo.data :as td :refer [with-tdb new-tdb eid-count-reset lookup match-triples match-triples->tagged search-triple
-                                        *tdb* <tag <val ->Eid Eid? ->Idx Idx? ->Prim Prim? ->Param Param?
-                                        ]]
-            [clojure.string :as str]
-            [schema.core :as s]
+                                        *tdb* ->Eid Eid? ->Idx Idx? ->Prim Prim? ->Param Param? ]]
             [tupelo.data.index :as index]
+            [tupelo.tag :as tt :refer [IVal ITag ITagMap ->tagmap <tag <val ]]
             ))
-  (:import [tupelo.data Eid Idx Prim Param ITagMap ITag]))
+  (:import [tupelo.data Eid Idx Prim Param ]) )
 
 ; #todo fix for cljs
 
@@ -40,8 +39,6 @@
                     {:plant-id  2
                      :employees []}]}
      {:customer-id 2}]))
-
-(defn tv [t v] (td/->TagVal t v))
 
 ;-----------------------------------------------------------------------------
 (def skynet-widgets [{:basic-info   {:producer-code "Cyberdyne"}
@@ -105,38 +102,8 @@
        (is= true (every? t/truthy? (cons true []))))
 
      (dotest
-       (let [tv     (td/->TagVal :a 1)
-             tv-str (with-out-str (println tv))]
-         (is= {:tag :a :val 1} (unlazy tv))
-         (is= :a (td/<tag tv))
-         (is= 1 (td/<val tv))
-         (is= "<:a 1>" (str/trim tv-str))
-         (is (td/tagval? tv))
-         (isnt (td/tagval? 1))
-         (is= 1 (td/untagged tv))
-         (is= 1 (td/untagged 1)))
-
-       (let [idx5 (->Idx 5)]
-         (is (map? {:a 1})) ; expected
-         (isnt (record? {:a 1})) ; expected
-         (is (record? idx5)) ; expected
-         (is (map? idx5)) ; *** problem ***
-
-         (is (map-plain? (sorted-map))) ; expected
-         (is (map-plain? {:a 1})) ; solution
-         (isnt (map-plain? idx5))) ;solution
-
-       (let [vv [1 2 3]]
-         (isnt (map? vv))
-         (isnt (map-plain? vv)))
-
-       (let [sa  (t/->sym :a)
-             tva (td/->TagVal :sym sa)]
-         (is= (unlazy tva) {:tag :sym, :val (quote a)})))
-
-     (dotest
        (let [eid5 (->Eid 5)]
-         (is (satisfies? td/ITagMap eid5))
+         (is (satisfies? ITagMap eid5))
 
          (is= 5 (<val eid5))
          (is= (type eid5) tupelo.data.Eid)

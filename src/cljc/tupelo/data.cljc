@@ -18,6 +18,7 @@
             [tupelo.lexical :as lex]
             [tupelo.misc :as misc]
             [tupelo.schema :as tsk]
+            [tupelo.tag :as tt :refer [IVal ITag ITagMap ->tagmap <tag <val]]
             [tupelo.vec :as vec]
 
             [clojure.walk :as walk]
@@ -63,25 +64,6 @@
 ;(def SortedMapType (class (avl/sorted-map :a 1 :b 2 :c 3)))
 
 ;-----------------------------------------------------------------------------
-(defprotocol IVal (<val [this]))
-(defprotocol ITag (<tag [this]))
-(defprotocol ITagMap (->tagmap [this]))
-
-(defrecord TagVal
-  [tag val]
-  ITag (<tag [this] tag)
-  IVal (<val [this] val))
-
-; ***** fails strangely under lein-test-refresh after 1st file save if define this using Plumatic schema *****
-(defn tagval? ; :- s/Bool
-  [arg] (= TagVal (type arg)))
-
-(defmethod print-method TagVal
-  [tv ^java.io.Writer writer]
-  (.write writer
-    (format "<%s %s>" (<tag tv) (<val tv))))
-
-;-----------------------------------------------------------------------------
 (defrecord Eid
   [eid]
   IVal (<val [this] eid)
@@ -115,7 +97,7 @@
     (Idx? arg) (<val arg)
     (Prim? arg) (<val arg)
     ; (Param? arg) (<val arg) ; #todo enable this???
-    (tagval? arg) (<val arg)
+    ; (tagval? arg) (<val arg)
     :else arg))
 
 (defmethod print-method Eid
@@ -144,8 +126,6 @@
 (s/defn tagmap? :- s/Bool
   "Returns true iff arg is a map that looks like:  {:some-tag <some-primative>}"
   [item]
-  ; (spyx :tagmap?--enter item )
-  ; (spyx :tagmap?--leave)
   (and (map-plain? item)
     (= 1 (count item))
     (keyword? (only (keys item)))))
@@ -179,21 +159,6 @@
                    (t/cond-it-> item
                      (satisfies? ITagMap it) (->tagmap it)))
     data))
-
-;-----------------------------------------------------------------------------
-(s/defn tagval-map? :- s/Bool
-  "Returns true iff arg is a map that looks like a TagVal record:  {:tag :something :val 42}"
-  [item]
-  (and (map? item)
-    (= #{:tag :val} (set (keys item)))))
-
-;-----------------------------------------------------------------------------
-; #todo inline all of these?
-(defn tagged-param? [x] (and (= TagVal (type x)) (= :param (<tag x))))
-(defn tagged-eid? [x]
-  (or (Eid? x)
-    (and (= TagVal (type x))
-      (= :eid (<tag x)))))
 
 ;-----------------------------------------------------------------------------
 (defn unquote-form? ; #todo => `run` or `live` or `unq` or `ins` or `insert`???
@@ -256,18 +221,6 @@
   ;  [arg] (int? arg))
   )
 
-(do       ; keep these in sync
-  (def AttrTypeInput
-    "The Plumatic Schema type name for an attribute"
-    (s/cond-pre s/Keyword s/Int))
-  (def AttrType
-    "The Plumatic Schema type name for an attribute"
-    (s/cond-pre s/Keyword TagVal))
-  ;(s/defn attr? :- s/Bool ; #todo keep?
-  ;  "Returns true iff the arg type is a legal attribute value"
-  ;  [arg] (or (keyword? arg) (int? arg)))
-  )
-
 ; #todo update with other primitive types
 (do       ; keep these in sync
   (def Primitive (s/maybe ; maybe nil
@@ -281,7 +234,7 @@
     [arg :- s/Any]
     (or
       (primitive-data? arg)
-      (and (tagval? arg)
+      (and (tt/tagval? arg)
         (primitive-data? (<val arg)))
       (symbol? arg))))
 
@@ -346,7 +299,7 @@
   (or
     (and (Param? arg)
       (tmp-eid-kw? (<val arg)))
-    (and (tagged-param? arg) ; #todo remove this
+    (and  ; (tagged-param? arg) ; #todo remove this
       (tmp-eid-kw? (<val arg)))))
 
 ;-----------------------------------------------------------------------------
@@ -368,7 +321,7 @@
   (or
     (and (Param? arg)
       (tmp-attr-kw? (<val arg)))
-    (and (tagged-param? arg) ; #todo remove this
+    (and  ; (tagged-param? arg) ; #todo remove this
       (tmp-attr-kw? (<val arg)))))
 
 ;-----------------------------------------------------------------------------
@@ -804,7 +757,7 @@
         [-e- -a- v] triple-eav]
     (when-not (= :map entity-type)
       (throw (ex-info "non map type found" (vals->map teid entity-type))))
-    (when (tagged-eid? v)
+    (when (Eid? v)
       (entity-remove-impl (<val v)))
     (db-remove-triple triple-eav)))
 
@@ -828,7 +781,7 @@
            [-e- -a- v] triple-eav]
        (when-not (= :array entity-type)
          (throw (ex-info "non array type found" (vals->map teid entity-type))))
-       (when (tagged-eid? v)
+       (when (Eid? v)
          (entity-remove-impl (<val v)))
        (db-remove-triple triple-eav)
        (when rerack
@@ -849,7 +802,7 @@
         [-e- -a- v] triple-eav]
     (when-not (= :set entity-type)
       (throw (ex-info "non set type found" (vals->map teid entity-type))))
-    (when (tagged-eid? v)
+    (when (Eid? v)
       (entity-remove-impl (<val v)))
     (db-remove-triple triple-eav)))
 
@@ -954,7 +907,7 @@
   ; (newline) (spyx :unwrap-query-result-enter resmap)
   (let [result (apply glue
                  (forv [me resmap]
-                   {(<val (key me)) ; mapentry key is always a TagVal
+                   {(<val (key me)) ; mapentry key is always a tagmap
                     (untagged (val me))}))] ; mapentry val might be a primative
     ; (newline) (spyx :unwrap-query-result-leave result)
     result))
@@ -1217,7 +1170,7 @@
               ; >> (spyx me-key)
               ; >> (spyx me-val)
               param-raw (<val me-key)
-              val-raw   (untagged me-val) ; me-val might not be a TagVal
+              val-raw   (untagged me-val) ; me-val might not be a tagmap
               ]
           {param-raw val-raw})))))
 
