@@ -1,5 +1,4 @@
-(defproject tupelo-data
-  "20.03.01-SNAPSHOT"
+(defproject tupelo-data "20.05.21-SNAPSHOT"
   :license {:name "Eclipse Public License"
             :url  "http://www.eclipse.org/legal/epl-v10.html"}
   :min-lein-version "2.9.1"
@@ -11,7 +10,7 @@
   [
    [criterium "0.4.5"]
    [org.clojure/clojure "1.10.2-alpha1"]
-   [org.clojure/clojurescript "1.10.597"]
+   [org.clojure/clojurescript "1.10.764"]
    [org.clojure/data.avl "0.1.0"]
    [prismatic/schema "1.1.12"]
    [tupelo "0.9.207"]
