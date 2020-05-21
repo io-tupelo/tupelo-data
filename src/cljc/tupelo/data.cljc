@@ -7,7 +7,7 @@
 (ns tupelo.data
   "Effortless data access."
   (:require
-    [tupelo.core :as t :refer [spy spyx spyxx spyx-pretty with-spy-indent spyq spydiv
+    [tupelo.core :as t :refer [spy spyx spyxx spyx-pretty with-spy-indent spyq spydiv  ->true
                                grab glue map-entry indexed only only2 xfirst xsecond xthird xlast xrest not-empty? map-plain?
                                it-> cond-it-> forv vals->map fetch-in let-spy sym->kw with-map-vals vals->map
                                keep-if drop-if append prepend ->sym ->kw kw->sym validate dissoc-in
@@ -15,7 +15,7 @@
     [tupelo.data.index :as index]
     [tupelo.misc :as misc]
     [tupelo.schema :as tsk]
-    [tupelo.tag :as tt :refer [IVal ITag ITagMap ->tagmap <tag <val]]
+    [tupelo.tag :as tt :refer [IVal ITag ITagMap ->tagmap <tag <val untagged]]
     [tupelo.vec :as vec]
     [clojure.walk :as walk]
     [schema.core :as s]
@@ -84,16 +84,6 @@
   [arg :- s/Any] (instance? Prim arg))
 (s/defn Param? :- s/Bool
   [arg :- s/Any] (instance? Param arg))
-
-(s/defn untagged :- s/Any
-  [arg :- s/Any]
-  (cond
-    (Eid? arg) (<val arg)
-    (Idx? arg) (<val arg)
-    (Prim? arg) (<val arg)
-    ; (Param? arg) (<val arg) ; #todo enable this???
-    ; (tagval? arg) (<val arg)
-    :else arg))
 
 #?(:clj
    (do
@@ -936,50 +926,49 @@
     results-plain))
 
 (s/defn eval-with-env-map :- s/Any
-  [env-map :- s/Any ; {Param s/Any} :#todo ???
-   & forms] ; from tagged param => (possibly-tagged) value
+  [env-map :- tsk/KeyMap
+   pred]
   (with-spy-indent
-    (spyx env-map)
-    (let [sym-val-pairs (apply glue
-                          (forv [[kk vv] env-map]
-                            [(kw->sym (<val kk)) vv]))]
-      (spyx-pretty sym-val-pairs)
-      (spyx-pretty forms)
-      (eval
-        `(let ~sym-val-pairs
-           ~@forms)))))
+    ; (spyx :eval-with-env-map env-map)
+    ; (spyx pred)
+    (let [pred-result (pred env-map)]
+      ; (spyx pred-result)
+      pred-result)))
 
 (s/defn tagged-params->env-map :- s/Any ; #todo was tsk/KeyMap, should be ???
   [tagged-map :- {Param s/Any}] ; from tagged param => (possibly-tagged) value
-  ; (spyx-pretty tagged-map)
-  (let [env-map (apply glue
-                  (forv [[kk vv] tagged-map]
-                    {(untagged kk) (untagged vv)}))]
-    env-map))
+  (with-spy-indent
+    ; (spyx :untagger-enter tagged-map)
+    (let [env-map (apply glue
+                    (forv [[kk vv] tagged-map]
+                      {(untagged kk) (untagged vv)}))]
+      ; (spyx :untagger-leave env-map)
+      env-map)))
 
 (defn eval-with-tagged-params
-  [tagged-map forms] ; from tagged param => (possibly-tagged) value
+  [tagged-map pred] ; from tagged param => (possibly-tagged) value
   (with-spy-indent
-    (spyx :eval-with-tagged-params tagged-map)
+    ; (spyx :eval-with-tagged-params tagged-map)
     (let [env-map     (tagged-params->env-map tagged-map)
-          >>          (spyx :eval-with-tagged-params env-map)
-          eval-result (apply eval-with-env-map env-map forms)]
-      (spyx :eval-with-tagged-params eval-result)
-      ))) ; #todo unify rest params on forms!!!
+          ; >>          (spyx :eval-with-tagged-params env-map)
+          eval-result (eval-with-env-map env-map pred)]
+      ; (spyx :eval-with-tagged-params eval-result)
+      eval-result ))) ; #todo unify rest params on forms!!!
 
-(s/defn match-triples+preds
+(s/defn match-triples+pred
   [qspec-list :- [tsk/Triple]
-   pred-master :- tsk/List]
-  (let [query-results-tagged (match-triples->tagged qspec-list)
-        >>                   (spyx-pretty query-results-tagged)
-        query-results-kept   (keep-if (fn [query-result]
-                                        (spyx-pretty query-result)
-                                        (let [keep-result (eval-with-tagged-params query-result [pred-master])]
-                                          (spyx keep-result)
-                                          keep-result))
-                               query-results-tagged)]
-    (spyx-pretty query-results-kept)
-    query-results-kept))
+   keep-pred :- s/Any] ; #todo function schema!
+  (with-spy-indent
+    (let [query-results-tagged (match-triples->tagged qspec-list)
+          ; >>                   (spyx-pretty query-results-tagged)
+          query-results-kept   (keep-if (fn [query-result]
+                                          ; (spyx-pretty query-result)
+                                          (let [keep-result (eval-with-tagged-params query-result keep-pred)]
+                                            ; (spyx keep-result)
+                                            keep-result))
+                                 query-results-tagged)]
+      ; (spyx-pretty query-results-kept)
+      query-results-kept)))
 
 (s/defn ^:no-doc search-triple-fn
   [args :- tsk/Triple]
@@ -1141,15 +1130,19 @@
   (exclude-reserved-identifiers query-specs)
   (let [maps-in      (keep-if map-plain? query-specs)
         triple-forms (keep-if search-triple-form? query-specs)
-        pred-forms   (keep-if #(and (not (search-triple-form? %))
-                                 (fn-form? %)) query-specs)
-        ;>>           (spyx-pretty maps-in)
-        ;>>           (spyx triple-forms)
-        ;>>           (spyx pred-forms)
-        pred-master  `(clojure.core/every? tupelo.core/truthy?
-                        [true ; sentinal in case of empty list
-                         ~@pred-forms])
-        ; >> (spyx pred-master)
+        pred-specs   (keep-if #(and (not (search-triple-form? %))
+                                 ; (fn-form? %) ; #todo delete???
+                                 (fn? %))
+                       query-specs)
+        ; >>           (spyx-pretty maps-in)
+        ; >>           (spyx triple-forms)
+        ; >>           (spyx pred-specs)
+        keep-pred  (if (not-empty? pred-specs)
+                       (only pred-specs)
+                       ->true)
+        ; >> (spyx keep-pred)
+        ; #todo add ability to have multiple simple preds that can be pushed deeper in the query to
+        ; #todo eliminate failing matches asap
 
         triples-proc (forv [triple-form triple-forms]
                        ; (spyx triple-form)
@@ -1165,10 +1158,10 @@
     (let [map-triples    (match->triples maps-in)
           search-triples (glue map-triples triples-proc)]
       ; (spyx-pretty map-triples)
-      (let [unfiltered-results (match-triples+preds
+      (let [unfiltered-results (match-triples+pred
                                  search-triples
-                                 pred-master)
-            ; >>                 (spyx unfiltered-results)
+                                 keep-pred)
+            ; >>                 (spyx-pretty unfiltered-results)
             filtered-results   (match-results-filter-tmp-attr-mapentry
                                  (match-results-filter-tmp-eid-mapentry
                                    unfiltered-results))]
@@ -1189,7 +1182,7 @@
           {param-raw val-raw})))))
 
 (defn match-fn
-  [args]
+  [& args]
   ; #todo need a linter to catch nonsensical qspecs (attr <> keyword for example)
   (let [unwrapped-query-results (untag-match-results
                                   (match->tagged args))]
@@ -1198,7 +1191,7 @@
 
 (defn match-impl
   [qspecs]
-  `(match-fn (quote ~qspecs)))
+  `(apply match-fn (quote ~qspecs)))
 
 (defmacro match
   "Will evaluate embedded calls to `(search-triple ...)` "
