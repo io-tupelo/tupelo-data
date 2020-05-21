@@ -5,22 +5,16 @@
 ;   bound by the terms of this license.  You must not remove this notice, or any other, from this
 ;   software.
 (ns tupelo.data.index
-  (:refer-clojure :exclude [load ->VecNode])
+  ; (:refer-clojure :exclude [load ->VecNode])
+  #?(:cljs (:require-macros tupelo.data.index))
   (:require
+    [clojure.data.avl :as avl]
+    [schema.core :as s]
+    [tupelo.core :as t :refer [spy spyx spyxx spyx-pretty grab glue map-entry indexed
+                               grab forv vals->map fetch-in ]]
     [tupelo.lexical :as lex]
     [tupelo.schema :as tsk]
-    [clojure.data.avl :as avl]
-    [clojure.set :as set]
-    [schema.core :as s]
-    )
-  #?(:clj (:require
-            [tupelo.core :as t :refer [spy spyx spyxx spyx-pretty grab glue map-entry indexed
-                                       forv vals->map fetch-in ]]
-            ))
-  #?(:cljs (:require
-             [tupelo.core :as t :refer [spy spyx spyxx spyx-pretty grab]] ; #todo :include-macros true
-             ))
-  )
+    ))
 
 ; #todo add indexes
 ; #todo add sets (primative only or HID) => map with same key/value
