@@ -10,7 +10,6 @@
     [tst.tupelo.data]
     [tst.tupelo.data.index]
     ;-----------------------------------------------------------------------------
-
     ))
 
 ; tests can be asynchronous, we must hook test end
@@ -22,15 +21,13 @@
 
 (defn -main [& args]
   (run-tests
-
     ; ********** MUST REPEAT HERE ALL TEST NS FROM ABOVE `(:require ...)` **********
     ;-----------------------------------------------------------------------------
     'tst._bootstrap
 
-    'tst.tupelo.data.
+    'tst.tupelo.data
     'tst.tupelo.data.index
     ;-----------------------------------------------------------------------------
-
     )
   ; return a message to the figwheel process that tells it to wait
   [:figwheel.main.async-result/wait 5000] ; millis

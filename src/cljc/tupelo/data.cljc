@@ -6,25 +6,20 @@
 ;   software.
 (ns tupelo.data
   "Effortless data access."
-  (:refer-clojure :exclude [load ->VecNode])
-  ; #?(:clj (:use tupelo.core)) ; #todo remove for cljs
-  #?(:clj (:require
-            [tupelo.core :as t :refer [spy spyx spyxx spyx-pretty with-spy-indent spyq spydiv
-                                       grab glue map-entry indexed only only2 xfirst xsecond xthird xlast xrest not-empty? map-plain?
-                                       it-> cond-it-> forv vals->map fetch-in let-spy sym->kw with-map-vals vals->map
-                                       keep-if drop-if append prepend ->sym ->kw kw->sym validate dissoc-in
-                                       ]]
-            [tupelo.data.index :as index]
-            [tupelo.lexical :as lex]
-            [tupelo.misc :as misc]
-            [tupelo.schema :as tsk]
-            [tupelo.tag :as tt :refer [IVal ITag ITagMap ->tagmap <tag <val]]
-            [tupelo.vec :as vec]
-
-            [clojure.walk :as walk]
-            [schema.core :as s]
-            [clojure.core :as cc]
-            [clojure.set :as set]))
+  (:require
+    [tupelo.core :as t :refer [spy spyx spyxx spyx-pretty with-spy-indent spyq spydiv
+                               grab glue map-entry indexed only only2 xfirst xsecond xthird xlast xrest not-empty? map-plain?
+                               it-> cond-it-> forv vals->map fetch-in let-spy sym->kw with-map-vals vals->map
+                               keep-if drop-if append prepend ->sym ->kw kw->sym validate dissoc-in
+                               ]]
+    [tupelo.data.index :as index]
+    [tupelo.misc :as misc]
+    [tupelo.schema :as tsk]
+    [tupelo.tag :as tt :refer [IVal ITag ITagMap ->tagmap <tag <val]]
+    [tupelo.vec :as vec]
+    [clojure.walk :as walk]
+    [schema.core :as s]
+    [clojure.set :as set])
   )
 
 ; #todo Treeify: {k1 v1 k2 v2} =>

@@ -4,22 +4,22 @@
 ;   the root of this distribution.  By using this software in any fashion, you are agreeing to be
 ;   bound by the terms of this license.  You must not remove this notice, or any other, from this
 ;   software.
-(ns       ; ^:test-refresh/focus
-  tst.tupelo.data
-  #?(:clj (:refer-clojure :exclude [load ->VecNode]))
-  #?(:clj (:require
-            [clojure.string :as str]
-            [schema.core :as s]
-            [tupelo.test :refer [define-fixture deftest dotest dotest-focus is isnt is= isnt= is-set= is-nonblank= testing throws?]]
-            [tupelo.core :as t :refer [spy spyx spyxx spy-pretty spyx-pretty unlazy let-spy
-                                       only only2 forv glue grab nl keep-if drop-if ->sym xfirst xsecond xthird not-nil?
-                                       it-> fetch-in with-map-vals map-plain? ]]
-            [tupelo.data :as td :refer [with-tdb new-tdb eid-count-reset lookup match-triples match-triples->tagged search-triple
-                                        *tdb* ->Eid Eid? ->Idx Idx? ->Prim Prim? ->Param Param? ]]
-            [tupelo.data.index :as index]
-            [tupelo.tag :as tt :refer [IVal ITag ITagMap ->tagmap <tag <val ]]
-            ))
-  (:import [tupelo.data Eid Idx Prim Param ]) )
+(ns tst.tupelo.data
+  (:require
+    [clojure.string :as str]
+    [schema.core :as s]
+    [tupelo.test :refer [define-fixture deftest dotest dotest-focus is isnt is= isnt= is-set= is-nonblank= testing throws?]]
+    [tupelo.core :as t :refer [spy spyx spyxx spy-pretty spyx-pretty unlazy let-spy
+                               only only2 forv glue grab nl keep-if drop-if ->sym xfirst xsecond xthird not-nil?
+                               it-> fetch-in with-map-vals map-plain?]]
+    [tupelo.data :as td :refer [with-tdb new-tdb eid-count-reset lookup match-triples match-triples->tagged search-triple
+                                *tdb* ->Eid Eid? ->Idx Idx? ->Prim Prim? ->Param Param?]]
+    [tupelo.data.index :as index]
+    [tupelo.tag :as tt :refer [IVal ITag ITagMap ->tagmap <tag <val]]
+    )
+  ; #?(:clj)
+  (:import [tupelo.data Eid Idx Prim Param])
+  )
 
 ; #todo fix for cljs
 
@@ -60,7 +60,7 @@
 
 (def users-and-accesses {:people [{:name "jimmy" :id 1}
                                   {:name "joel" :id 2}
-                                  {:name "tim" :id 3} ]
+                                  {:name "tim" :id 3}]
                          :addrs  {1 [{:addr     "123 street ave"
                                       :address2 "apt 2"
                                       :city     "Townville"
@@ -84,7 +84,7 @@
                                       :city     "City"
                                       :state    "WA"
                                       :zip      "11456"
-                                      :pref     true}] }
+                                      :pref     true}]}
                          :visits {1 [{:date "12-25-1900" :geo-loc {:zip "11201"}}
                                      {:date "12-31-1900" :geo-loc {:zip "00666"}}]
                                   2 [{:date "1-1-1970" :geo-loc {:zip "12345"}}
@@ -92,14 +92,14 @@
                                   3 [{:date "4-4-4444" :geo-loc {:zip "54221"}}
                                      {:date "5-4-4444" :geo-loc {:zip "11456"}}]}})
 
+;-----------------------------------------------------------------------------
+(dotest
+  (is= true (and true))
+  (is= [true] (cons true []))
+  (is= true (every? t/truthy? (cons true []))))
+
 #?(:clj
    (do
-
-     ;-----------------------------------------------------------------------------
-     (dotest
-       (is= true (and true))
-       (is= [true] (cons true []))
-       (is= true (every? t/truthy? (cons true []))))
 
      (dotest
        (let [eid5 (->Eid 5)]
