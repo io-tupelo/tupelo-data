@@ -30,7 +30,9 @@
   #?(:clj (:import [tupelo.data Eid Idx Prim Param]))
   )
 
-; #todo fix for cljs
+(comment  ; <<comment>>
+  ) ; <<comment>>
+
 
 #?(:cljs (enable-console-print!))
 
@@ -1650,8 +1652,6 @@
                                            {:name nil}
                                            {:name "", :role :programmer, :salary nil}
                                            {:name "Raymond Richard Mathews", :role :programmer, :salary 48226}]})))))
-
-
 
 
 

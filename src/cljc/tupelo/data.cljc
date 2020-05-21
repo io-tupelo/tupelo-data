@@ -6,6 +6,13 @@
 ;   software.
 (ns tupelo.data
   "Effortless data access."
+  ;---------------------------------------------------------------------------------------------------
+  ;   https://code.thheller.com/blog/shadow-cljs/2019/10/12/clojurescript-macros.html
+  ;   http://blog.fikesfarm.com/posts/2015-12-18-clojurescript-macro-tower-and-loop.html
+  #?(:cljs (:require-macros
+             [tupelo.core]
+             [tupelo.data]
+             ))
   (:require
     [tupelo.core :as t :refer [spy spyx spyxx spyx-pretty with-spy-indent spyq spydiv  ->true
                                grab glue map-entry indexed only only2 xfirst xsecond xthird xlast xrest not-empty? map-plain?
@@ -107,16 +114,16 @@
    (do    ; https://stackoverflow.com/questions/42916447/adding-a-custom-print-method-for-clojurescript
      (extend-protocol IPrintWithWriter Eid
        (-pr-writer [eid writer -opts-]
-         (write-all writer "<Eid" (<val eid) ">")))
+         (write-all writer "<Eid " (<val eid) ">")))
      (extend-protocol IPrintWithWriter Idx
        (-pr-writer [idx writer _]
-         (write-all writer "<Idx" (<val idx) ">")))
+         (write-all writer "<Idx " (<val idx) ">")))
      (extend-protocol IPrintWithWriter Prim
        (-pr-writer [prim writer _]
-         (write-all writer "<Prim" (<val prim) ">")))
+         (write-all writer "<Prim " (<val prim) ">")))
      (extend-protocol IPrintWithWriter Param
        (-pr-writer [param writer _]
-         (write-all writer "<Param" (<val param) ">")))))
+         (write-all writer "<Param " (<val param) ">")))))
 
 ; #todo data-readers for #td/eid #td/idx #td/prim #td/param
 
@@ -159,38 +166,41 @@
     data))
 
 ;-----------------------------------------------------------------------------
-(defn unquote-form? ; #todo => `run` or `live` or `unq` or `ins` or `insert`???
-  [arg]
-  (and (list? arg)
-    (= (quote unquote) (first arg))))
+#?(:clj
+   (do
+     (defn unquote-form? ; #todo => `run` or `live` or `unq` or `ins` or `insert`???
+       [arg]
+       (and (list? arg)
+         (= (quote unquote) (first arg))))
 
-(defn unquote-splicing-form? ; #todo => `splat` or `splice` or `unq*` ???
-  [arg]
-  (and (list? arg)
-    (= (quote unquote-splicing) (first arg))))
+     (defn unquote-splicing-form? ; #todo => `splat` or `splice` or `unq*` ???
+       [arg]
+       (and (list? arg)
+         (= (quote unquote-splicing) (first arg))))
 
-(defn quote-template-impl
-  [form]
-  (walk/prewalk
-    (fn [item]
-      (cond
-        (unquote-form? item) (eval (xsecond item))
-        (sequential? item) (let [unquoted-vec (apply glue
-                                                (forv [it item]
-                                                  (if (unquote-splicing-form? it)
-                                                    (eval (xsecond it))
-                                                    [it])))
-                                 final-result (if (list? item)
-                                                (t/->list unquoted-vec)
-                                                unquoted-vec)]
-                             final-result)
-        :else item))
-    form))
+     (defn quote-template-impl
+       [form]
+       (walk/prewalk
+         (fn [item]
+           (cond
+             (unquote-form? item) (eval (xsecond item))
+             (sequential? item) (let [unquoted-vec (apply glue
+                                                     (forv [it item]
+                                                       (if (unquote-splicing-form? it)
+                                                         (eval (xsecond it))
+                                                         [it])))
+                                      final-result (if (list? item)
+                                                     (t/->list unquoted-vec)
+                                                     unquoted-vec)]
+                                  final-result)
+             :else item))
+         form))
 
-(defmacro quote-template ; #todo maybe => `qtmpl` or `quot` or `qt` or `quoted` or `template`
-  [form]
-  (quote-template-impl form))
+     (defmacro quote-template ; #todo maybe => `qtmpl` or `quot` or `qt` or `quoted` or `template`
+       [form]
+       (quote-template-impl form))
 
+     ))
 ;-----------------------------------------------------------------------------
 (defn construct-impl
   [template]
@@ -972,7 +982,7 @@
 
 (s/defn ^:no-doc search-triple-fn
   [args :- tsk/Triple]
-  ; (assert (= 3 (count args)))
+  (assert (= 3 (count args)))
   (with-spy-indent
     (let [[e a v] args
           e-out (if (symbol? e)
@@ -981,7 +991,6 @@
           ; #todo IMPORTANT! have a conflict for map with int keys {1 :a 2 :b}
           ; #todo need to wrap like (->Key 5) or (->Idx 5)
           a-out (cond
-                  ; (Prim? a) a ; #todo remove this???
                   (symbol? a) (->Param (sym->kw a))
                   (int? a) (->Idx a)
                   (primitive? a) (->Prim a)
@@ -1029,6 +1038,12 @@
   [seq-entity :- tsk/List]
   (into {} (indexed seq-entity)))
 
+; (t/cum-vector-append triple) ; #todo fails under CLJS
+(s/defn cum-vector-swap-append :- s/Any
+  "Works inside of a `with-cum-vector` block to append a new vector value."
+  [value :- s/Any]
+  (swap! tupelo.core/*cumulative-val* t/append value))
+
 (defn ^:no-doc match->triples-impl
   [qmaps]
   (with-spy-indent
@@ -1053,7 +1068,10 @@
               (let [sym-to-use (autosym-resolve kk vv)
                     triple     (search-triple-fn [eid-val kk sym-to-use])]
                 ; (spyx :symbol triple)
-                (t/cum-vector-append triple)))
+                ; (spyx tupelo.core/*cumulative-val*)
+                ; (t/cum-vector-append triple) ; #todo fails under CLJS
+                (cum-vector-swap-append triple)
+                ))
 
             (sequential? vv) ; (throw (ex-info "not implemented" {:type :sequential :value vv}))
             (let [array-val       vv
@@ -1063,7 +1081,8 @@
                   qmaps-modified  (forv [elem array-val]
                                     {:eid tmp-eid (gensym "tmp-attr-") elem})]
               ; (spyx qmaps-modified)
-              (t/cum-vector-append triple-modified)
+              ; (spyx :sequential  triple-modified)
+              (cum-vector-swap-append triple-modified)
               (match->triples-impl qmaps-modified))
 
             (map-plain? vv)
@@ -1072,13 +1091,14 @@
                   ; >>              (spyx triple-modified)
                   qmaps-modified  [(glue {:eid tmp-eid} vv)]]
               ; (spyx qmaps-modified)
-              (t/cum-vector-append triple-modified)
+              ; (spyx :map-plain  triple-modified)
+              (cum-vector-swap-append triple-modified)
               (match->triples-impl qmaps-modified))
 
             (primitive-data? vv)
             (let [triple (search-triple-fn [eid-val kk vv])]
-              ; (spyx triple)
-              (t/cum-vector-append triple))
+              ; (spyx :primitive-data triple)
+              (cum-vector-swap-append triple))
 
             :else (throw (ex-info "unrecognized value" (vals->map kk vv map-remaining)))
             ))))))
@@ -1112,17 +1132,17 @@
     {:enter (fn [-parents- item]
               (when (or (tmp-eid-sym? item) (tmp-eid-kw? item))
                 (throw (ex-info "Error: detected reserved tmp-eid-xxxx value" (vals->map item)))))}))
-
-(s/defn fn-form? :- s/Bool
-  [arg :- s/Any]
-  ; (spyx :fn-form?--enter arg)
-  ; (spy :fn-form?--result)
-  (and (list? arg)
-    (let [elem0 (xfirst arg)]
-      (and (symbol? elem0)
-        (let [eval-result (eval elem0)]
-          ; (spyxx eval-result)
-          (fn? eval-result))))))
+#?(:clj
+   (s/defn fn-form? :- s/Bool
+     [arg :- s/Any]
+     ; (spyx :fn-form?--enter arg)
+     ; (spy :fn-form?--result)
+     (and (list? arg)
+       (let [elem0 (xfirst arg)]
+         (and (symbol? elem0)
+           (let [eval-result (eval elem0)]
+             ; (spyxx eval-result)
+             (fn? eval-result)))))))
 
 (defn ^:no-doc match->tagged
   [query-specs]
@@ -1131,27 +1151,24 @@
   (let [maps-in      (keep-if map-plain? query-specs)
         triple-forms (keep-if search-triple-form? query-specs)
         pred-specs   (keep-if #(and (not (search-triple-form? %))
-                                 ; (fn-form? %) ; #todo delete???
                                  (fn? %))
                        query-specs)
-        ; >>           (spyx-pretty maps-in)
-        ; >>           (spyx triple-forms)
-        ; >>           (spyx pred-specs)
-        keep-pred  (if (not-empty? pred-specs)
+        ;>>           (spyx-pretty maps-in)
+        ;>>           (spyx triple-forms)
+        ;>>           (spyx pred-specs)
+        keep-pred    (if (not-empty? pred-specs)
                        (only pred-specs)
                        ->true)
-        ; >> (spyx keep-pred)
+        ;>>           (spyx keep-pred)
         ; #todo add ability to have multiple simple preds that can be pushed deeper in the query to
         ; #todo eliminate failing matches asap
 
         triples-proc (forv [triple-form triple-forms]
-                       ; (spyx triple-form)
-                       (let [form-to-eval (cons
-                                            (quote tupelo.data/search-triple)
-                                            (rest triple-form))
-                             ; >>           (spyx form-to-eval)
-                             form-result  (eval form-to-eval)]
-                         ; (spyx form-result)
+                       ;(spyx triple-form)
+                       (let [triple-params (rest triple-form)
+                             ; >> (spyx triple-params)
+                             form-result   (search-triple-fn triple-params)]
+                         ;(spyx form-result)
                          form-result))]
 
     ; (spyx-pretty triples-proc)
