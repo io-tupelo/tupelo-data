@@ -29,8 +29,6 @@
 
 #?(:cljs (enable-console-print!))
 
-#?(:clj (do
-
 (dotest
   (let [index   (t/it-> (index/empty-index)
                   (index/add-entry it [2 :b])
@@ -44,7 +42,8 @@
     (is= (vec index-2) [[2 :a] [2 :b]])
     (throws? (index/remove-entry index-2 [2 :c]))))
 
-(dotest
+
+          (dotest
   (is= (vec (avl/sorted-set-by lex/compare-lex [1 :a] [1] [2]))
     [[1] [1 :a] [2]])
   (is= (vec (avl/sorted-set-by lex/compare-lex [1 :a] [1 nil] [1] [2]))
@@ -147,11 +146,7 @@
     (is= (index/split-key-prefix [:joker 2] data-raw)
       {:smaller #{[:b 1] [:b 2] [:b 3] [:f 1] [:f 2] [:f 3] [:h 1] [:h 2]},
        :matches #{}
-       :larger  #{}}))
-
-  )
-
-))
+       :larger  #{}})) )
 
 
 
