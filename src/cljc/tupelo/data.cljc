@@ -95,25 +95,38 @@
     ; (tagval? arg) (<val arg)
     :else arg))
 
-(defmethod print-method Eid
-  [tv ^java.io.Writer writer]
-  (.write writer
-    (format "<Eid %s>" (<val tv))))
-
-(defmethod print-method Idx
-  [tv ^java.io.Writer writer]
-  (.write writer
-    (format "<Idx %s>" (<val tv))))
-
-(defmethod print-method Prim
-  [tv ^java.io.Writer writer]
-  (.write writer
-    (format "<Prim %s>" (<val tv))))
-
-(defmethod print-method Param
-  [tv ^java.io.Writer writer]
-  (.write writer
-    (format "<Param %s>" (<val tv))))
+#?(:clj
+   (do
+     (defmethod print-method Eid
+       [eid ^java.io.Writer writer]
+       (.write writer
+         (format "<Eid %s>" (<val eid))))
+     (defmethod print-method Idx
+       [idx ^java.io.Writer writer]
+       (.write writer
+         (format "<Idx %s>" (<val idx))))
+     (defmethod print-method Prim
+       [prim ^java.io.Writer writer]
+       (.write writer
+         (format "<Prim %s>" (<val prim))))
+     (defmethod print-method Param
+       [param ^java.io.Writer writer]
+       (.write writer
+         (format "<Param %s>" (<val param)))))
+   :cljs
+   (do    ; https://stackoverflow.com/questions/42916447/adding-a-custom-print-method-for-clojurescript
+     (extend-protocol IPrintWithWriter Eid
+       (-pr-writer [eid writer -opts-]
+         (write-all writer "<Eid" (<val eid) ">")))
+     (extend-protocol IPrintWithWriter Idx
+       (-pr-writer [idx writer _]
+         (write-all writer "<Idx" (<val idx) ">")))
+     (extend-protocol IPrintWithWriter Prim
+       (-pr-writer [prim writer _]
+         (write-all writer "<Prim" (<val prim) ">")))
+     (extend-protocol IPrintWithWriter Param
+       (-pr-writer [param writer _]
+         (write-all writer "<Param" (<val param) ">")))))
 
 ; #todo data-readers for #td/eid #td/idx #td/prim #td/param
 
@@ -241,7 +254,7 @@
     (Eid? arg) arg
     (int? arg) (->Eid arg)
     (tagmap? arg) (validate Eid? (tagmap-reader arg))
-    :else (throw (ex-info "Invalid type found:" (:arg arg :type (type arg))))))
+    :else (throw (ex-info "Invalid type found:" {:arg arg :type (type arg)}))))
 
 (s/defn coerce->Idx :- Idx ; #todo reimplement in terms of walk-entity ???
   "Coerce any non-Idx input to Idx"
@@ -251,7 +264,7 @@
     (Idx? arg) arg
     (int? arg) (->Idx arg)
     (tagmap? arg) (validate Idx? (tagmap-reader arg))
-    :else (throw (ex-info "Invalid type found:" (:arg arg :type (type arg))))))
+    :else (throw (ex-info "Invalid type found:" {:arg arg :type (type arg)}))))
 
 (s/defn coerce->Prim :- Prim ; #todo reimplement in terms of walk-entity ???
   "Coerce any non-Prim input to Prim"
@@ -261,7 +274,7 @@
     (Prim? arg) arg
     (primitive-data? arg) (->Prim arg)
     (tagmap? arg) (validate Prim? (tagmap-reader arg))
-    :else (throw (ex-info "Invalid type found:" (:arg arg :type (type arg))))))
+    :else (throw (ex-info "Invalid type found:" {:arg arg :type (type arg)}))))
 
 (defn raw->Prim
   "If given raw primitive or tagmap data, coerce to Prim; else return unchanged."

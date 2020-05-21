@@ -5,10 +5,20 @@
 ;   bound by the terms of this license.  You must not remove this notice, or any other, from this
 ;   software.
 (ns tst.tupelo.data
+  ;---------------------------------------------------------------------------------------------------
+  ;   https://code.thheller.com/blog/shadow-cljs/2019/10/12/clojurescript-macros.html
+  ;   http://blog.fikesfarm.com/posts/2015-12-18-clojurescript-macro-tower-and-loop.html
+  #?(:cljs (:require-macros
+             [tupelo.core]
+             [tupelo.data]
+             [tupelo.testy]
+             ))
   (:require
+    [clojure.test] ; sometimes this is required - not sure why
     [clojure.string :as str]
     [schema.core :as s]
-    [tupelo.test :refer [define-fixture deftest dotest dotest-focus is isnt is= isnt= is-set= is-nonblank= testing throws?]]
+    [tupelo.testy :refer [deftest testing is dotest isnt is= isnt= is-set= is-nonblank=
+                          throws? throws-not? define-fixture]]
     [tupelo.core :as t :refer [spy spyx spyxx spy-pretty spyx-pretty unlazy let-spy
                                only only2 forv glue grab nl keep-if drop-if ->sym xfirst xsecond xthird not-nil?
                                it-> fetch-in with-map-vals map-plain?]]
@@ -17,8 +27,7 @@
     [tupelo.data.index :as index]
     [tupelo.tag :as tt :refer [IVal ITag ITagMap ->tagmap <tag <val]]
     )
-  ; #?(:clj)
-  (:import [tupelo.data Eid Idx Prim Param])
+  #?(:clj (:import [tupelo.data Eid Idx Prim Param]))
   )
 
 ; #todo fix for cljs
@@ -98,16 +107,13 @@
   (is= [true] (cons true []))
   (is= true (every? t/truthy? (cons true []))))
 
-#?(:clj
-   (do
-
      (dotest
        (let [eid5 (->Eid 5)]
          (is (satisfies? ITagMap eid5))
 
          (is= 5 (<val eid5))
          (is= (type eid5) tupelo.data.Eid)
-         (is= (instance? Eid eid5) true)
+         (is= (instance? tupelo.data.Eid eid5) true)
          (is (Eid? eid5))
          (is= (td/walk-compact eid5) {:eid 5})
          (is= eid5 (td/coerce->Eid 5))
@@ -118,7 +124,7 @@
        (let [idx5 (->Idx 5)]
          (is= 5 (<val idx5))
          (is= (type idx5) tupelo.data.Idx)
-         (is= (instance? Idx idx5) true)
+         (is= (instance? tupelo.data.Idx idx5) true)
          (is (Idx? idx5))
          (is= (td/walk-compact idx5) {:idx 5})
          (is= idx5 (td/coerce->Idx 5))
@@ -129,7 +135,7 @@
        (let [prim5 (->Prim 5)]
          (is= 5 (<val prim5))
          (is= (type prim5) tupelo.data.Prim)
-         (is= (instance? Prim prim5) true)
+         (is= (instance? tupelo.data.Prim prim5) true)
          (is (Prim? prim5))
          (is= (td/walk-compact prim5) {:prim 5})
          (is= prim5 (td/coerce->Prim 5))
@@ -141,9 +147,12 @@
        (let [param5 (->Param 5)]
          (is= 5 (<val param5))
          (is= (type param5) tupelo.data.Param)
-         (is= (instance? Param param5) true)
+         (is= (instance? tupelo.data.Param param5) true)
          (is (Param? param5))
          (is= (td/walk-compact param5) {:param 5})))
+
+#?(:clj
+   (do
 
      ;-----------------------------------------------------------------------------
      (dotest
