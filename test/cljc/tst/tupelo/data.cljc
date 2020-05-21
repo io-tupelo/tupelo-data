@@ -107,52 +107,49 @@
   (is= [true] (cons true []))
   (is= true (every? t/truthy? (cons true []))))
 
-     (dotest
-       (let [eid5 (->Eid 5)]
-         (is (satisfies? ITagMap eid5))
+(dotest
+  (let [eid5 (->Eid 5)]
+    (is (satisfies? ITagMap eid5))
 
-         (is= 5 (<val eid5))
-         (is= (type eid5) tupelo.data.Eid)
-         (is= (instance? tupelo.data.Eid eid5) true)
-         (is (Eid? eid5))
-         (is= (td/walk-compact eid5) {:eid 5})
-         (is= eid5 (td/coerce->Eid 5))
-         (is= eid5 (td/coerce->Eid eid5))
-         (is= eid5 (td/coerce->Eid {:eid 5}))
-         (throws? (td/coerce->Eid {:idx 5}))
-         (throws? (td/coerce->Eid :a)))
-       (let [idx5 (->Idx 5)]
-         (is= 5 (<val idx5))
-         (is= (type idx5) tupelo.data.Idx)
-         (is= (instance? tupelo.data.Idx idx5) true)
-         (is (Idx? idx5))
-         (is= (td/walk-compact idx5) {:idx 5})
-         (is= idx5 (td/coerce->Idx 5))
-         (is= idx5 (td/coerce->Idx idx5))
-         (is= idx5 (td/coerce->Idx {:idx 5}))
-         (throws? (td/coerce->Idx {:eid 5}))
-         (throws? (td/coerce->Idx :a)))
-       (let [prim5 (->Prim 5)]
-         (is= 5 (<val prim5))
-         (is= (type prim5) tupelo.data.Prim)
-         (is= (instance? tupelo.data.Prim prim5) true)
-         (is (Prim? prim5))
-         (is= (td/walk-compact prim5) {:prim 5})
-         (is= prim5 (td/coerce->Prim 5))
-         (is= prim5 (td/coerce->Prim prim5))
-         (is= prim5 (td/coerce->Prim {:prim 5}))
-         (is= (->Prim :a) (td/coerce->Prim :a))
-         (is= (->Prim "abc") (td/coerce->Prim "abc"))
-         (throws? (td/coerce->Prim {:idx 5})))
-       (let [param5 (->Param 5)]
-         (is= 5 (<val param5))
-         (is= (type param5) tupelo.data.Param)
-         (is= (instance? tupelo.data.Param param5) true)
-         (is (Param? param5))
-         (is= (td/walk-compact param5) {:param 5})))
-
-#?(:clj
-   (do
+    (is= 5 (<val eid5))
+    (is= (type eid5) tupelo.data.Eid)
+    (is= (instance? tupelo.data.Eid eid5) true)
+    (is (Eid? eid5))
+    (is= (td/walk-compact eid5) {:eid 5})
+    (is= eid5 (td/coerce->Eid 5))
+    (is= eid5 (td/coerce->Eid eid5))
+    (is= eid5 (td/coerce->Eid {:eid 5}))
+    (throws? (td/coerce->Eid {:idx 5}))
+    (throws? (td/coerce->Eid :a)))
+  (let [idx5 (->Idx 5)]
+    (is= 5 (<val idx5))
+    (is= (type idx5) tupelo.data.Idx)
+    (is= (instance? tupelo.data.Idx idx5) true)
+    (is (Idx? idx5))
+    (is= (td/walk-compact idx5) {:idx 5})
+    (is= idx5 (td/coerce->Idx 5))
+    (is= idx5 (td/coerce->Idx idx5))
+    (is= idx5 (td/coerce->Idx {:idx 5}))
+    (throws? (td/coerce->Idx {:eid 5}))
+    (throws? (td/coerce->Idx :a)))
+  (let [prim5 (->Prim 5)]
+    (is= 5 (<val prim5))
+    (is= (type prim5) tupelo.data.Prim)
+    (is= (instance? tupelo.data.Prim prim5) true)
+    (is (Prim? prim5))
+    (is= (td/walk-compact prim5) {:prim 5})
+    (is= prim5 (td/coerce->Prim 5))
+    (is= prim5 (td/coerce->Prim prim5))
+    (is= prim5 (td/coerce->Prim {:prim 5}))
+    (is= (->Prim :a) (td/coerce->Prim :a))
+    (is= (->Prim "abc") (td/coerce->Prim "abc"))
+    (throws? (td/coerce->Prim {:idx 5})))
+  (let [param5 (->Param 5)]
+    (is= 5 (<val param5))
+    (is= (type param5) tupelo.data.Param)
+    (is= (instance? tupelo.data.Param param5) true)
+    (is (Param? param5))
+    (is= (td/walk-compact param5) {:param 5})))
 
      ;-----------------------------------------------------------------------------
      (dotest
@@ -177,40 +174,40 @@
      ;-----------------------------------------------------------------------------
      (def vec234 [2 3 4])
 
-     (dotest
-       (is (td/unquote-form? (quote (unquote (+ 2 3)))))
-       (is (td/unquote-splicing-form? (quote (unquote-splicing (+ 2 3)))))
+#?(:clj   ; #todo fails on cljs
 
-       (is= (td/quote-template-impl (quote {:a 1 :b (unquote (+ 2 3))}))
-         {:a 1, :b 5})
-       (is= (td/quote-template-impl (quote [a b (unquote (+ 2 3))]))
-         (quote [a b 5]))
-       (is= (td/quote-template {:a 1 :b (unquote (+ 2 3))})
-         {:a 1, :b 5})
-       (is= (td/quote-template {:a 1 :b (unquote (vec (range 3)))})
-         {:a 1, :b [0 1 2]})
-       (is= (td/quote-template {:a 1 :b (unquote vec234)})
-         {:a 1, :b [2 3 4]})
+   (dotest
+     (is (td/unquote-form? (quote (unquote (+ 2 3)))))
+     (is (td/unquote-splicing-form? (quote (unquote-splicing (+ 2 3)))))
 
-       (let [result (td/quote-template (list 1 2 (unquote (inc 2)) 4 5))]
-         (is (list? result))
-         (is= result (quote (1 2 3 4 5))))
+     (is= (td/quote-template-impl (quote {:a 1 :b (unquote (+ 2 3))}))
+       {:a 1, :b 5})
+     (is= (td/quote-template-impl (quote [a b (unquote (+ 2 3))]))
+       (quote [a b 5]))
+     (is= (td/quote-template {:a 1 :b (unquote (+ 2 3))})
+       {:a 1, :b 5})
+     (is= (td/quote-template {:a 1 :b (unquote (vec (range 3)))})
+       {:a 1, :b [0 1 2]})
+     (is= (td/quote-template {:a 1 :b (unquote vec234)})
+       {:a 1, :b [2 3 4]})
 
-       (is= (td/quote-template-impl (quote [1 (unquote-splicing (range 2 5)) 5]))
-         [1 2 3 4 5])
-       (is= (td/quote-template-impl (quote [1 (unquote-splicing tst.tupelo.data/vec234) 5])) ; must be fully-qualified Var here
-         [1 2 3 4 5])
-       (is= (td/quote-template [1 (unquote-splicing vec234) 5]) ; unqualified name OK here
-         [1 2 3 4 5])
-       (is= (td/quote-template [1 (unquote-splicing (t/thru 2 4)) 5])
-         [1 2 3 4 5])
-       (is= (td/quote-template [1 (unquote (t/thru 2 4)) 5])
-         [1 [2 3 4] 5]))
+     (let [result (td/quote-template (list 1 2 (unquote (inc 2)) 4 5))]
+       (is (list? result))
+       (is= result (quote (1 2 3 4 5))))
 
+     (is= (td/quote-template-impl (quote [1 (unquote-splicing (range 2 5)) 5]))
+       [1 2 3 4 5])
+     (is= (td/quote-template-impl (quote [1 (unquote-splicing tst.tupelo.data/vec234) 5])) ; must be fully-qualified Var here
+       [1 2 3 4 5])
+     (is= (td/quote-template [1 (unquote-splicing vec234) 5]) ; unqualified name OK here
+       [1 2 3 4 5])
+     (is= (td/quote-template [1 (unquote-splicing (t/thru 2 4)) 5])
+       [1 2 3 4 5])
+     (is= (td/quote-template [1 (unquote (t/thru 2 4)) 5])
+       [1 [2 3 4] 5])
 
-     (dotest
-       (is= 3 (eval (quote (+ 1 2)))))
-
+     (is= 3 (eval (quote (+ 1 2)))))
+   )
 
      (dotest
        (let [ss123 (t/it-> (index/empty-index)
@@ -432,6 +429,9 @@
              [[{:eid 1009} {:prim :c} {:prim 3}]])
            (is= (td/walk-compact (lookup [(->Eid 1005) (->Prim :b) nil]))
              [[{:eid 1005} {:prim :b} {:prim 2}]]))))
+
+#?(:clj
+   (do
 
      (dotest
        (with-tdb (new-tdb)
