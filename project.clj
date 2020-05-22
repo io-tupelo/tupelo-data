@@ -1,4 +1,4 @@
-(defproject tupelo-data "20.05.21-SNAPSHOT"
+(defproject tupelo-data "20.05.22-SNAPSHOT"
   :license {:name "Eclipse Public License"
             :url  "http://www.eclipse.org/legal/epl-v10.html"}
   :min-lein-version "2.9.1"
