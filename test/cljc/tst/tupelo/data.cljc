@@ -174,42 +174,6 @@
     (throws? (td/tagidx-map->array bad))))
 
 ;-----------------------------------------------------------------------------
-(def vec234 [2 3 4])
-
-#?(:clj   ; #todo fails on cljs
-
-   (dotest
-     (is (td/unquote-form? (quote (unquote (+ 2 3)))))
-     (is (td/unquote-splicing-form? (quote (unquote-splicing (+ 2 3)))))
-
-     (is= (td/quote-template-impl (quote {:a 1 :b (unquote (+ 2 3))}))
-       {:a 1, :b 5})
-     (is= (td/quote-template-impl (quote [a b (unquote (+ 2 3))]))
-       (quote [a b 5]))
-     (is= (td/quote-template {:a 1 :b (unquote (+ 2 3))})
-       {:a 1, :b 5})
-     (is= (td/quote-template {:a 1 :b (unquote (vec (range 3)))})
-       {:a 1, :b [0 1 2]})
-     (is= (td/quote-template {:a 1 :b (unquote vec234)})
-       {:a 1, :b [2 3 4]})
-
-     (let [result (td/quote-template (list 1 2 (unquote (inc 2)) 4 5))]
-       (is (list? result))
-       (is= result (quote (1 2 3 4 5))))
-
-     (is= (td/quote-template-impl (quote [1 (unquote-splicing (range 2 5)) 5]))
-       [1 2 3 4 5])
-     (is= (td/quote-template-impl (quote [1 (unquote-splicing tst.tupelo.data/vec234) 5])) ; must be fully-qualified Var here
-       [1 2 3 4 5])
-     (is= (td/quote-template [1 (unquote-splicing vec234) 5]) ; unqualified name OK here
-       [1 2 3 4 5])
-     (is= (td/quote-template [1 (unquote-splicing (t/thru 2 4)) 5])
-       [1 2 3 4 5])
-     (is= (td/quote-template [1 (unquote (t/thru 2 4)) 5])
-       [1 [2 3 4] 5])
-
-     (is= 3 (eval (quote (+ 1 2)))))
-   )
 
 (dotest
   (let [ss123 (t/it-> (index/empty-index)
@@ -1425,36 +1389,7 @@
          {:description "Mimetic polyalloy" :widget-code "Model-201" :producer-code "Cyberdyne" :wtc "t1000"}
          {:description "Boom!" :widget-code "Dynamite" :producer-code "ACME" :wtc "c40"}]))))
 
-(comment  ; demo and poc for td/construct
-  (def a-1400 1401)
-  (def b-1400 1402)
-  (dotest
-    (let [a 1
-          b (inc a)]
-      (println (quote [a b]))
-      (println '{:out [~a ~b]}) ; ***** doesn't work *****
-      (println `{:out [~a ~b]})
-      ; (println (td/quote-template {:out (unquote [a b])})) ; ***** fails due to locals *****
-      (println (td/quote-template {:out (unquote [a-1400 b-1400])})) ; globals are OK
-      (println (td/quote-template {:a 1 :b (unquote (+ 2 3))})) ; global function works too
-      (newline)
-      (let [env {:a 1 :b 2}]
-        (println :with-env
-          (td/eval-with-env-map env
-            (quote [a b])))))))
-
-(dotest
-  (let [env {:a 1 :b 2}]
-    (t/with-map-vals env [a b]
-      (is= {:likes {:a a :b b}} ; normal
-        {:likes {:a 1, :b 2}})
-      (is= (td/construct-impl (quote {:likes {:a ? :b ?}}))
-        (quote {:likes {:a a, :b b}}))
-      (is= (td/construct {:likes {:a ? :b ?}})
-        {:likes {:a a, :b b}}
-        {:likes {:a 1, :b 2}}
-        ))))
-
+;---------------------------------------------------------------------------------------------------
 (dotest
   (td/eid-count-reset)
   (td/with-tdb (td/new-tdb)

@@ -165,60 +165,6 @@
                      (satisfies? ITagMap it) (->tagmap it)))
     data))
 
-;-----------------------------------------------------------------------------
-#?(:clj
-   (do
-     (defn unquote-form? ; #todo => `run` or `live` or `unq` or `ins` or `insert`???
-       [arg]
-       (and (list? arg)
-         (= (quote unquote) (first arg))))
-
-     (defn unquote-splicing-form? ; #todo => `splat` or `splice` or `unq*` ???
-       [arg]
-       (and (list? arg)
-         (= (quote unquote-splicing) (first arg))))
-
-     (defn quote-template-impl
-       [form]
-       (walk/prewalk
-         (fn [item]
-           (cond
-             (unquote-form? item) (eval (xsecond item))
-             (sequential? item) (let [unquoted-vec (apply glue
-                                                     (forv [it item]
-                                                       (if (unquote-splicing-form? it)
-                                                         (eval (xsecond it))
-                                                         [it])))
-                                      final-result (if (list? item)
-                                                     (t/->list unquoted-vec)
-                                                     unquoted-vec)]
-                                  final-result)
-             :else item))
-         form))
-
-     (defmacro quote-template ; #todo maybe => `qtmpl` or `quot` or `qt` or `quoted` or `template`
-       [form]
-       (quote-template-impl form))
-
-     ))
-;-----------------------------------------------------------------------------
-(defn construct-impl
-  [template]
-  ;(spyx template)
-  ;(spy :impl-out)
-  (t/walk-with-parents template
-    {:leave (fn [parents item]
-              (t/with-nil-default item
-                (when (= (->sym :?) item)
-                  (let [ancestors  (vec (reverse parents))
-                        -mv-ent-   (xfirst ancestors)
-                        me         (xsecond ancestors)
-                        me-key     (xfirst me)
-                        me-key-sym (kw->sym me-key)]
-                    me-key-sym))))}))
-(defmacro construct
-  [template] (construct-impl template))
-
 ;---------------------------------------------------------------------------------------------------
 (do       ; keep these in sync
   (def EidType

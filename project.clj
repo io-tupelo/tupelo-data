@@ -12,7 +12,7 @@
    [org.clojure/clojure "1.10.2-alpha1"]
    [org.clojure/data.avl "0.1.0"]
    [prismatic/schema "1.1.12"]
-   [tupelo "0.9.207"]
+   [tupelo "0.9.209"]
    ]
 
   :plugins [[com.jakemccrary/lein-test-refresh "0.24.1"]]
