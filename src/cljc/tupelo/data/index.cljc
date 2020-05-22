@@ -5,7 +5,6 @@
 ;   bound by the terms of this license.  You must not remove this notice, or any other, from this
 ;   software.
 (ns tupelo.data.index
-  ; (:refer-clojure :exclude [load ->VecNode])
   #?(:cljs (:require-macros tupelo.data.index))
   (:require
     [clojure.data.avl :as avl]
@@ -25,15 +24,14 @@
 ; #todo Tupelo Data Language (TDL)
 
 ;---------------------------------------------------------------------------------------------------
-; index stuff
-(def LexicalValType tsk/Vec)
-(def IndexType #{LexicalValType})
+; Plumatic Schema type definition
+(def Index #{tsk/Vec})
 
 (s/defn empty-index
   "Returns an empty lexically-sorted index"
   [] (avl/sorted-set-by lex/compare-lex))
 
-(s/defn ->index :- IndexType
+(s/defn ->index :- Index
   "Converts a sequence (vec or set) into a lexically-sorted index"
   [some-set :- (s/cond-pre tsk/Set tsk/Vec)]
   (into (empty-index) some-set))
@@ -49,11 +47,11 @@
 
 (s/defn prefix-match? :- s/Bool
   "Returns true if the sample value equals the pattern when truncated to the same length"
-  [pattern :- LexicalValType
-   sample :- LexicalValType]
+  [pattern :- tsk/Vec
+   sample :- tsk/Vec]
   (= pattern (t/xtake (count pattern) sample)))
 
-(s/defn split-key-prefix :- {s/Keyword IndexType}
+(s/defn split-key-prefix :- {s/Keyword Index}
   "Like clojure.data.avl/split-key, but allows prefix matches. Given a lexically sorted set like:
     #{[:a 1]
       [:a 2]
@@ -73,8 +71,8 @@
    :larger  #{[:c 1]
               [:c 2]} ]
       "
-  [match-val :- LexicalValType
-   lex-set :- IndexType]
+  [match-val :- tsk/Vec
+   lex-set :- Index]
   (let [[smaller-set found-val larger-set] (avl/split-key match-val lex-set)
         result (if (t/not-nil? found-val)
                  {:smaller smaller-set
@@ -85,21 +83,21 @@
                     :matches (->index matches-seq)
                     :larger  (->index larger-seq)}))]
     (when false
-      (s/validate IndexType (grab :smaller result))
-      (s/validate IndexType (grab :matches result))
-      (s/validate IndexType (grab :larger result)))
+      (s/validate Index (grab :smaller result))
+      (s/validate Index (grab :matches result))
+      (s/validate Index (grab :larger result)))
     result))
 
-(s/defn prefix-match->index :- IndexType
+(s/defn prefix-match->index :- Index
   "Return the `:matches` values found via `split-key-prefix`."
-  [match-val :- LexicalValType
-   lex-set :- IndexType]
+  [match-val :- tsk/Vec
+   lex-set :- Index]
   (t/grab :matches (split-key-prefix match-val lex-set)))
 
 (s/defn prefix-match->seq :- [tsk/Triple]
   "Degenerate implementation of `split-key-prefix` that returns only the `:matches` value as a seq."
-  [match-val :- LexicalValType
-   lex-set :- IndexType]
+  [match-val :- tsk/Vec
+   lex-set :- Index]
   (let [[-smaller-set- found-val larger-set] (avl/split-key match-val lex-set)]
     (if (t/not-nil? found-val)
       [found-val]
@@ -109,13 +107,13 @@
 ; #todo add-entry & remove-entry instead of conj/disj  ???
 (s/defn add-entry
   "Add an entry to the index, returning the modified index"
-  [index :- IndexType
+  [index :- Index
    entry :- tsk/Vec]
   (conj index entry))
 
 (s/defn remove-entry
   "Remove an entry to the index, returning the modified index. Throws if entry not found in index."
-  [index :- IndexType
+  [index :- Index
    entry :- tsk/Vec]
   (when-not (contains? index entry)
     (throw (ex-info "entry not found in index" (vals->map entry))))
