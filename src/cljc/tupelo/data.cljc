@@ -935,7 +935,7 @@
                          (untag-match-result result-tagged))]
     results-plain))
 
-(s/defn eval-with-env-map :- s/Any
+(s/defn eval-with-env-map :- s/Any ; #todo inline
   [env-map :- tsk/KeyMap
    pred]
   (with-spy-indent
