@@ -94,19 +94,19 @@
 
 #?(:clj
    (do
-     (defmethod print-method Eid
+     (defmethod ^:no-doc print-method Eid
        [eid ^java.io.Writer writer]
        (.write writer
          (format "<Eid %s>" (<val eid))))
-     (defmethod print-method Idx
+     (defmethod ^:no-doc print-method Idx
        [idx ^java.io.Writer writer]
        (.write writer
          (format "<Idx %s>" (<val idx))))
-     (defmethod print-method Prim
+     (defmethod ^:no-doc print-method Prim
        [prim ^java.io.Writer writer]
        (.write writer
          (format "<Prim %s>" (<val prim))))
-     (defmethod print-method Param
+     (defmethod ^:no-doc print-method Param
        [param ^java.io.Writer writer]
        (.write writer
          (format "<Param %s>" (<val param)))))
@@ -135,7 +135,7 @@
     (= 1 (count item))
     (keyword? (only (keys item)))))
 
-(s/defn tagmap-reader
+(s/defn ^:no-doc tagmap-reader
   [x :- tsk/KeyMap]
   (let [tag   (key (only x))
         value (val (only x))]
@@ -192,7 +192,7 @@
         (primitive-data? (<val arg)))
       (symbol? arg))))
 
-(s/defn coerce->Eid :- Eid ; #todo reimplement in terms of walk-entity ???
+(s/defn ^:no-doc coerce->Eid :- Eid ; #todo reimplement in terms of walk-entity ???
   "Coerce any non-Eid input to Eid"
   [arg    ; :- (s/pred Eid s/Int) ; #todo fix
    ]
@@ -202,7 +202,7 @@
     (tagmap? arg) (validate Eid? (tagmap-reader arg))
     :else (throw (ex-info "Invalid type found:" {:arg arg :type (type arg)}))))
 
-(s/defn coerce->Idx :- Idx ; #todo reimplement in terms of walk-entity ???
+(s/defn ^:no-doc coerce->Idx :- Idx ; #todo reimplement in terms of walk-entity ???
   "Coerce any non-Idx input to Idx"
   [arg    ; :- (s/pred Eid s/Int) ; #todo fix
    ]
@@ -212,7 +212,7 @@
     (tagmap? arg) (validate Idx? (tagmap-reader arg))
     :else (throw (ex-info "Invalid type found:" {:arg arg :type (type arg)}))))
 
-(s/defn coerce->Prim :- Prim ; #todo reimplement in terms of walk-entity ???
+(s/defn ^:no-doc coerce->Prim :- Prim ; #todo reimplement in terms of walk-entity ???
   "Coerce any non-Prim input to Prim"
   [arg    ; :- (s/pred Eid s/Int) ; #todo fix
    ]
@@ -222,7 +222,7 @@
     (tagmap? arg) (validate Prim? (tagmap-reader arg))
     :else (throw (ex-info "Invalid type found:" {:arg arg :type (type arg)}))))
 
-(defn raw->Prim
+(defn ^:no-doc raw->Prim
   "If given raw primitive or tagmap data, coerce to Prim; else return unchanged."
   [arg]
   ; (spyx :untagged->Prim arg )
@@ -234,16 +234,16 @@
 (def TripleIndex #{tsk/Triple})
 
 ;-----------------------------------------------------------------------------
-(s/defn tmp-eid-prefix-str? :- s/Bool
+(s/defn ^:no-doc tmp-eid-prefix-str? :- s/Bool
   "Returns true iff arg is a String like `tmp-eid-99999`"
   [arg :- s/Str]
   (.startsWith arg "tmp-eid-"))
 
-(s/defn tmp-eid-sym? :- s/Bool
+(s/defn ^:no-doc tmp-eid-sym? :- s/Bool
   "Returns true iff arg is a symbol like `tmp-eid-99999`"
   [arg :- s/Any] (and (symbol? arg) (tmp-eid-prefix-str? (t/sym->str arg))))
 
-(s/defn tmp-eid-kw? :- s/Bool
+(s/defn ^:no-doc tmp-eid-kw? :- s/Bool
   "Returns true iff arg is a symbol like `tmp-eid-99999`"
   [arg :- s/Any] (and (keyword? arg) (tmp-eid-prefix-str? (t/kw->str arg))))
 
@@ -286,7 +286,7 @@
   `(binding [*tdb* (atom ~tdb-arg)]
      ~@forms))
 
-(def TDB
+(def ^:no-doc TdbType
   "Plumatic Schema type definition for tupelo.data DB"
   {:eid-type {Eid s/Keyword}
    :idx-eav  #{tsk/Triple}
@@ -295,7 +295,7 @@
 ; #todo need add :keypath-eids #{ Eid } to flag any entity contributing to the key of a map or set => no update!
 ; #todo   i.e. all (possibly composite) keys must be immutable
 
-(s/defn new-tdb :- TDB
+(s/defn new-tdb :- TdbType
   "Returns a new, empty db."
   []
   (into (sorted-map)
@@ -318,7 +318,7 @@
 
 (s/defn db-pretty :- tsk/KeyMap
   "Returns a pretty version of the DB"
-  [db :- TDB]
+  [db :- TdbType]
   (let [db-compact (walk-compact db) ; returns plain maps & sets instead of sorted or index
         result     (it-> (new-tdb)
                      (update it :eid-type glue (grab :eid-type db-compact))
@@ -345,7 +345,7 @@
 ; #todo add tsk/Set
 (do       ; keep these in sync
   (def EntityType (s/cond-pre tsk/Map tsk/Set tsk/Vec))
-  (s/defn entity-like?
+  (s/defn ^:no-doc entity-like?
     [arg] (t/contains-key? #{:map :set :array} (edn->type arg))))
 
 ;-----------------------------------------------------------------------------
@@ -381,13 +381,13 @@
   "Returns the next integer EID"
   [] (swap! eid-counter inc))
 
-(s/defn array->tagidx-map :- {Idx s/Any}
+(s/defn ^:no-doc array->tagidx-map :- {Idx s/Any}
   [edn-array :- tsk/List]
   (apply glue {}
     (forv [[idx val] (indexed edn-array)]
       {(->Idx idx) val})))
 
-(s/defn tagidx-map->array :- tsk/List
+(s/defn ^:no-doc tagidx-map->array :- tsk/List
   [idx-map :- {Idx s/Any}]
   (let [result (forv [idx (range (count idx-map))]
                  (grab (->Idx idx) idx-map))]
@@ -517,7 +517,7 @@
   'nil' represents unknown values. Returns an index in [e a v] format."
   ([triple :- tsk/Triple]
    (lookup (deref *tdb*) triple))
-  ([db :- TDB
+  ([db :- TdbType
     triple :- tsk/Triple]
    (let [[e a v] triple
          known-flgs    (mapv #(misc/boolean->binary (t/not-nil? %)) triple)
@@ -536,7 +536,7 @@
 ;-----------------------------------------------------------------------------
 (declare add-entity-edn-impl)
 
-(s/defn entity-mapentry-add
+(s/defn entity-map-entry-add
   "Adds a new attr-val pair to an existing map entity."
   [eid :- s/Int
    attr :- Primitive
@@ -577,7 +577,9 @@
     (doseq [triple triples-new]
       (db-add-triple triple))))
 
-(s/defn entity-array-idx-add
+; #todo need entity-array-elem-prepend
+; #todo need entity-array-elem-append
+(s/defn entity-array-elem-add
   "Adds a new idx-val pair to an existing map entity. "
   [eid :- s/Int
    idx-in :- s/Int
@@ -648,7 +650,7 @@
         (= :map entity-type) (doseq [[k-in v-in] entity-edn]
                                (when-not (primitive? k-in) ; #todo generalize?
                                  (throw (ex-info "Attribute must be primitive (non-collection) type" (vals->map k-in v-in entity-edn))))
-                               (entity-mapentry-add eid-raw k-in v-in))
+                               (entity-map-entry-add eid-raw k-in v-in))
 
         (= :set entity-type) (doseq [k-in entity-edn]
                                (when-not (primitive? k-in) ; #todo generalize?
@@ -656,7 +658,7 @@
                                (entity-set-elem-add eid-raw k-in))
 
         (= :array entity-type) (doseq [[idx val] (indexed entity-edn)]
-                                 (entity-array-idx-add eid-raw idx val))
+                                 (entity-array-elem-add eid-raw idx val))
 
         :else (throw (ex-info "unknown value found" (vals->map entity-edn))))
       teid)))
@@ -696,7 +698,7 @@
     (doseq [triple-eav eav-triples]
       (remove-triple triple-eav))))
 
-(s/defn entity-mapentry-remove
+(s/defn entity-map-entry-remove
   "Recursively removes an attr-val pair from a map entity"
   [eid    ; :- #todo fix
    attr :- s/Any] ; #todo add db arg version
@@ -715,11 +717,11 @@
       (entity-remove-impl (<val v)))
     (db-remove-triple triple-eav)))
 
-(s/defn entity-array-idx-remove
+(s/defn entity-array-elem-remove
   "Recursively removes an index location from an array entity"
   ([eid :- s/Int
     idx :- s/Int] ; #todo add db arg version
-   (entity-array-idx-remove {:eid eid :idx idx :rerack true}))
+   (entity-array-elem-remove {:eid eid :idx idx :rerack true}))
   ([ctx :- {:eid    s/Int
             :idx    s/Int
             :rerack s/Bool}]
@@ -774,7 +776,7 @@
 ; #todo update-map-entry
 ; #todo update-set-elem
 
-(s/defn entity-mapentry-update
+(s/defn entity-map-entry-update
   "Update an attr-val pair in a map entity."
   [eid :- s/Int
    attr :- Primitive
@@ -782,10 +784,10 @@
   (assert (fn? delta-fn)) ; #todo can do in Schema?
   (let [edn-value (grab attr (eid->edn eid))
         edn-next  (delta-fn edn-value)]
-    (entity-mapentry-remove eid attr)
-    (entity-mapentry-add eid attr edn-next)))
+    (entity-map-entry-remove eid attr)
+    (entity-map-entry-add eid attr edn-next)))
 
-(s/defn entity-array-idx-update
+(s/defn entity-array-elem-update
   "Update an element in an array entity."
   [eid :- s/Int
    idx :- s/Int
@@ -793,8 +795,8 @@
   (assert (fn? delta-fn)) ; #todo can do in Schema?
   (let [edn-value (nth (eid->edn eid) idx)
         edn-next  (delta-fn edn-value)]
-    (entity-array-idx-remove {:eid eid :idx idx :rerack false})
-    (entity-array-idx-add eid idx edn-next)))
+    (entity-array-elem-remove {:eid eid :idx idx :rerack false})
+    (entity-array-elem-add eid idx edn-next)))
 
 (s/defn entity-set-elem-update
   "Update a value in a set entity."
@@ -810,7 +812,7 @@
     (entity-set-elem-add eid edn-next)))
 
 ;-----------------------------------------------------------------------------
-(s/defn apply-env
+(s/defn ^:no-doc apply-env
   [env :- tsk/Map
    elements :- tsk/Vec]
   (forv [elem elements]
@@ -856,7 +858,7 @@
           (let [env-next (glue env env-frame)]
             (match-triples-impl query-result env-next qspec-rest)))))))
 
-(s/defn untag-match-result :- s/Any ; #todo fix, was tsk/KeyMap
+(s/defn ^:no-doc untag-match-result :- s/Any ; #todo fix, was tsk/KeyMap
   [resmap :- tsk/Map]
   ; (newline) (spyx :unwrap-query-result-enter resmap)
   (let [result (apply glue
@@ -866,7 +868,7 @@
     ; (newline) (spyx :unwrap-query-result-leave result)
     result))
 
-(s/defn match-triples->tagged
+(s/defn ^:no-doc match-triples->tagged
   [qspec-list-in :- [tsk/Triple]]
   (let [qspec-list    (walk-tagmap-reader qspec-list-in)
         query-results (atom [])]
@@ -881,7 +883,7 @@
                          (untag-match-result result-tagged))]
     results-plain))
 
-(s/defn eval-with-env-map :- s/Any ; #todo inline
+(s/defn ^:no-doc eval-with-env-map :- s/Any ; #todo inline
   [env-map :- tsk/KeyMap
    pred]
   (with-spy-indent
@@ -891,7 +893,7 @@
       ; (spyx pred-result)
       pred-result)))
 
-(s/defn tagged-params->env-map :- s/Any ; #todo was tsk/KeyMap, should be ???
+(s/defn ^:no-doc tagged-params->env-map :- s/Any ; #todo was tsk/KeyMap, should be ???
   [tagged-map :- {Param s/Any}] ; from tagged param => (possibly-tagged) value
   (with-spy-indent
     ; (spyx :untagger-enter tagged-map)
@@ -901,7 +903,7 @@
       ; (spyx :untagger-leave env-map)
       env-map)))
 
-(defn eval-with-tagged-params
+(defn ^:no-doc eval-with-tagged-params
   [tagged-map pred] ; from tagged param => (possibly-tagged) value
   (with-spy-indent
     ; (spyx :eval-with-tagged-params tagged-map)
@@ -911,7 +913,7 @@
       ; (spyx :eval-with-tagged-params eval-result)
       eval-result ))) ; #todo unify rest params on forms!!!
 
-(s/defn match-triples+pred
+(s/defn ^:no-doc match-triples+pred
   [qspec-list :- [tsk/Triple]
    keep-pred :- s/Any] ; #todo function schema!
   (with-spy-indent
@@ -957,7 +959,7 @@
   [& args]
   (search-triple-impl args))
 
-(defn search-triple-form?
+(defn ^:no-doc search-triple-form?
   [form]
   (and (list? form)
     (= (quote search-triple) (xfirst form))))
@@ -976,7 +978,7 @@
         (swap! *autosyms-seen* conj kk-sym)
         kk-sym))))
 
-(s/defn seq->idx-map :- tsk/Map
+(s/defn seq->idx-map :- tsk/Map ; #todo => tupelo?
   "Converts a sequential like [:a :b :c] into an indexed-map like
   {0 :a
    1 :b
@@ -985,7 +987,7 @@
   (into {} (indexed seq-entity)))
 
 ; (t/cum-vector-append triple) ; #todo fails under CLJS
-(s/defn cum-vector-swap-append :- s/Any
+(s/defn ^:no-doc cum-vector-swap-append :- s/Any
   "Works inside of a `with-cum-vector` block to append a new vector value."
   [value :- s/Any]
   (swap! tupelo.core/*cumulative-val* t/append value))
@@ -1079,7 +1081,7 @@
               (when (or (tmp-eid-sym? item) (tmp-eid-kw? item))
                 (throw (ex-info "Error: detected reserved tmp-eid-xxxx value" (vals->map item)))))}))
 #?(:clj
-   (s/defn fn-form? :- s/Bool
+   (s/defn ^:no-doc fn-form? :- s/Bool
      [arg :- s/Any]
      ; (spyx :fn-form?--enter arg)
      ; (spy :fn-form?--result)
@@ -1131,7 +1133,7 @@
         ; (spyx-pretty :query->wrapped-fn-leave filtered-results)
         filtered-results))))
 
-(s/defn untag-match-results :- s/Any ; #todo fix, was [tsk/KeyMap]
+(s/defn ^:no-doc untag-match-results :- s/Any ; #todo fix, was [tsk/KeyMap]
   [query-result-maps]
   (forv [result-map query-result-maps]
     (apply glue
@@ -1152,7 +1154,7 @@
     ; (spyx unwrapped-query-results)
     unwrapped-query-results))
 
-(defn match-impl
+(defn ^:no-doc match-impl
   [qspecs]
   `(apply match-fn (quote ~qspecs)))
 

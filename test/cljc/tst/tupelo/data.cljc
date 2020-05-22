@@ -1440,10 +1440,10 @@
       ; (prn dashes) (td/walk-compact (deref *tdb*))
       (throws? (td/entity-remove 1002))
       (is= (td/eid->edn 1002) [0 1 2])
-      (td/entity-array-idx-remove 1002 1)
+      (td/entity-array-elem-remove 1002 1)
       ; (prn dashes) (td/walk-compact (deref *tdb*))
       (is= (td/eid->edn root-eid) {:a "fred", :b [0 2]})
-      (td/entity-mapentry-remove 1001 :b)
+      (td/entity-map-entry-remove 1001 :b)
       (is= (td/eid->edn root-eid) {:a "fred"})))
   (td/eid-count-reset)
   (td/with-tdb (td/new-tdb)
@@ -1460,20 +1460,20 @@
     (let [root-eid (td/add-entity-edn {:a 1})]
       ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
 
-      (td/entity-mapentry-add root-eid :b 2) ; legal add
+      (td/entity-map-entry-add root-eid :b 2) ; legal add
       ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
       (is= (td/eid->edn root-eid) {:a 1 :b 2})
 
-      (throws? (td/entity-mapentry-add 9999 [1 2] 2)) ; invalid eid
-      (throws? (td/entity-mapentry-add root-eid [1 2] 2)) ; non-primitive key
-      (throws? (td/entity-mapentry-add root-eid :a 99)) ; duplicate key
+      (throws? (td/entity-map-entry-add 9999 [1 2] 2)) ; invalid eid
+      (throws? (td/entity-map-entry-add root-eid [1 2] 2)) ; non-primitive key
+      (throws? (td/entity-map-entry-add root-eid :a 99)) ; duplicate key
 
-      (td/entity-mapentry-add root-eid :c {:d 4 :e [5 6 7]})
+      (td/entity-map-entry-add root-eid :c {:d 4 :e [5 6 7]})
       ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
 
       (is= (td/walk-compact (td/eid->edn root-eid))
         {:a 1, :b 2, :c {:d 4, :e [5 6 7]}})
-      (td/entity-mapentry-update root-eid :a inc)
+      (td/entity-map-entry-update root-eid :a inc)
       (is= (td/walk-compact (td/eid->edn root-eid))
         {:a 2, :b 2, :c {:d 4, :e [5 6 7]}}))))
 
@@ -1482,24 +1482,24 @@
   (td/with-tdb (td/new-tdb)
     (let [root-eid (td/add-entity-edn [0 1])]
       ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
-      (throws? (td/entity-array-idx-add 9999 9 99)) ; invalid eid
-      (throws? (td/entity-array-idx-add root-eid :a 99)) ; non-primitive key
-      (throws? (td/entity-array-idx-add root-eid 0 99)) ; duplicate key
+      (throws? (td/entity-array-elem-add 9999 9 99)) ; invalid eid
+      (throws? (td/entity-array-elem-add root-eid :a 99)) ; non-primitive key
+      (throws? (td/entity-array-elem-add root-eid 0 99)) ; duplicate key
 
-      (td/entity-array-idx-add root-eid 3 3) ; legal add
-      (td/entity-array-idx-add root-eid 9 9) ; legal add
+      (td/entity-array-elem-add root-eid 3 3) ; legal add
+      (td/entity-array-elem-add root-eid 9 9) ; legal add
       ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
       (is= (td/eid->edn root-eid) [0 1 3 9])
 
-      (td/entity-array-idx-add root-eid 99 {:a 1 :b #{:c :d}}) ; legal add
+      (td/entity-array-elem-add root-eid 99 {:a 1 :b #{:c :d}}) ; legal add
       ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
       (is= (td/eid->edn root-eid) [0 1 3 9 {:a 1, :b #{:c :d}}])
-      (td/entity-array-idx-remove root-eid 1)
-      (td/entity-array-idx-remove root-eid 0)
+      (td/entity-array-elem-remove root-eid 1)
+      (td/entity-array-elem-remove root-eid 0)
       ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
       (is= (td/eid->edn root-eid)
         [3 9 {:a 1, :b #{:c :d}}])
-      (td/entity-array-idx-update root-eid 0 #(* 14 %))
+      (td/entity-array-elem-update root-eid 0 #(* 14 %))
       ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
       (is= (td/eid->edn root-eid)
         [42 9 {:a 1, :b #{:c :d}}])
@@ -1568,7 +1568,7 @@
 
       ; Capitalize all the names
       (doseq [frame frames-name]
-        (td/entity-mapentry-update (grab :eid frame) :name name-cap-fn))
+        (td/entity-map-entry-update (grab :eid frame) :name name-cap-fn))
       (is= (td/eid->edn root-eid) ; verify result
         {:employees
          [{:name "Justice Ward", :role :programmer, :salary 86750}
@@ -1586,7 +1586,7 @@
 
         ; Update salary with 10% raise
         (doseq [frame frames-name]
-          (td/entity-mapentry-update (grab :eid frame) :salary #(int (* % 1.05))))
+          (td/entity-map-entry-update (grab :eid frame) :salary #(int (* % 1.05))))
         (is= (td/eid->edn root-eid) ; Verify result
           {:employees
            [{:name "Justice Ward", :role :programmer, :salary 91087}
