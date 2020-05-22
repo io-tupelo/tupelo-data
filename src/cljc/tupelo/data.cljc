@@ -83,13 +83,13 @@
   IVal (<val [this] param)
   ITagMap (->tagmap [this] (vals->map param)))
 
-(s/defn Eid? :- s/Bool
+(s/defn ^:no-doc Eid? :- s/Bool
   [arg :- s/Any] (instance? Eid arg))
-(s/defn Idx? :- s/Bool
+(s/defn ^:no-doc Idx? :- s/Bool
   [arg :- s/Any] (instance? Idx arg))
-(s/defn Prim? :- s/Bool
+(s/defn ^:no-doc Prim? :- s/Bool
   [arg :- s/Any] (instance? Prim arg))
-(s/defn Param? :- s/Bool
+(s/defn ^:no-doc Param? :- s/Bool
   [arg :- s/Any] (instance? Param arg))
 
 #?(:clj
@@ -128,7 +128,7 @@
 ; #todo data-readers for #td/eid #td/idx #td/prim #td/param
 
 ;-----------------------------------------------------------------------------
-(s/defn tagmap? :- s/Bool
+(s/defn ^:no-doc tagmap? :- s/Bool
   "Returns true iff arg is a map that looks like:  {:some-tag <some-primative>}"
   [item]
   (and (map-plain? item)
@@ -146,7 +146,7 @@
       (= tag :param) (->Param value)
       :else (throw (ex-info "invalid tag value" (vals->map tag value))))))
 
-(defn walk-tagmap-reader
+(defn ^:no-doc walk-tagmap-reader
   "Walks a data structure, converting any tagmap record like
     {:eid 42}  =>  (->Eid 42)"
   [data]
@@ -167,8 +167,7 @@
 
 ;---------------------------------------------------------------------------------------------------
 (do       ; keep these in sync
-  (def EidType
-    "The Plumatic Schema type name for a pointer to a tdb node (abbrev. for Hex ID)"
+  (def ^:no-doc EidType
     s/Int)
   ;(s/defn eid-data? :- s/Bool ; #todo keep?  rename -> validate-eid  ???
   ;  "Returns true iff the arg type is a legal EID value"
@@ -177,13 +176,13 @@
 
 ; #todo update with other primitive types
 (do       ; keep these in sync
-  (def Primitive (s/maybe ; maybe nil
+  (def ^:no-doc Primitive (s/maybe ; maybe nil
                    (s/cond-pre s/Num s/Str s/Keyword s/Bool s/Symbol))) ; instant, uuid, Time ID (TID) (as strings?)
-  (s/defn primitive-data? :- s/Bool
+  (s/defn ^:no-doc primitive-data? :- s/Bool
     "Returns true iff a value is of primitive data type"
     [arg :- s/Any]
     (or (nil? arg) (number? arg) (string? arg) (keyword? arg) (boolean? arg)))
-  (s/defn primitive? :- s/Bool
+  (s/defn ^:no-doc primitive? :- s/Bool
     "Returns true iff a value is of primitive type (not a collection)"
     [arg :- s/Any]
     (or
@@ -231,7 +230,7 @@
     (tagmap? arg) (validate Prim? (tagmap-reader arg))
     :else arg)) ; assume already tagged
 
-(def TripleIndex #{tsk/Triple})
+(def ^:no-doc TripleIndex #{tsk/Triple})
 
 ;-----------------------------------------------------------------------------
 (s/defn ^:no-doc tmp-eid-prefix-str? :- s/Bool
@@ -344,7 +343,7 @@
 
 ; #todo add tsk/Set
 (do       ; keep these in sync
-  (def EntityType (s/cond-pre tsk/Map tsk/Set tsk/Vec))
+  (def ^:no-doc EntityType (s/cond-pre tsk/Map tsk/Set tsk/Vec))
   (s/defn ^:no-doc entity-like?
     [arg] (t/contains-key? #{:map :set :array} (edn->type arg))))
 
@@ -512,7 +511,7 @@
   nil)
 
 ;-----------------------------------------------------------------------------
-(s/defn lookup :- [tsk/Triple] ; #todo maybe use :unk or :* for unknown?
+(s/defn ^:no-doc lookup :- [tsk/Triple] ; #todo maybe use :unk or :* for unknown?
   "Given a triple of [e a v] values, use the best index to find a matching subset, where
   'nil' represents unknown values. Returns an index in [e a v] format."
   ([triple :- tsk/Triple]
