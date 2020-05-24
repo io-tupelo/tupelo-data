@@ -341,11 +341,8 @@
   [eid :- Eid]
   (fetch-in (deref *tdb*) [:eid-type eid]))
 
-; #todo add tsk/Set
-(do       ; keep these in sync
-  (def ^:no-doc EntityType (s/cond-pre tsk/Map tsk/Set tsk/Vec))
-  (s/defn ^:no-doc entity-like?
-    [arg] (t/contains-key? #{:map :set :array} (edn->type arg))))
+(s/defn ^:no-doc entity?
+  [arg] (t/contains-key? #{:map :set :array} (edn->type arg)))
 
 ;-----------------------------------------------------------------------------
 (s/defn ^:no-doc eav->eav :- tsk/Triple
@@ -635,7 +632,7 @@
   ;(newline)
   ;(spyx-pretty entity-edn)
   (with-spy-indent
-    (when-not (entity-like? entity-edn)
+    (when-not (entity? entity-edn)
       (throw (ex-info "invalid edn-in" (vals->map entity-edn))))
     (let [eid-raw     (new-eid)
           teid        (->Eid eid-raw)
