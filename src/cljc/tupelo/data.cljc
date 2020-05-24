@@ -341,8 +341,8 @@
   [eid :- Eid]
   (fetch-in (deref *tdb*) [:eid-type eid]))
 
-(s/defn ^:no-doc entity?
-  [arg] (t/contains-key? #{:map :set :array} (edn->type arg)))
+(s/defn ^:no-doc entity? :- s/Bool
+  [arg :- s/Any] (t/contains-key? #{:map :set :array} (edn->type arg)))
 
 ;-----------------------------------------------------------------------------
 (s/defn ^:no-doc eav->eav :- tsk/Triple
@@ -401,10 +401,12 @@
     (let [found (index/prefix-match->seq [e a] (grab :idx-eav @*tdb*))]
       (when (not= 1 (count found))
         (throw (ex-info "Illegal DB state detected" (vals->map triple-eav found)))))
-
-    (swap! *tdb* update :idx-eav index/remove-entry [e a v])
-    (swap! *tdb* update :idx-vea index/remove-entry [v e a])
-    (swap! *tdb* update :idx-ave index/remove-entry [a v e])))
+    (swap! *tdb*
+      (fn [tdb]
+        (it-> tdb
+          (update it :idx-eav index/remove-entry [e a v])
+          (update it :idx-vea index/remove-entry [v e a])
+          (update it :idx-ave index/remove-entry [a v e]))))))
 
 (s/defn ^:no-doc db-add-triple
   [triple-eav]
@@ -413,10 +415,12 @@
     (let [found (index/prefix-match->seq [e a] (grab :idx-eav @*tdb*))]
       (when (pos? (count found))
         (throw (ex-info "Illegal DB state detected" (vals->map triple-eav found)))))
-
-    (swap! *tdb* update :idx-eav index/add-entry [e a v])
-    (swap! *tdb* update :idx-vea index/add-entry [v e a])
-    (swap! *tdb* update :idx-ave index/add-entry [a v e])))
+    (swap! *tdb*
+      (fn [tdb]
+        (it-> tdb
+          (update it :idx-eav index/add-entry [e a v])
+          (update it :idx-vea index/add-entry [v e a])
+          (update it :idx-ave index/add-entry [a v e]))))))
 
 ; #todo need to handle sets
 (s/defn ^:no-doc eid->edn-impl :- s/Any
