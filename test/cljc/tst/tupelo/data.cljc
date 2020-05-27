@@ -1472,15 +1472,15 @@
     (let [root-eid (td/add-entity-edn {:a 1})]
       ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
 
-      (td/entity-map-entry-add root-eid :b 2) ; legal add
+      (td/entity-map-entry-add-impl root-eid :b 2) ; legal add
       ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
       (is= (td/eid->edn root-eid) {:a 1 :b 2})
 
-      (throws? (td/entity-map-entry-add 9999 [1 2] 2)) ; invalid eid
-      (throws? (td/entity-map-entry-add root-eid [1 2] 2)) ; non-primitive key
-      (throws? (td/entity-map-entry-add root-eid :a 99)) ; duplicate key
+      (throws? (td/entity-map-entry-add-impl 9999 [1 2] 2)) ; invalid eid
+      (throws? (td/entity-map-entry-add-impl root-eid [1 2] 2)) ; non-primitive key
+      (throws? (td/entity-map-entry-add-impl root-eid :a 99)) ; duplicate key
 
-      (td/entity-map-entry-add root-eid :c {:d 4 :e [5 6 7]})
+      (td/entity-map-entry-add-impl root-eid :c {:d 4 :e [5 6 7]})
       ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
 
       (is= (td/walk-compact (td/eid->edn root-eid))
@@ -1494,16 +1494,16 @@
   (td/with-tdb (td/new-tdb)
     (let [root-eid (td/add-entity-edn [0 1])]
       ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
-      (throws? (td/entity-array-elem-add 9999 9 99)) ; invalid eid
-      (throws? (td/entity-array-elem-add root-eid :a 99)) ; non-primitive key
-      (throws? (td/entity-array-elem-add root-eid 0 99)) ; duplicate key
+      (throws? (td/entity-array-elem-add-impl 9999 9 99)) ; invalid eid
+      (throws? (td/entity-array-elem-add-impl root-eid :a 99)) ; non-primitive key
+      (throws? (td/entity-array-elem-add-impl root-eid 0 99)) ; duplicate key
 
-      (td/entity-array-elem-add root-eid 3 3) ; legal add
-      (td/entity-array-elem-add root-eid 9 9) ; legal add
+      (td/entity-array-elem-add-impl root-eid 3 3) ; legal add
+      (td/entity-array-elem-add-impl root-eid 9 9) ; legal add
       ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
       (is= (td/eid->edn root-eid) [0 1 3 9])
 
-      (td/entity-array-elem-add root-eid 99 {:a 1 :b #{:c :d}}) ; legal add
+      (td/entity-array-elem-add-impl root-eid 99 {:a 1 :b #{:c :d}}) ; legal add
       ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
       (is= (td/eid->edn root-eid) [0 1 3 9 {:a 1, :b #{:c :d}}])
       (td/entity-array-elem-remove root-eid 1)
@@ -1522,15 +1522,15 @@
   (td/with-tdb (td/new-tdb)
     (let [root-eid (td/add-entity-edn #{:a :b})]
       ; (prn dashes) (spyx-pretty (td/walk-compact (deref *tdb*)))
-      (throws? (td/entity-set-elem-add 9999 2)) ; invalid eid
-      (throws? (td/entity-set-elem-add root-eid [1 2])) ; non-primitive key
-      (throws? (td/entity-set-elem-add root-eid :a)) ; duplicate key
-      (td/entity-set-elem-add root-eid :c) ; legal add
+      (throws? (td/entity-set-elem-add-impl 9999 2)) ; invalid eid
+      (throws? (td/entity-set-elem-add-impl root-eid [1 2])) ; non-primitive key
+      (throws? (td/entity-set-elem-add-impl root-eid :a)) ; duplicate key
+      (td/entity-set-elem-add-impl root-eid :c) ; legal add
       (is= (td/eid->edn root-eid) #{:a :b :c})
       (td/entity-set-elem-remove root-eid :c)
       (is= (td/eid->edn root-eid) #{:a :b})
 
-      (td/entity-set-elem-add root-eid 1)
+      (td/entity-set-elem-add-impl root-eid 1)
       (is= (td/eid->edn root-eid) #{:a :b 1})
       (td/entity-set-elem-update root-eid 1 inc)
       (is= (td/eid->edn root-eid) #{:a :b 2}))))
@@ -1631,7 +1631,7 @@
   )
 
 
-(dotest
+(dotest-focus
   (is= {:a 1} (assoc nil :a 1))
   (is= nil (dissoc nil :a ))
   (is= {:a {:b 12}} (assoc-in nil [:a :b] 12)) ; replaces nil with nested maps as req'd
@@ -1646,9 +1646,21 @@
     (td/entity-watch-add 101 :101b (fn [& args] [:watch-101-b args]))
     (td/entity-watch-add 102 :102b (t/const-fn :watch-102-b))
     (is-set= (td/entity-watchers-notify 101 1 2 3) [:watch-101-a [:watch-101-b [:101b 1 2 3]]])
-    (is-set= (td/entity-watchers-notify 102 :a :b :c) [:watch-102-a :watch-102-b])
+    (is-set= (td/entity-watchers-notify 102 :a :b :c) [:watch-102-a :watch-102-b]) )
 
+  (td/with-tdb (td/new-tdb)
+    (let [root-eid (td/add-entity-edn {:a 1 :b 2})]
+      (td/entity-watch-add root-eid :watch-a (fn watch-a-fn [ key arg] [:got key arg]))
+      (spyx
+        (td/entity-map-entry-update root-eid :a inc))
+
+      )
     )
 
   )
+
+
+
+
+
 
