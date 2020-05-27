@@ -23,10 +23,12 @@
     [tupelo.misc :as misc]
     [tupelo.schema :as tsk]
     [tupelo.tag :as tt :refer [IVal ITag ITagMap ->tagmap <tag <val untagged]]
+    [tupelo.set :as tset]
+    [clojure.set :as set]
     [tupelo.vec :as vec]
     [clojure.walk :as walk]
     [schema.core :as s]
-    [clojure.set :as set])
+    )
   )
 
 ; #todo Treeify: {k1 v1 k2 v2} =>
@@ -66,6 +68,16 @@
 ;(def SortedMapType (class (avl/sorted-map :a 1 :b 2 :c 3)))
 
 ;-----------------------------------------------------------------------------
+; #todo Maybe put all props on edges, and define a special :db/self edge to hold props for a node
+
+;-----------------------------------------------------------------------------
+; #todo need new EidRef type that defines a *unique* Eid for data loading
+(comment
+  (s/defn eidref :- Eid
+    [id-map :- tsk/KeyMap]
+    (let [eid (match (glue id-map (quote {:eid ?})))]
+      (->eid eiv))))
+
 (defrecord Eid
   [eid]
   IVal (<val [this] eid)
@@ -279,6 +291,7 @@
 
 ;-----------------------------------------------------------------------------
 (def ^:dynamic ^:no-doc *tdb* nil)
+(def ^:dynamic ^:no-doc *tdb-deltas* nil)
 
 (defmacro with-tdb ; #todo swap names?
   [tdb-arg & forms]
@@ -287,10 +300,11 @@
 
 (def ^:no-doc TdbType
   "Plumatic Schema type definition for tupelo.data DB"
-  {:eid-type {Eid s/Keyword}
-   :idx-eav  #{tsk/Triple}
-   :idx-ave  #{tsk/Triple}
-   :idx-vea  #{tsk/Triple}})
+  {:eid-type     {Eid s/Keyword}
+   :eid-watchers {s/Int #{s/Any}} ; from Eid to set of callback fns
+   :idx-eav      #{tsk/Triple}
+   :idx-ave      #{tsk/Triple}
+   :idx-vea      #{tsk/Triple}})
 ; #todo need add :keypath-eids #{ Eid } to flag any entity contributing to the key of a map or set => no update!
 ; #todo   i.e. all (possibly composite) keys must be immutable
 
@@ -299,11 +313,31 @@
   []
   (into (sorted-map)
     ; #todo add `immutible` field
-    ; #todo add `metadata` map from [e a v] => KeyMap
+    ; #todo add `metadata` map from [e a v] => KeyMap  (or just [e a] since it is unique).
+    ; Watch out for rerack! => not on array indexes.
     {:eid-type (t/sorted-map-generic) ; source type of entity (:map :array :set)
+     :eid-watchers {} ; from Eid to set of callback fns
      :idx-eav  (index/empty-index)
      :idx-ave  (index/empty-index)
      :idx-vea  (index/empty-index)}))
+
+(s/defn entity-watch-add
+  [eid :- s/Int
+      callback :- s/Any] ; #todo Fn
+  (swap! *tdb* (fn [tdb]
+                 (update-in tdb [:eid-watchers eid]
+                   (s/fn [watchers :- (s/maybe #{s/Any})]
+                     (tset/add watchers callback))))))
+
+(s/defn entity-watchers-notify
+  "Calles all watchers"
+  [eid :- s/Int
+   & args ]
+  (let [watchers (get-in (deref *tdb*) [:eid-watchers eid])]
+    ; called for side effects. Must be eager/imperative
+    ; We use (vec (for ...)) for ease of testing
+    (vec (for [watcher watchers]
+           (apply watcher args)))))
 
 ;***************************************************************************************************
 ; NOTE: every Pair [e a] is unique, so the eav index could be a sorted map {[e a] v}. This implies that
@@ -321,6 +355,7 @@
   (let [db-compact (walk-compact db) ; returns plain maps & sets instead of sorted or index
         result     (it-> (new-tdb)
                      (update it :eid-type glue (grab :eid-type db-compact))
+                     (update it :eid-watchers glue (grab :eid-watchers db-compact))
                      (update it :idx-eav glue (grab :idx-eav db-compact))
                      (update it :idx-ave glue (grab :idx-ave db-compact))
                      (update it :idx-vea glue (grab :idx-vea db-compact)))]
@@ -560,8 +595,11 @@
         (throw (ex-info "pre-existing element found" (vals->map teid tattr ea-triples))))
       ;(spyx-pretty entity-type)
       ;(spyx-pretty tval)
-      (db-add-triple [teid tattr tval])
-      teid)))
+      (binding [*tdb-deltas* (atom {:add [] :remove []})]
+        (db-add-triple [teid tattr tval])
+        )
+      teid)
+    ))
 
 (s/defn ^:no-doc array-entity-rerack
   [teid :- Eid] ; #todo make all require db param
@@ -1092,8 +1130,8 @@
              ; (spyxx eval-result)
              (fn? eval-result)))))))
 
-(defn ^:no-doc match->tagged
-  [query-specs]
+(s/defn ^:no-doc match->tagged
+  [query-specs :- tsk/List]
   ; (spyx-pretty :query->wrapped-fn-enter query-specs)
   (exclude-reserved-identifiers query-specs)
   (let [maps-in      (keep-if map-plain? query-specs)
@@ -1147,7 +1185,7 @@
           {param-raw val-raw})))))
 
 (defn match-fn
-  [& args]
+  [& args] ; #todo doc qspecs format
   ; #todo need a linter to catch nonsensical qspecs (attr <> keyword for example)
   (let [unwrapped-query-results (untag-match-results
                                   (match->tagged args))]
@@ -1160,7 +1198,7 @@
 
 (defmacro match
   "Will evaluate embedded calls to `(search-triple ...)` "
-  [qspecs]
+  [qspecs] ; #todo doc qspecs format
   (match-impl qspecs))
 
 

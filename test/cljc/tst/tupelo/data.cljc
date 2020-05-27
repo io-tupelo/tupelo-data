@@ -12,12 +12,14 @@
              [tupelo.core]
              [tupelo.data]
              [tupelo.testy]
+             ; #todo finish dotest-focus for tupelo.testy
+             ; #todo finish tupelo.testy => tupelo.test
              ))
   (:require
     [clojure.test] ; sometimes this is required - not sure why
     [clojure.string :as str]
     [schema.core :as s]
-    [tupelo.testy :refer [deftest testing is dotest isnt is= isnt= is-set= is-nonblank=
+    [tupelo.testy :refer [deftest testing is dotest dotest-focus isnt is= isnt= is-set= is-nonblank=
                           throws? throws-not? define-fixture]]
     [tupelo.core :as t :refer [spy spyx spyxx spy-pretty spyx-pretty spyq unlazy let-spy with-spy-indent
                                only only2 forv glue grab nl keep-if drop-if ->sym xfirst xsecond xthird not-nil?
@@ -226,12 +228,13 @@
   (td/with-tdb (td/new-tdb)
     (td/eid-count-reset)
     (is= (deref *tdb*)
-      {:eid-type {} :idx-eav #{} :idx-vea #{} :idx-ave #{}})
+      {:eid-type {} :eid-watchers {}
+       :idx-eav #{} :idx-vea #{} :idx-ave #{}})
     (let [edn-val  {:a 1}
           root-eid (td/add-entity-edn edn-val)]
       (is= root-eid 1001)
       (is= (td/walk-compact (deref *tdb*))
-        {:eid-type {{:eid 1001} :map},
+        {:eid-type {{:eid 1001} :map}, :eid-watchers {}
          :idx-ave  #{[{:prim :a} {:prim 1} {:eid 1001}]},
          :idx-eav  #{[{:eid 1001} {:prim :a} {:prim 1}]},
          :idx-vea  #{[{:prim 1} {:eid 1001} {:prim :a}]}})
@@ -244,7 +247,7 @@
           root-eid (td/add-entity-edn edn-val)]
       (is= 1001 root-eid)
       (is= (td/walk-compact (deref *tdb*))
-        {:eid-type {{:eid 1001} :map},
+        {:eid-type {{:eid 1001} :map}, :eid-watchers {}
          :idx-ave  #{[{:prim :a} {:prim 1} {:eid 1001}]
                      [{:prim :b} {:prim 2} {:eid 1001}]},
          :idx-eav  #{[{:eid 1001} {:prim :a} {:prim 1}]
@@ -261,6 +264,7 @@
       (is= 1001 root-eid)
       (is= (td/walk-compact (deref *tdb*))
         {:eid-type {{:eid 1001} :map, {:eid 1002} :map},
+         :eid-watchers {}
          :idx-ave  #{[{:prim :a} {:prim 1} {:eid 1001}]
                      [{:prim :b} {:prim 2} {:eid 1001}]
                      [{:prim :c} {:eid 1002} {:eid 1001}]
@@ -282,6 +286,7 @@
           root-eid (td/add-entity-edn edn-val)]
       (is= (td/walk-compact (deref *tdb*))
         {:eid-type {{:eid 1001} :array},
+         :eid-watchers {}
          :idx-ave  #{[{:idx 0} {:prim 1} {:eid 1001}] [{:idx 1} {:prim 2} {:eid 1001}]
                      [{:idx 2} {:prim 3} {:eid 1001}]},
          :idx-eav  #{[{:eid 1001} {:idx 0} {:prim 1}]
@@ -298,6 +303,7 @@
           root-eid (td/add-entity-edn edn-val)]
       (is= (td/walk-compact (deref *tdb*))
         {:eid-type {{:eid 1001} :map, {:eid 1002} :array},
+         :eid-watchers {}
          :idx-ave  #{[{:idx 0} {:prim 10} {:eid 1002}] [{:idx 1} {:prim 11} {:eid 1002}]
                      [{:idx 2} {:prim 12} {:eid 1002}] [{:prim :a} {:prim 1} {:eid 1001}]
                      [{:prim :b} {:prim 2} {:eid 1001}]
@@ -330,7 +336,8 @@
       (doseq [m data]
         (td/add-entity-edn m))
       (is= (td/walk-compact @*tdb*) ; #todo error: missing :array
-        {:eid-type {{:eid 1001} :map,
+        { :eid-watchers {}
+         :eid-type {{:eid 1001} :map,
                     {:eid 1002} :map,
                     {:eid 1003} :map,
                     {:eid 1004} :map,
@@ -403,7 +410,7 @@
           root-eid (td/add-entity-edn edn-val)]
       (is= edn-val (td/eid->edn root-eid))
       (is= (td/walk-compact (deref *tdb*))
-        {:eid-type {{:eid 1001} :map},
+        {:eid-type {{:eid 1001} :map}, :eid-watchers {}
          :idx-ave  #{[{:prim :a} {:prim 1} {:eid 1001}]
                      [{:prim :b} {:prim 2} {:eid 1001}]},
          :idx-eav  #{[{:eid 1001} {:prim :a} {:prim 1}]
@@ -439,7 +446,7 @@
           root-eid (td/add-entity-edn edn-val)]
       (is= edn-val (td/eid->edn root-eid))
       (is= (td/walk-compact (deref *tdb*))
-        {:eid-type {{:eid 1001} :map},
+        {:eid-type {{:eid 1001} :map}, :eid-watchers {}
          :idx-ave  #{[{:prim :a} {:prim 1} {:eid 1001}]
                      [{:prim :b} {:prim 2} {:eid 1001}]},
          :idx-eav  #{[{:eid 1001} {:prim :a} {:prim 1}]
@@ -463,7 +470,7 @@
           root-eid (td/add-entity-edn edn-val)]
       (is= edn-val (td/eid->edn root-eid))
       (is= (td/walk-compact (deref *tdb*))
-        {:eid-type {{:eid 1001} :map},
+        {:eid-type {{:eid 1001} :map}, :eid-watchers {}
          :idx-ave  #{[{:prim :a} {:prim 1} {:eid 1001}]
                      [{:prim :b} {:prim 1} {:eid 1001}]},
          :idx-eav  #{[{:eid 1001} {:prim :a} {:prim 1}]
@@ -497,7 +504,7 @@
     (let [edn-val  {:a {:b 2}}
           root-eid (td/add-entity-edn edn-val)]
       (is= (td/walk-compact (deref *tdb*))
-        {:eid-type {{:eid 1001} :map, {:eid 1002} :map},
+        {:eid-type {{:eid 1001} :map, {:eid 1002} :map}, :eid-watchers {}
          :idx-ave  #{[{:prim :a} {:eid 1002} {:eid 1001}]
                      [{:prim :b} {:prim 2} {:eid 1002}]},
          :idx-eav  #{[{:eid 1001} {:prim :a} {:eid 1002}]
@@ -1595,6 +1602,40 @@
             {:name "", :role :programmer, :salary nil}
             {:name "Raymond Richard Mathews", :role :programmer, :salary 48226}]})))))
 
+(comment  ; #todo idea
+  (let [ctx    {:name "Joe" :city "Springfield"}
+        query  (with-ctx ctx
+                 (q/tmpl {:eid ? :state ? :age ? :name ? :city ?})) ; fills in vals from ctx
+        preds  {; basic preds are called at each state if corresponding param is resolved
+                :age    #(odd? %)
+                :state  (s/fn [state-code :- s/Str]
+                          (let [first-letter (str (first (str/lower-case state-code)))]
+                            (< "a" first-letter "k")))
+                :td/all [; all of these are called for all ctx vals at each stage
+                         (fn [ctx]
+                           (t/destruct ctx
+                             [:age ?
+                              :state ?
+                              :eid ?]
+                             (when (and age eid)
+                               (even? (+ age eid)))))]}
+        result (match* {:query query
+                        :preds preds
+                        :ctx   ctx ; #todo maybe pass in the ctx ???
+                        })])
+  )
 
 
+(dotest
+  (td/with-tdb (td/new-tdb)
+    (td/entity-watch-add 101 (t/const-fn :watch-101-a))
+    (td/entity-watch-add 102 (t/const-fn :watch-102-a))
+    (td/entity-watch-add 101 (fn [& args] [:watch-101-b args]))
+    (td/entity-watch-add 102 (t/const-fn :watch-102-b))
+    (is-set= (td/entity-watchers-notify 101 1 2 3) [:watch-101-a [:watch-101-b [1 2 3]]])
+    (is-set= (td/entity-watchers-notify 102 :a :b :c) [:watch-102-a :watch-102-b])
+
+    )
+
+  )
 
