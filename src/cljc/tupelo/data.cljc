@@ -179,7 +179,7 @@
 
 ;---------------------------------------------------------------------------------------------------
 (do       ; keep these in sync
-  (def ^:no-doc EidType
+  (def ^:no-doc EidRaw
     s/Int)
   ;(s/defn eid-data? :- s/Bool ; #todo keep?  rename -> validate-eid  ???
   ;  "Returns true iff the arg type is a legal EID value"
@@ -301,7 +301,7 @@
 (def ^:no-doc TdbType
   "Plumatic Schema type definition for tupelo.data DB"
   {:eid-type     {Eid s/Keyword}
-   :eid-watchers {s/Int #{s/Any}} ; from Eid to set of callback fns
+   :eid-watchers {s/Int tsk/Map} ; from Eid to map of callback fns
    :idx-eav      #{tsk/Triple}
    :idx-ave      #{tsk/Triple}
    :idx-vea      #{tsk/Triple}})
@@ -323,21 +323,26 @@
 
 (s/defn entity-watch-add
   [eid :- s/Int
-      callback :- s/Any] ; #todo Fn
+   key :- s/Any
+   callback-fn :- s/Any] ; #todo Fn
   (swap! *tdb* (fn [tdb]
-                 (update-in tdb [:eid-watchers eid]
-                   (s/fn [watchers :- (s/maybe #{s/Any})]
-                     (tset/add watchers callback))))))
+                 (assoc-in tdb [:eid-watchers eid key] callback-fn))))
+
+(s/defn entity-watch-remove
+  [eid :- s/Int
+   key :- s/Any ]
+  (swap! *tdb* (fn [tdb]
+                 (t/dissoc-in tdb [:eid-watchers eid key] ))))
 
 (s/defn entity-watchers-notify
   "Calles all watchers"
   [eid :- s/Int
    & args ]
-  (let [watchers (get-in (deref *tdb*) [:eid-watchers eid])]
+  (let [watchers-map (get-in (deref *tdb*) [:eid-watchers eid])]
     ; called for side effects. Must be eager/imperative
     ; We use (vec (for ...)) for ease of testing
-    (vec (for [watcher watchers]
-           (apply watcher args)))))
+    (vec (for [[watch-key watcher-fn] watchers-map]
+           (apply watcher-fn watch-key args)))))
 
 ;***************************************************************************************************
 ; NOTE: every Pair [e a] is unique, so the eav index could be a sorted map {[e a] v}. This implies that
@@ -408,7 +413,7 @@
   "Reset the eid-count to its initial value"
   [] (reset! eid-counter eid-count-base))
 
-(s/defn ^:no-doc new-eid :- EidType ; #todo maybe return Eid record???
+(s/defn ^:no-doc new-eid :- EidRaw ; #todo maybe return Eid record???
   "Returns the next integer EID"
   [] (swap! eid-counter inc))
 
@@ -431,6 +436,7 @@
 
 (s/defn ^:no-doc db-remove-triple
   [triple-eav]
+  ; (spy :db-remove-triple--enter triple-eav)
   (let [[e a v] triple-eav]
     ; detect missing data
     (let [found (index/prefix-match->seq [e a] (grab :idx-eav @*tdb*))]
@@ -441,7 +447,10 @@
         (it-> tdb
           (update it :idx-eav index/remove-entry [e a v])
           (update it :idx-vea index/remove-entry [v e a])
-          (update it :idx-ave index/remove-entry [a v e]))))))
+          (update it :idx-ave index/remove-entry [a v e]))))
+    ; (spyx *tdb-deltas*)
+    (swap! *tdb-deltas* update :remove t/append triple-eav)
+    triple-eav))
 
 (s/defn ^:no-doc db-add-triple
   [triple-eav]
@@ -455,7 +464,9 @@
         (it-> tdb
           (update it :idx-eav index/add-entry [e a v])
           (update it :idx-vea index/add-entry [v e a])
-          (update it :idx-ave index/add-entry [a v e]))))))
+          (update it :idx-ave index/add-entry [a v e]))))
+    (swap! *tdb-deltas* update :add t/append triple-eav)
+    triple-eav))
 
 ; #todo need to handle sets
 (s/defn ^:no-doc eid->edn-impl :- s/Any
@@ -529,7 +540,7 @@
        (fn [triple-eav] ...)
 
    where `eid-in` specifies the root of the sub-tree being walked. Returns nil."
-  [eid-in :- EidType
+  [eid-in :- EidRaw
    intc-map :- tsk/KeyMap]
   (let [legal-keys   #{:id :enter :leave}
         counted-keys #{:enter :leave}
@@ -597,9 +608,8 @@
       ;(spyx-pretty tval)
       (binding [*tdb-deltas* (atom {:add [] :remove []})]
         (db-add-triple [teid tattr tval])
-        )
-      teid)
-    ))
+        (entity-watchers-notify eid (deref *tdb-deltas*)) )
+      teid) ))
 
 (s/defn ^:no-doc array-entity-rerack
   [teid :- Eid] ; #todo make all require db param
@@ -640,8 +650,10 @@
       ;(newline)
       ;(spyx-pretty entity-type)
       ;(spyx-pretty value)
-      (db-add-triple [teid tidx tval])
-      (array-entity-rerack teid)
+      (binding [*tdb-deltas* (atom {:add [] :remove []})]
+        (db-add-triple [teid tidx tval])
+        (array-entity-rerack teid)
+        (entity-watchers-notify eid (deref *tdb-deltas*)) )
       teid)))
 
 (s/defn entity-set-elem-add
@@ -665,7 +677,9 @@
       ;(newline)
       ;(spyx-pretty entity-type)
       ;(spyx-pretty value)
-      (db-add-triple [teid tval tval])
+      (binding [*tdb-deltas* (atom {:add [] :remove []})]
+        (db-add-triple [teid tval tval])
+        (entity-watchers-notify eid (deref *tdb-deltas*)))
       teid)))
 
 (s/defn ^:no-doc add-entity-edn-impl :- Eid ; #todo maybe rename:  load-edn->eid  ???
@@ -710,14 +724,15 @@
 ; #todo (defn update-triple [triple-eav fn] ...)
 (declare entity-remove-impl)
 
-(s/defn remove-triple ; #todo redundant/dangerous?  maybe remove this...?
+(s/defn ^:no-doc remove-triple-impl ; #todo redundant/dangerous?  maybe remove this...?
   "Recursively removes an EAV triple of data from the db."
   [triple-eav :- tsk/Triple] ; #todo add db arg version
   ; (spyx :remove-triple triple-eav)
-  (let [[-e- a-in v-in] triple-eav
+  (let [[e-in a-in v-in] triple-eav
         a              (raw->Prim a-in)
         v              (raw->Prim v-in)
-        triple-wrapped [-e- a v]]
+        triple-wrapped [e-in a v]
+        eid-raw        (<val e-in)]
     ; (spyx-pretty triple-wrapped)
     (when-not (db-contains-triple? triple-wrapped) ; #todo redundant check - remove?
       (throw (ex-info "triple not found" (vals->map triple-wrapped))))
@@ -726,15 +741,19 @@
     (db-remove-triple triple-wrapped)))
 
 (s/defn ^:no-doc entity-remove-impl
-  [eid-in :- EidType] ; #todo add db arg version
-  (let [idx-eav     (grab :idx-eav (deref *tdb*))
-        teid        (->Eid eid-in)
-        eav-triples (index/prefix-match->seq [teid] idx-eav)]
-    (when (empty? eav-triples)
-      (throw (ex-info "entity not found" (vals->map eid-in))))
-    (swap! *tdb* dissoc-in [:eid-type teid])
-    (doseq [triple-eav eav-triples]
-      (remove-triple triple-eav))))
+  [eid-raw :- EidRaw] ; #todo add db arg version
+  (with-spy-indent
+    ; (spy :entity-remove-impl--enter eid-raw)
+    (let [idx-eav     (grab :idx-eav (deref *tdb*))
+          teid        (->Eid eid-raw)
+          eav-triples (index/prefix-match->seq [teid] idx-eav)]
+      (when (empty? eav-triples)
+        (throw (ex-info "entity not found" (vals->map eid-raw))))
+      (swap! *tdb* dissoc-in [:eid-type teid])
+      (binding [*tdb-deltas* (atom {:add [] :remove []})]
+        (doseq [triple-eav eav-triples]
+          (remove-triple-impl triple-eav))
+        (entity-watchers-notify eid-raw (deref *tdb-deltas*))))))
 
 (s/defn entity-map-entry-remove
   "Recursively removes an attr-val pair from a map entity"
@@ -753,7 +772,9 @@
       (throw (ex-info "non map type found" (vals->map teid entity-type))))
     (when (Eid? v)
       (entity-remove-impl (<val v)))
-    (db-remove-triple triple-eav)))
+    (binding [*tdb-deltas* (atom {:add [] :remove []})]
+      (db-remove-triple triple-eav)
+      (entity-watchers-notify eid (deref *tdb-deltas*)))))
 
 (s/defn entity-array-elem-remove
   "Recursively removes an index location from an array entity"
@@ -777,9 +798,11 @@
          (throw (ex-info "non array type found" (vals->map teid entity-type))))
        (when (Eid? v)
          (entity-remove-impl (<val v)))
-       (db-remove-triple triple-eav)
-       (when rerack
-         (array-entity-rerack teid))))))
+       (binding [*tdb-deltas* (atom {:add [] :remove []})]
+         (db-remove-triple triple-eav)
+         (when rerack
+           (array-entity-rerack teid))
+         (entity-watchers-notify eid (deref *tdb-deltas*))) ))))
 
 (s/defn entity-set-elem-remove
   "Recursively removes an attr-val pair from a set entity"
@@ -798,11 +821,13 @@
       (throw (ex-info "non set type found" (vals->map teid entity-type))))
     (when (Eid? v)
       (entity-remove-impl (<val v)))
-    (db-remove-triple triple-eav)))
+    (binding [*tdb-deltas* (atom {:add [] :remove []})]
+      (db-remove-triple triple-eav)
+      (entity-watchers-notify eid (deref *tdb-deltas*)))))
 
 (s/defn entity-remove
   "Recursively removes an entity from the db."
-  [eid-in :- EidType] ; #todo add db arg version
+  [eid-in :- EidRaw] ; #todo add db arg version
   (let [idx-vea     (grab :idx-vea (deref *tdb*))
         teid        (->Eid eid-in)
         vea-triples (index/prefix-match->seq [teid] idx-vea)]

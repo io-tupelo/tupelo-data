@@ -1422,9 +1422,14 @@
            :leave => [<Eid 1002> <Prim :d> <Eid 1003>]
          :leave => [<Eid 1001> <Prim :b> <Eid 1002>]")
       (is= (td/eid->edn root-eid) {:a 1 :b {:c 3 :d [4 5 6]}})
-      (td/remove-triple [(->Eid 1001) :a 1])
+      ; (newline)
+      ; (println ":1425-enter-----------------------------------------------------------------------------")
+      (binding [td/*tdb-deltas* (atom {:add [] :remove []})] ; #todo kludgy!  clean up
+        (td/remove-triple-impl [(->Eid 1001) :a 1]))
+      ; (println ":1425-leave-----------------------------------------------------------------------------")
       (is= (td/eid->edn root-eid) {:b {:c 3, :d [4 5 6]}})
-      (td/remove-triple [(->Eid 1002) :d (->Eid 1003)])
+      (binding [td/*tdb-deltas* (atom {:add [] :remove []})]
+        (td/remove-triple-impl [(->Eid 1002) :d (->Eid 1003)]))
       (is= (td/eid->edn root-eid) {:b {:c 3}}))))
 
 (dotest
@@ -1627,12 +1632,20 @@
 
 
 (dotest
+  (is= {:a 1} (assoc nil :a 1))
+  (is= nil (dissoc nil :a ))
+  (is= {:a {:b 12}} (assoc-in nil [:a :b] 12)) ; replaces nil with nested maps as req'd
+  (is= {:a {:b 12}} (assoc-in {:a nil} [:a :b] 12))
+  (is= {:a {}} (t/dissoc-in {:a {}} [:a :b])) ; demo with missing data
+  (is= {:a nil} (t/dissoc-in {:a nil} [:a :b]))
+  (is= {:a nil} (t/dissoc-in {} [:a :b]))
+
   (td/with-tdb (td/new-tdb)
-    (td/entity-watch-add 101 (t/const-fn :watch-101-a))
-    (td/entity-watch-add 102 (t/const-fn :watch-102-a))
-    (td/entity-watch-add 101 (fn [& args] [:watch-101-b args]))
-    (td/entity-watch-add 102 (t/const-fn :watch-102-b))
-    (is-set= (td/entity-watchers-notify 101 1 2 3) [:watch-101-a [:watch-101-b [1 2 3]]])
+    (td/entity-watch-add 101 :101a (t/const-fn :watch-101-a))
+    (td/entity-watch-add 102 :102a (t/const-fn :watch-102-a))
+    (td/entity-watch-add 101 :101b (fn [& args] [:watch-101-b args]))
+    (td/entity-watch-add 102 :102b (t/const-fn :watch-102-b))
+    (is-set= (td/entity-watchers-notify 101 1 2 3) [:watch-101-a [:watch-101-b [:101b 1 2 3]]])
     (is-set= (td/entity-watchers-notify 102 :a :b :c) [:watch-102-a :watch-102-b])
 
     )
