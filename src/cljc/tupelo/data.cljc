@@ -359,7 +359,7 @@
   "Execute forms saving delta triples, then notify watchers"
   [& forms]
   `(binding [*tdb-deltas* (atom {:add [] :remove []})]
-     (let [result# ~@forms]
+     (let [result# (do ~@forms)]
        (entity-watchers-dispatch (deref *tdb-deltas*))
        result#) ))
 
@@ -706,9 +706,7 @@
       ;(newline)
       ;(spyx-pretty entity-type)
       ;(spyx-pretty value)
-      (binding [*tdb-deltas* (atom {:add [] :remove []})]
-        (db-add-triple [teid tval tval])
-        (entity-watchers-notify eid (deref *tdb-deltas*)))
+      (db-add-triple [teid tval tval])
       teid)))
 
 (s/defn entity-set-elem-add
@@ -790,8 +788,7 @@
       (doseq [triple-eav eav-triples]
         (remove-triple-impl triple-eav)) )))
 
-(s/defn entity-map-entry-remove
-  "Recursively removes an attr-val pair from a map entity"
+(s/defn ^:no-doc entity-map-entry-remove-impl
   [eid    ; :- #todo fix
    attr :- s/Any] ; #todo add db arg version
   (let [teid        (coerce->Eid eid)
@@ -809,11 +806,17 @@
       (entity-remove-impl (<val v)))
     (db-remove-triple triple-eav) ))
 
-(s/defn entity-array-elem-remove
-  "Recursively removes an index location from an array entity"
+(s/defn entity-map-entry-remove
+  "Recursively removes an attr-val pair from a map entity"
+  [eid    ; :- #todo fix
+   attr :- s/Any] ; #todo add db arg version
+  (with-entity-watchers
+    (entity-map-entry-remove-impl eid attr)))
+
+(s/defn ^:no-doc entity-array-elem-remove-impl
   ([eid :- s/Int
     idx :- s/Int] ; #todo add db arg version
-   (entity-array-elem-remove {:eid eid :idx idx :rerack true}))
+   (entity-array-elem-remove-impl {:eid eid :idx idx :rerack true}))
   ([ctx :- {:eid    s/Int
             :idx    s/Int
             :rerack s/Bool}]
@@ -833,10 +836,15 @@
          (entity-remove-impl (<val v)))
        (db-remove-triple triple-eav)
        (when rerack
-         (array-entity-rerack teid)) ))))
+         (array-entity-rerack teid))))))
 
-(s/defn entity-set-elem-remove
-  "Recursively removes an attr-val pair from a set entity"
+(s/defn entity-array-elem-remove
+  "Recursively removes an index location from an array entity"
+  [eid :- s/Int
+   idx :- s/Int] ; #todo add db arg version
+  (entity-array-elem-remove-impl eid idx))
+
+(s/defn ^:no-doc entity-set-elem-remove-impl
   [eid    ; :- #todo fix
    attr :- s/Any] ; #todo add db arg version
   (let [teid        (coerce->Eid eid)
@@ -852,7 +860,14 @@
       (throw (ex-info "non set type found" (vals->map teid entity-type))))
     (when (Eid? v)
       (entity-remove-impl (<val v)))
-    (db-remove-triple triple-eav) ))
+    (db-remove-triple triple-eav)))
+
+(s/defn entity-set-elem-remove
+  "Recursively removes an attr-val pair from a set entity"
+  [eid    ; :- #todo fix
+   attr :- s/Any] ; #todo add db arg version
+  (with-entity-watchers
+    (entity-set-elem-remove-impl eid attr)))
 
 (s/defn entity-remove
   "Recursively removes an entity from the db."
@@ -862,11 +877,8 @@
         vea-triples (index/prefix-match->seq [teid] idx-vea)]
     (when (not-empty? vea-triples)
       (throw (ex-info "entity not root" (vals->map eid-in))))
-    (entity-remove-impl eid-in)))
-
-; #todo update-array-elem
-; #todo update-map-entry
-; #todo update-set-elem
+    (with-entity-watchers
+      (entity-remove-impl eid-in))))
 
 (s/defn entity-map-entry-update
   "Update an attr-val pair in a map entity."
@@ -875,11 +887,10 @@
    delta-fn] ; #todo add db arg version
   (assert (fn? delta-fn)) ; #todo can do in Schema?
   (let [edn-curr (grab attr (eid->edn eid))
-        edn-next  (delta-fn edn-curr)]
-    (binding [*tdb-deltas* (atom {:add [] :remove []})]
-      (entity-map-entry-remove eid attr)
-      (entity-map-entry-add-impl eid attr edn-next)
-      (entity-watchers-notify eid (deref *tdb-deltas*)))))
+        edn-next (delta-fn edn-curr)]
+    (with-entity-watchers
+      (entity-map-entry-remove-impl eid attr)
+      (entity-map-entry-add-impl eid attr edn-next))))
 
 (s/defn entity-array-elem-update
   "Update an element in an array entity."
@@ -889,8 +900,9 @@
   (assert (fn? delta-fn)) ; #todo can do in Schema?
   (let [edn-value (nth (eid->edn eid) idx)
         edn-next  (delta-fn edn-value)]
-    (entity-array-elem-remove {:eid eid :idx idx :rerack false})
-    (entity-array-elem-add-impl eid idx edn-next)))
+    (with-entity-watchers
+      (entity-array-elem-remove-impl {:eid eid :idx idx :rerack false})
+      (entity-array-elem-add-impl eid idx edn-next))))
 
 (s/defn entity-set-elem-update
   "Update a value in a set entity."
@@ -902,8 +914,9 @@
         >>       (when-not (contains? edn-set value)
                    (throw (ex-info "Set element not found!" (vals->map value))))
         edn-next (delta-fn value)]
-    (entity-set-elem-remove eid value)
-    (entity-set-elem-add-impl eid edn-next)))
+    (with-entity-watchers
+      (entity-set-elem-remove-impl eid value)
+      (entity-set-elem-add-impl eid edn-next))))
 
 ;-----------------------------------------------------------------------------
 (s/defn ^:no-doc apply-env
