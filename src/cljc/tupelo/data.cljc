@@ -329,20 +329,23 @@
   [eid :- EidArg
    key :- s/Keyword
    callback-fn :- s/Any] ; #todo Fn
-  (swap! *tdb* (fn [tdb]
-                 (assoc-in tdb [:eid-watchers (coerce->Eid eid) key] callback-fn))))
+  (let [teid (coerce->Eid eid)]
+    (swap! *tdb* (fn [tdb]
+                   (assoc-in tdb [:eid-watchers teid key] callback-fn)))))
 
 (s/defn entity-watch-remove
   [eid :- EidArg
    key :- s/Keyword ]
-  (swap! *tdb* (fn [tdb]
-                 (t/dissoc-in tdb [:eid-watchers (coerce->Eid eid) key] ))))
+  (let [teid (coerce->Eid eid)]
+    (swap! *tdb* (fn [tdb]
+                   (t/dissoc-in tdb [:eid-watchers teid key])))))
 
 (s/defn entity-watchers-notify
   "Calls all watchers"
-  [eid :- Eid
+  [eid :- EidArg
    & args ]
-  (let [watchers-map (get-in (deref *tdb*) [:eid-watchers (coerce->Eid eid)])]
+  (let [teid (coerce->Eid eid)
+        watchers-map (get-in (deref *tdb*) [:eid-watchers teid])]
     ; Called for side effects. Must be eager/imperative. We use (forv ...) for ease of testing
     (forv [[watch-key watcher-fn] watchers-map]
       (apply watcher-fn watch-key args))))
@@ -573,11 +576,11 @@
         (throw (ex-info "walk-entity: unrecognized keys found:" intc-map))))
     (let [counted-keys-present (set/intersection counted-keys keys-present)]
       (when (empty? counted-keys-present)
-        (throw (ex-info "walk-entity: no counted keys found:" intc-map)))))
-  (let [enter-fn              (get intc-map :enter t/noop)
-        leave-fn              (get intc-map :leave t/noop)
-        canonical-interceptor (glue intc-map {:enter enter-fn :leave leave-fn})]
-    (walk-entity-impl eid canonical-interceptor))
+        (throw (ex-info "walk-entity: no counted keys found:" intc-map))))
+    (let [enter-fn              (get intc-map :enter t/noop)
+          leave-fn              (get intc-map :leave t/noop)
+          canonical-interceptor (glue intc-map {:enter enter-fn :leave leave-fn})]
+      (walk-entity-impl eid canonical-interceptor)))
   nil)
 
 ;-----------------------------------------------------------------------------
@@ -662,8 +665,6 @@
   [eid-in :- EidArg
    idx-in :- IdxArg
    val-in :- s/Any] ; #todo add db arg version
-  (when-not (int? idx-in)
-    (throw (ex-info "Index must be integer type" (vals->map eid-in idx-in))))
   (with-spy-indent
     (let [teid        (coerce->Eid eid-in)
           tidx        (coerce->Idx idx-in)
