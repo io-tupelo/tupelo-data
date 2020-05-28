@@ -138,6 +138,14 @@
          (write-all writer "<Param " (<val param) ">")))))
 
 ; #todo data-readers for #td/eid #td/idx #td/prim #td/param
+(def EidRaw s/Int)
+(def IdxRaw s/Int)
+(def PrimRaw (s/maybe ; maybe nil
+               (s/cond-pre s/Num s/Str s/Keyword s/Bool s/Symbol))) ; instant, uuid, Time ID (TID) (as strings?)
+
+(def EidArg (s/cond-pre Eid EidRaw ))
+(def IdxArg (s/cond-pre Idx IdxRaw ))
+(def PrimArg (s/cond-pre Prim PrimRaw ))
 
 ;-----------------------------------------------------------------------------
 (s/defn ^:no-doc tagmap? :- s/Bool
@@ -152,10 +160,10 @@
   (let [tag   (key (only x))
         value (val (only x))]
     (cond
-      (= tag :eid) (->Eid value)
-      (= tag :idx) (->Idx value)
-      (= tag :prim) (->Prim value)
-      (= tag :param) (->Param value)
+      (= tag :eid) (->Eid (s/validate EidRaw value))
+      (= tag :idx) (->Idx (s/validate IdxRaw value))
+      (= tag :prim) (->Prim (s/validate PrimRaw value))
+      (= tag :param) (->Param value) ; #todo complete validation
       :else (throw (ex-info "invalid tag value" (vals->map tag value))))))
 
 (defn ^:no-doc walk-tagmap-reader
@@ -179,17 +187,12 @@
 
 ;---------------------------------------------------------------------------------------------------
 (do       ; keep these in sync
-  (def ^:no-doc EidRaw
-    s/Int)
   ;(s/defn eid-data? :- s/Bool ; #todo keep?  rename -> validate-eid  ???
   ;  "Returns true iff the arg type is a legal EID value"
   ;  [arg] (int? arg))
   )
-
 ; #todo update with other primitive types
 (do       ; keep these in sync
-  (def ^:no-doc Primitive (s/maybe ; maybe nil
-                   (s/cond-pre s/Num s/Str s/Keyword s/Bool s/Symbol))) ; instant, uuid, Time ID (TID) (as strings?)
   (s/defn ^:no-doc primitive-data? :- s/Bool
     "Returns true iff a value is of primitive data type"
     [arg :- s/Any]
@@ -209,7 +212,7 @@
    ]
   (cond
     (Eid? arg) arg
-    (int? arg) (->Eid arg)
+    (int? arg) (->Eid (s/validate EidRaw arg))
     (tagmap? arg) (validate Eid? (tagmap-reader arg))
     :else (throw (ex-info "Invalid type found:" {:arg arg :type (type arg)}))))
 
@@ -219,7 +222,7 @@
    ]
   (cond
     (Idx? arg) arg
-    (int? arg) (->Idx arg)
+    (int? arg) (->Idx (s/validate IdxRaw arg))
     (tagmap? arg) (validate Idx? (tagmap-reader arg))
     :else (throw (ex-info "Invalid type found:" {:arg arg :type (type arg)}))))
 
@@ -229,7 +232,7 @@
    ]
   (cond
     (Prim? arg) arg
-    (primitive-data? arg) (->Prim arg)
+    (primitive-data? arg) (->Prim (s/validate PrimRaw arg))
     (tagmap? arg) (validate Prim? (tagmap-reader arg))
     :else (throw (ex-info "Invalid type found:" {:arg arg :type (type arg)}))))
 
@@ -238,7 +241,7 @@
   [arg]
   ; (spyx :untagged->Prim arg )
   (cond
-    (primitive-data? arg) (->Prim arg)
+    (primitive-data? arg) (->Prim arg) ; #todo s/validate
     (tagmap? arg) (validate Prim? (tagmap-reader arg))
     :else arg)) ; assume already tagged
 
@@ -301,7 +304,8 @@
 (def ^:no-doc TdbType
   "Plumatic Schema type definition for tupelo.data DB"
   {:eid-type     {Eid s/Keyword}
-   :eid-watchers {s/Int tsk/Map} ; from Eid to map of callback fns
+   :eid-watchers {Eid tsk/Map} ; from Eid to map of callback fns
+   ; #todo ^^^ merge all above into nested {:eid {:type {}  :watchers {}}}
    :idx-eav      #{tsk/Triple}
    :idx-ave      #{tsk/Triple}
    :idx-vea      #{tsk/Triple}})
@@ -322,33 +326,34 @@
      :idx-vea  (index/empty-index)}))
 
 (s/defn entity-watch-add
-  [eid :- s/Int
-   key :- s/Any
+  [eid :- EidArg
+   key :- s/Keyword
    callback-fn :- s/Any] ; #todo Fn
   (swap! *tdb* (fn [tdb]
-                 (assoc-in tdb [:eid-watchers (->Eid eid) key] callback-fn))))
+                 (assoc-in tdb [:eid-watchers (coerce->Eid eid) key] callback-fn))))
 
 (s/defn entity-watch-remove
-  [eid :- s/Int
-   key :- s/Any ]
+  [eid :- EidArg
+   key :- s/Keyword ]
   (swap! *tdb* (fn [tdb]
-                 (t/dissoc-in tdb [:eid-watchers (->Eid eid) key] ))))
+                 (t/dissoc-in tdb [:eid-watchers (coerce->Eid eid) key] ))))
 
 (s/defn entity-watchers-notify
-  "Calles all watchers"
-  [teid :- Eid
+  "Calls all watchers"
+  [eid :- Eid
    & args ]
-  (let [watchers-map (get-in (deref *tdb*) [:eid-watchers teid])]
+  (let [watchers-map (get-in (deref *tdb*) [:eid-watchers (coerce->Eid eid)])]
     ; Called for side effects. Must be eager/imperative. We use (forv ...) for ease of testing
-    (vec (for [[watch-key watcher-fn] watchers-map]
-           (apply watcher-fn watch-key args)))))
+    (forv [[watch-key watcher-fn] watchers-map]
+      (apply watcher-fn watch-key args))))
 
 (s/defn ^:no-doc entity-watchers-dispatch
   [tdb-deltas :- tsk/KeyMap]
   (let [triples-added   (grab :add tdb-deltas)
         triples-removed (grab :remove tdb-deltas)
         triples-all     (glue triples-added triples-removed)
-        eids-changed    (set (mapv xfirst triples-all))]
+        eids-changed    (set (mapv xfirst triples-all))
+        ] ; #todo refactor using group-by
     ; Called for side effects. Must be eager/imperative. We use (forv ...) for ease of testing
     (forv [eid eids-changed]
       (let [eid-deltas {:add    (keep-if #(= eid (xfirst %)) triples-added)
@@ -361,7 +366,7 @@
   `(binding [*tdb-deltas* (atom {:add [] :remove []})]
      (let [result# (do ~@forms)]
        (entity-watchers-dispatch (deref *tdb-deltas*))
-       result#) ))
+       result#)))
 
 ;***************************************************************************************************
 ; NOTE: every Pair [e a] is unique, so the eav index could be a sorted map {[e a] v}. This implies that
@@ -377,13 +382,18 @@
   "Returns a pretty version of the DB"
   [db :- TdbType]
   (let [db-compact (walk-compact db) ; returns plain maps & sets instead of sorted or index
-        result     (it-> (new-tdb)
+        result     (it-> (new-tdb) ; #todo => (merge-with t/glue xxx yyy) & test!
                      (update it :eid-type glue (grab :eid-type db-compact))
                      (update it :eid-watchers glue (grab :eid-watchers db-compact))
                      (update it :idx-eav glue (grab :idx-eav db-compact))
                      (update it :idx-ave glue (grab :idx-ave db-compact))
                      (update it :idx-vea glue (grab :idx-vea db-compact)))]
     result))
+
+(s/defn eid->type
+  "Returns the type of an entity"
+  [eid :- Eid]
+  (fetch-in (deref *tdb*) [:eid-type eid]))
 
 (s/defn edn->type :- s/Keyword
   "Given EDN data, returns a keyword indicating its type "
@@ -395,12 +405,8 @@
     (set? edn) :set
     :else (throw (ex-info "unknown EDN type " (vals->map edn)))))
 
-(s/defn eid->type
-  "Returns the type of an entity"
-  [eid :- Eid]
-  (fetch-in (deref *tdb*) [:eid-type eid]))
-
-(s/defn ^:no-doc entity? :- s/Bool
+(s/defn edn-entity? :- s/Bool
+  "Returns true iff arg is an entity type (sequential, map, or set)."
   [arg :- s/Any] (t/contains-key? #{:map :set :array} (edn->type arg)))
 
 ;-----------------------------------------------------------------------------
@@ -445,7 +451,7 @@
 (s/defn ^:no-doc tagidx-map->array :- tsk/List
   [idx-map :- {Idx s/Any}]
   (let [result (forv [idx (range (count idx-map))]
-                 (grab (->Idx idx) idx-map))]
+                 (grab (->Idx idx) idx-map))] ; ensures all idx in [0..N)
     result))
 
 (s/defn ^:no-doc db-contains-triple?
@@ -458,7 +464,7 @@
   ; (spy :db-remove-triple--enter triple-eav)
   (let [[e a v] triple-eav]
     ; detect missing data
-    (let [found (index/prefix-match->seq [e a] (grab :idx-eav @*tdb*))]
+    (let [found (index/prefix-match->seq [e a] (grab :idx-eav (deref *tdb*)))]
       (when (not= 1 (count found))
         (throw (ex-info "Illegal DB state detected" (vals->map triple-eav found)))))
     (swap! *tdb*
@@ -467,7 +473,6 @@
           (update it :idx-eav index/remove-entry [e a v])
           (update it :idx-vea index/remove-entry [v e a])
           (update it :idx-ave index/remove-entry [a v e]))))
-    ; (spyx *tdb-deltas*)
     (swap! *tdb-deltas* update :remove t/append triple-eav)
     triple-eav))
 
@@ -475,7 +480,7 @@
   [triple-eav]
   (let [[e a v] triple-eav]
     ; detect semantic error
-    (let [found (index/prefix-match->seq [e a] (grab :idx-eav @*tdb*))]
+    (let [found (index/prefix-match->seq [e a] (grab :idx-eav (deref *tdb*)))]
       (when (pos? (count found))
         (throw (ex-info "Illegal DB state detected" (vals->map triple-eav found)))))
     (swap! *tdb*
@@ -489,13 +494,13 @@
 
 ; #todo need to handle sets
 (s/defn ^:no-doc eid->edn-impl :- s/Any
-  [teid :- Eid]
+  [eid :- Eid]
   (with-spy-indent
-    (let [eav-matches (index/prefix-match->seq [teid] (grab :idx-eav @*tdb*))
+    (let [eav-matches (index/prefix-match->seq [eid] (grab :idx-eav (deref *tdb*)))
           ; >>          (spyx-pretty eav-matches)
           result-map  (apply glue
-                        (forv [[-teid-match- attr-match val-match] eav-matches]
-                          ; (assert (= teid -teid-match-))
+                        (forv [[-eid-match- attr-match val-match] eav-matches]
+                          ; (assert (= eid -eid-match-))
                           (let [attr-edn (t/cond-it-> attr-match
                                            (Eid? it) (eid->edn-impl it)
                                            (Prim? it) (<val it))
@@ -508,7 +513,7 @@
                             ;(spyx result)
                             result)))
           ; >>          (spyx-pretty result-map)
-          result-out  (let [entity-type (fetch-in @*tdb* [:eid-type teid])]
+          result-out  (let [entity-type (fetch-in (deref *tdb*) [:eid-type eid])]
                         (cond
                           (= entity-type :map) result-map
                           (= entity-type :set) (into #{} (keys result-map))
@@ -518,26 +523,24 @@
 
 (s/defn eid->edn :- s/Any ; #todo reimplement in terms of walk-entity ???
   "Returns the EDN subtree rooted at a eid."
-  [eid-in ; :- (s/pred Eid s/Int) ; #todo fix
+  [eid-in :- EidArg  ; (s/pred Eid s/Int) ; #todo fix
    ]
-  (assert (or (int? eid-in)
-            (Eid? eid-in)))
   (eid->edn-impl ; #todo fix crutch
     (coerce->Eid eid-in)))
 
 ;---------------------------------------------------------------------------------------------------
 ; #todo need to handle sets
 (s/defn ^:no-doc walk-entity-impl :- s/Any
-  [teid :- Eid
+  [eid :- Eid
    interceptor :- tsk/Interceptor]
   (with-spy-indent
     (let [enter-fn    (grab :enter interceptor)
           leave-fn    (grab :leave interceptor)
-          eav-matches (index/prefix-match->seq [teid] (grab :idx-eav @*tdb*))]
+          eav-matches (index/prefix-match->seq [eid] (grab :idx-eav (deref *tdb*)))]
       (doseq [eav-curr eav-matches]
         (enter-fn eav-curr)
         (let [[-e- -a- v] eav-curr]
-          (assert (= teid -e-)) ; #todo temp
+          (assert (= eid -e-)) ; #todo temp
           (when (Eid? v)
             (walk-entity-impl v interceptor)))
         (leave-fn eav-curr)
@@ -561,7 +564,8 @@
    where `eid-in` specifies the root of the sub-tree being walked. Returns nil."
   [eid-in :- EidRaw
    intc-map :- tsk/KeyMap]
-  (let [legal-keys   #{:id :enter :leave}
+  (let [eid          (coerce->Eid eid-in)
+        legal-keys   #{:id :enter :leave}
         counted-keys #{:enter :leave}
         keys-present (set (keys intc-map))]
     (let [extra-keys (set/difference keys-present legal-keys)]
@@ -573,7 +577,7 @@
   (let [enter-fn              (get intc-map :enter t/noop)
         leave-fn              (get intc-map :leave t/noop)
         canonical-interceptor (glue intc-map {:enter enter-fn :leave leave-fn})]
-    (walk-entity-impl (->Eid eid-in) canonical-interceptor))
+    (walk-entity-impl eid canonical-interceptor))
   nil)
 
 ;-----------------------------------------------------------------------------
@@ -602,20 +606,20 @@
 (declare add-entity-edn-impl)
 
 (s/defn ^:no-doc entity-map-entry-add-impl
-  [eid :- s/Int
-   attr :- Primitive
-   value :- s/Any] ; #todo add db arg version
-  (when-not (primitive? attr) ; #todo generalize?
-    (throw (ex-info "Attribute must be primitive (non-collection) type" (vals->map attr value))))
+  [eid-in :- EidArg
+   attr-in :- PrimRaw
+   val-in :- s/Any] ; #todo add db arg version
+  (when-not (primitive? attr-in) ; #todo generalize?
+    (throw (ex-info "Attribute must be primitive (non-collection) type" (vals->map attr-in val-in))))
   (with-spy-indent
-    (let [teid        (coerce->Eid eid)
-          tattr       (if (primitive? attr)
-                        (->Prim attr)
-                        (add-entity-edn-impl attr))
-          tval        (if (primitive? value)
-                        (->Prim value)
-                        (add-entity-edn-impl value))
-          entity-type (fetch-in @*tdb* [:eid-type teid])
+    (let [teid        (coerce->Eid eid-in)
+          tattr       (if (primitive? attr-in)
+                        (->Prim attr-in)
+                        (add-entity-edn-impl attr-in)) ; #todo we don't allow non-prim attrs yet
+          tval        (if (primitive? val-in)
+                        (->Prim val-in)
+                        (add-entity-edn-impl val-in))
+          entity-type (fetch-in (deref *tdb*) [:eid-type teid])
           idx-eav     (grab :idx-eav (deref *tdb*))
           ea-triples  (index/prefix-match->seq [teid tattr] idx-eav)]
       (when-not (= :map entity-type)
@@ -629,21 +633,24 @@
 
 (s/defn entity-map-entry-add
   "Adds a new attr-val pair to an existing map entity."
-  [eid :- s/Int
-   attr :- Primitive
-   value :- s/Any] ; #todo add db arg version
+  [eid :- EidArg
+   attr :- PrimRaw
+   val :- s/Any] ; #todo add db arg version
   (with-entity-watchers
-    (entity-map-entry-add-impl eid attr value)))
+    (entity-map-entry-add-impl
+      (coerce->Eid eid)
+      attr ; #todo (coerce->Prim) ???
+      val)))
 
 (s/defn ^:no-doc array-entity-rerack
-  [teid :- Eid] ; #todo make all require db param
-  (when (not= :array (eid->type teid))
-    (throw (ex-info "non-array found" (vals->map teid))))
+  [eid :- Eid] ; #todo make all require db param
+  (when (not= :array (eid->type eid))
+    (throw (ex-info "non-array found" (vals->map eid))))
   (let [idx-eav      (grab :idx-eav (deref *tdb*))
-        triples-orig (index/prefix-match->seq [teid] idx-eav)
+        triples-orig (index/prefix-match->seq [eid] idx-eav)
         vals         (mapv xthird triples-orig)
         triples-new  (forv [[idx val] (indexed vals)]
-                       [teid (->Idx idx) val])]
+                       [eid (->Idx idx) val])]
     (doseq [triple triples-orig]
       (db-remove-triple triple))
     (doseq [triple triples-new]
@@ -652,17 +659,17 @@
 ; #todo need entity-array-elem-prepend
 ; #todo need entity-array-elem-append
 (s/defn ^:no-doc entity-array-elem-add-impl
-  [eid :- s/Int
-   idx-in :- s/Int
-   value :- s/Any] ; #todo add db arg version
+  [eid-in :- EidArg
+   idx-in :- IdxArg
+   val-in :- s/Any] ; #todo add db arg version
   (when-not (int? idx-in)
-    (throw (ex-info "Index must be integer type" (vals->map eid idx-in))))
+    (throw (ex-info "Index must be integer type" (vals->map eid-in idx-in))))
   (with-spy-indent
-    (let [teid        (coerce->Eid eid)
-          tidx        (->Idx idx-in)
-          tval        (if (primitive? value)
-                        (->Prim value)
-                        (add-entity-edn-impl value))
+    (let [teid        (coerce->Eid eid-in)
+          tidx        (coerce->Idx idx-in)
+          tval        (if (primitive? val-in)
+                        (->Prim val-in)
+                        (add-entity-edn-impl val-in))
           entity-type (eid->type teid)
           idx-eav     (grab :idx-eav (deref *tdb*))
           ea-triples  (index/prefix-match->seq [teid tidx] idx-eav)]
@@ -672,49 +679,49 @@
         (throw (ex-info "pre-existing element found" (vals->map teid idx-in ea-triples))))
       ;(newline)
       ;(spyx-pretty entity-type)
-      ;(spyx-pretty value)
+      ;(spyx-pretty val-in)
       (db-add-triple [teid tidx tval])
       (array-entity-rerack teid)
       teid)))
 
 (s/defn entity-array-elem-add
   "Adds a new idx-val pair to an existing map entity. "
-  [eid :- s/Int
-   idx-in :- s/Int
-   value :- s/Any] ; #todo add db arg version
+  [eid :- EidArg
+   idx :- IdxArg
+   val :- s/Any] ; #todo add db arg version
   (with-entity-watchers
-    (entity-array-elem-add-impl eid idx-in value)))
+    (entity-array-elem-add-impl eid idx val)))
 
 (s/defn entity-set-elem-add-impl
   "Adds a new element to an existing set entity."
-  [eid :- s/Int
-   value :- s/Any] ; #todo add db arg version
-  (when-not (primitive? value) ; #todo generalize?
-    (throw (ex-info "Attribute must be primitive (non-collection) type" (vals->map value))))
+  [eid :- EidArg
+   val :- s/Any] ; #todo add db arg version
+  (when-not (primitive? val) ; #todo generalize?
+    (throw (ex-info "Attribute must be primitive (non-collection) type" (vals->map val))))
   (with-spy-indent
     (let [teid        (coerce->Eid eid)
-          tval        (if (primitive? value)
-                        (->Prim value)
-                        (add-entity-edn-impl value))
+          tval        (if (primitive? val)
+                        (->Prim val)
+                        (add-entity-edn-impl val)) ; #todo we don't allow non-prim set elements
           entity-type (eid->type teid)
           idx-eav     (grab :idx-eav (deref *tdb*))
           ea-triples  (index/prefix-match->seq [teid tval] idx-eav)]
       (when-not (= :set entity-type)
         (throw (ex-info "non set type found" (vals->map teid entity-type))))
       (when (not-empty? ea-triples)
-        (throw (ex-info "pre-existing element found" (vals->map teid value ea-triples))))
+        (throw (ex-info "pre-existing element found" (vals->map teid val ea-triples))))
       ;(newline)
       ;(spyx-pretty entity-type)
-      ;(spyx-pretty value)
+      ;(spyx-pretty val)
       (db-add-triple [teid tval tval])
       teid)))
 
 (s/defn entity-set-elem-add
   "Adds a new element to an existing set entity."
-  [eid :- s/Int
-   value :- s/Any] ; #todo add db arg version
+  [eid :- EidArg
+   val :- s/Any] ; #todo add db arg version
   (with-entity-watchers
-    (entity-set-elem-add-impl eid value)))
+    (entity-set-elem-add-impl (coerce->Eid eid) val)))
 
 (s/defn ^:no-doc add-entity-edn-impl :- Eid ; #todo maybe rename:  load-edn->eid  ???
   [entity-edn :- s/Any]
@@ -722,7 +729,7 @@
   ;(newline)
   ;(spyx-pretty entity-edn)
   (with-spy-indent
-    (when-not (entity? entity-edn)
+    (when-not (edn-entity? entity-edn)
       (throw (ex-info "invalid edn-in" (vals->map entity-edn))))
     (let [eid-raw     (new-eid)
           teid        (->Eid eid-raw)
@@ -736,20 +743,20 @@
         (= :map entity-type) (doseq [[k-in v-in] entity-edn]
                                (when-not (primitive? k-in) ; #todo generalize?
                                  (throw (ex-info "Attribute must be primitive (non-collection) type" (vals->map k-in v-in entity-edn))))
-                               (entity-map-entry-add-impl eid-raw k-in v-in))
+                               (entity-map-entry-add-impl teid k-in v-in))
 
         (= :set entity-type) (doseq [k-in entity-edn]
                                (when-not (primitive? k-in) ; #todo generalize?
                                  (throw (ex-info "Attribute must be primitive (non-collection) type" (vals->map k-in entity-edn))))
-                               (entity-set-elem-add-impl eid-raw k-in))
+                               (entity-set-elem-add-impl teid k-in))
 
         (= :array entity-type) (doseq [[idx val] (indexed entity-edn)]
-                                 (entity-array-elem-add-impl eid-raw idx val))
+                                 (entity-array-elem-add-impl teid idx val))
 
         :else (throw (ex-info "unknown value found" (vals->map entity-edn))))
       teid)))
 
-(s/defn add-entity-edn :- s/Int
+(s/defn add-entity-edn :- EidRaw
   "Add the EDN entity (map, array, or set) to the db, returning the EID"
   [entity-edn :- tsk/Collection]
   (with-entity-watchers
@@ -764,26 +771,27 @@
   [triple-eav :- tsk/Triple] ; #todo add db arg version
   ; (spyx :remove-triple triple-eav)
   (let [[e-in a-in v-in] triple-eav
-        a              (raw->Prim a-in)
-        v              (raw->Prim v-in)
-        triple-wrapped [e-in a v]
-        eid-raw        (<val e-in)]
+        ; #todo should use coerce->XXX for all here?
+        teid           (coerce->Eid e-in)
+        tattr          (raw->Prim a-in)
+        tval           (raw->Prim v-in)
+        triple-wrapped [teid tattr tval]]
     ; (spyx-pretty triple-wrapped)
     (when-not (db-contains-triple? triple-wrapped) ; #todo redundant check - remove?
       (throw (ex-info "triple not found" (vals->map triple-wrapped))))
-    (when (Eid? v)
-      (entity-remove-impl (<val v)))
+    (when (Eid? tval)
+      (entity-remove-impl tval))
     (db-remove-triple triple-wrapped)))
 
 (s/defn ^:no-doc entity-remove-impl
-  [eid-raw :- EidRaw] ; #todo add db arg version
+  [eid-in :- EidArg] ; #todo add db arg version
   (with-spy-indent
-    ; (spy :entity-remove-impl--enter eid-raw)
-    (let [idx-eav     (grab :idx-eav (deref *tdb*))
-          teid        (->Eid eid-raw)
+    ; (spy :entity-remove-impl--enter eid-in)
+    (let [teid        (coerce->Eid eid-in)
+          idx-eav     (grab :idx-eav (deref *tdb*))
           eav-triples (index/prefix-match->seq [teid] idx-eav)]
       (when (empty? eav-triples)
-        (throw (ex-info "entity not found" (vals->map eid-raw))))
+        (throw (ex-info "entity not found" (vals->map eid-in))))
       (swap! *tdb* dissoc-in [:eid-type teid])
       (doseq [triple-eav eav-triples]
         (remove-triple-impl triple-eav)) )))
@@ -803,26 +811,26 @@
     (when-not (= :map entity-type)
       (throw (ex-info "non map type found" (vals->map teid entity-type))))
     (when (Eid? v)
-      (entity-remove-impl (<val v)))
-    (db-remove-triple triple-eav) ))
+      (entity-remove-impl v))
+    (db-remove-triple triple-eav)))
 
 (s/defn entity-map-entry-remove
   "Recursively removes an attr-val pair from a map entity"
-  [eid    ; :- #todo fix
+  [eid    :- EidArg
    attr :- s/Any] ; #todo add db arg version
   (with-entity-watchers
     (entity-map-entry-remove-impl eid attr)))
 
 (s/defn ^:no-doc entity-array-elem-remove-impl
-  ([eid :- s/Int
-    idx :- s/Int] ; #todo add db arg version
+  ([eid :- EidArg
+    idx :- IdxArg] ; #todo add db arg version
    (entity-array-elem-remove-impl {:eid eid :idx idx :rerack true}))
-  ([ctx :- {:eid    s/Int
-            :idx    s/Int
+  ([ctx :- {:eid    EidArg
+            :idx    IdxArg
             :rerack s/Bool}]
    (with-map-vals ctx [eid idx rerack]
      (let [teid        (coerce->Eid eid)
-           tattr       (->Idx idx)
+           tattr       (coerce->Idx idx)
            entity-type (eid->type teid)
            idx-eav     (grab :idx-eav (deref *tdb*))
            eav-triples (index/prefix-match->seq [teid tattr] idx-eav)
@@ -833,19 +841,20 @@
        (when-not (= :array entity-type)
          (throw (ex-info "non array type found" (vals->map teid entity-type))))
        (when (Eid? v)
-         (entity-remove-impl (<val v)))
+         (entity-remove-impl v))
        (db-remove-triple triple-eav)
        (when rerack
          (array-entity-rerack teid))))))
 
 (s/defn entity-array-elem-remove
   "Recursively removes an index location from an array entity"
-  [eid :- s/Int
-   idx :- s/Int] ; #todo add db arg version
-  (entity-array-elem-remove-impl eid idx))
+  [eid :- EidArg
+   idx :- IdxArg] ; #todo add db arg version
+  (with-entity-watchers
+    (entity-array-elem-remove-impl eid idx)))
 
 (s/defn ^:no-doc entity-set-elem-remove-impl
-  [eid    ; :- #todo fix
+  [eid :- EidArg
    attr :- s/Any] ; #todo add db arg version
   (let [teid        (coerce->Eid eid)
         tattr       (coerce->Prim attr)
@@ -859,21 +868,21 @@
     (when-not (= :set entity-type)
       (throw (ex-info "non set type found" (vals->map teid entity-type))))
     (when (Eid? v)
-      (entity-remove-impl (<val v)))
+      (entity-remove-impl v))
     (db-remove-triple triple-eav)))
 
 (s/defn entity-set-elem-remove
   "Recursively removes an attr-val pair from a set entity"
-  [eid    ; :- #todo fix
+  [eid :- EidArg
    attr :- s/Any] ; #todo add db arg version
   (with-entity-watchers
     (entity-set-elem-remove-impl eid attr)))
 
 (s/defn entity-remove
   "Recursively removes an entity from the db."
-  [eid-in :- EidRaw] ; #todo add db arg version
-  (let [idx-vea     (grab :idx-vea (deref *tdb*))
-        teid        (->Eid eid-in)
+  [eid-in :- EidArg] ; #todo add db arg version
+  (let [teid        (coerce->Eid eid-in)
+        idx-vea     (grab :idx-vea (deref *tdb*))
         vea-triples (index/prefix-match->seq [teid] idx-vea)]
     (when (not-empty? vea-triples)
       (throw (ex-info "entity not root" (vals->map eid-in))))
@@ -882,41 +891,45 @@
 
 (s/defn entity-map-entry-update
   "Update an attr-val pair in a map entity."
-  [eid :- s/Int
-   attr :- Primitive
+  [eid :- EidArg
+   attr :- PrimRaw
    delta-fn] ; #todo add db arg version
   (assert (fn? delta-fn)) ; #todo can do in Schema?
-  (let [edn-curr (grab attr (eid->edn eid))
+  (let [teid     (coerce->Eid eid)
+        edn-curr (grab attr (eid->edn teid))
         edn-next (delta-fn edn-curr)]
     (with-entity-watchers
-      (entity-map-entry-remove-impl eid attr)
-      (entity-map-entry-add-impl eid attr edn-next))))
+      (entity-map-entry-remove-impl teid attr)
+      (entity-map-entry-add-impl teid attr edn-next))))
 
 (s/defn entity-array-elem-update
   "Update an element in an array entity."
-  [eid :- s/Int
-   idx :- s/Int
+  [eid :- EidArg
+   idx :- IdxArg
    delta-fn] ; #todo add db arg version
   (assert (fn? delta-fn)) ; #todo can do in Schema?
-  (let [edn-value (nth (eid->edn eid) idx)
+  (let [teid (coerce->Eid eid)
+        tidx (coerce->Idx idx)
+        edn-value (nth (eid->edn teid) idx)
         edn-next  (delta-fn edn-value)]
     (with-entity-watchers
-      (entity-array-elem-remove-impl {:eid eid :idx idx :rerack false})
-      (entity-array-elem-add-impl eid idx edn-next))))
+      (entity-array-elem-remove-impl {:eid teid :idx tidx :rerack false})
+      (entity-array-elem-add-impl teid tidx edn-next))))
 
 (s/defn entity-set-elem-update
   "Update a value in a set entity."
-  [eid :- s/Int
-   value :- Primitive
+  [eid :- EidArg
+   value :- PrimRaw
    delta-fn] ; #todo add db arg version
   (assert (fn? delta-fn)) ; #todo can do in Schema?
-  (let [edn-set  (eid->edn eid)
+  (let [teid     (coerce->Eid eid)
+        edn-set  (eid->edn teid)
         >>       (when-not (contains? edn-set value)
                    (throw (ex-info "Set element not found!" (vals->map value))))
         edn-next (delta-fn value)]
     (with-entity-watchers
-      (entity-set-elem-remove-impl eid value)
-      (entity-set-elem-add-impl eid edn-next))))
+      (entity-set-elem-remove-impl teid value)
+      (entity-set-elem-add-impl teid edn-next))))
 
 ;-----------------------------------------------------------------------------
 (s/defn ^:no-doc apply-env
