@@ -23,7 +23,8 @@
                           throws? throws-not? define-fixture]]
     [tupelo.core :as t :refer [spy spyx spyxx spy-pretty spyx-pretty spyq unlazy let-spy with-spy-indent
                                only only2 forv glue grab nl keep-if drop-if ->sym xfirst xsecond xthird not-nil?
-                               it-> fetch-in with-map-vals map-plain?]]
+                               it-> fetch-in with-map-vals map-plain? append prepend
+                               ]]
     [tupelo.data :as td :refer [with-tdb new-tdb eid-count-reset lookup match-triples match-triples->tagged search-triple
                                 *tdb* ->Eid Eid? ->Idx Idx? ->Prim Prim? ->Param Param?]]
     [tupelo.data.index :as index]
@@ -1632,9 +1633,10 @@
   )
 
 
-(dotest-focus
+(def ^:dynamic *result* nil)
+(dotest
   (is= {:a 1} (assoc nil :a 1))
-  (is= nil (dissoc nil :a ))
+  (is= nil (dissoc nil :a))
   (is= {:a {:b 12}} (assoc-in nil [:a :b] 12)) ; replaces nil with nested maps as req'd
   (is= {:a {:b 12}} (assoc-in {:a nil} [:a :b] 12))
   (is= {:a {}} (t/dissoc-in {:a {}} [:a :b])) ; demo with missing data
@@ -1647,18 +1649,18 @@
     (td/entity-watch-add 101 :101b (fn [& args] [:watch-101-b args]))
     (td/entity-watch-add 102 :102b (t/const-fn :watch-102-b))
     (is-set= (td/entity-watchers-notify 101 1 2 3) [:watch-101-a [:watch-101-b [:101b 1 2 3]]])
-    (is-set= (td/entity-watchers-notify 102 :a :b :c) [:watch-102-a :watch-102-b]) )
+    (is-set= (td/entity-watchers-notify 102 :a :b :c) [:watch-102-a :watch-102-b]))
 
-  (td/with-tdb (td/new-tdb)
-    (let [root-eid (td/add-entity-edn {:a 1 :b 2})]
-      (td/entity-watch-add root-eid :watch-a (fn watch-a-fn [ key arg] [:got key arg]))
-      (spyx
-        (td/entity-map-entry-update root-eid :a inc))
-
-      )
-    )
-
-  )
+  (binding [*result* (atom [])]
+    (td/eid-count-reset)
+    (td/with-tdb (td/new-tdb)
+      (let [root-eid (td/add-entity-edn {:a 1 :b 2})]
+        (td/entity-watch-add root-eid :watch-a (fn watch-a-fn [key arg]
+                                                 (swap! *result* append [:got key arg])))
+        (td/entity-map-entry-update root-eid :a inc)
+        (is= (td/walk-compact @*result*)
+          [[:got :watch-a {:add    [[{:eid 1001} {:prim :a} {:prim 2}]],
+                           :remove [[{:eid 1001} {:prim :a} {:prim 1}]]}]])))))
 
 
 
