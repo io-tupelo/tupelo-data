@@ -26,15 +26,13 @@
                                it-> fetch-in with-map-vals map-plain? append prepend
                                ]]
     [tupelo.data :as td :refer [with-tdb new-tdb eid-count-reset lookup match-triples match-triples->tagged search-triple
-                                *tdb* ->Eid Eid? ->Idx Idx? ->Prim Prim? ->Param Param?]]
+                                *tdb* ->Eid Eid? ->Idx Idx? ->Prim Prim? ->Param Param?
+                                ]]
     [tupelo.data.index :as index]
     [tupelo.tag :as tt :refer [IVal ITag ITagMap ->tagmap <tag <val]]
     )
   #?(:clj (:import [tupelo.data Eid Idx Prim Param]))
   )
-
-(comment  ; <<comment>>
-  )       ; <<comment>>
 
 
 #?(:cljs (enable-console-print!))
@@ -230,16 +228,25 @@
     (td/eid-count-reset)
     (is= (deref *tdb*)
       {:eid-type {} :eid-watchers {}
-       :idx-eav #{} :idx-vea #{} :idx-ave #{}})
+       :idx-eav  #{} :idx-vea #{} :idx-ave #{}})
+    ;(newline)
+    ;(spyx-pretty :dry-run
+    ;  (td/with-entity-watchers-impl  (quote [
+    ;                                         (spyx :add-entity-edn *tdb-deltas*)
+    ;                                         (<val (add-entity-edn-impl {:a 1})) ]) ) )
+    ;(newline)
     (let [edn-val  {:a 1}
-          root-eid (td/add-entity-edn edn-val)]
+          root-eid (td/add-entity-edn edn-val)
+          ]
       (is= root-eid 1001)
       (is= (td/walk-compact (deref *tdb*))
         {:eid-type {{:eid 1001} :map}, :eid-watchers {}
          :idx-ave  #{[{:prim :a} {:prim 1} {:eid 1001}]},
          :idx-eav  #{[{:eid 1001} {:prim :a} {:prim 1}]},
          :idx-vea  #{[{:prim 1} {:eid 1001} {:prim :a}]}})
-      (is= edn-val (td/eid->edn root-eid)))))
+      (is= edn-val (td/eid->edn root-eid))
+      )
+    ))
 
 (dotest
   (with-tdb (new-tdb)
@@ -264,20 +271,20 @@
           root-eid (td/add-entity-edn edn-val)]
       (is= 1001 root-eid)
       (is= (td/walk-compact (deref *tdb*))
-        {:eid-type {{:eid 1001} :map, {:eid 1002} :map},
+        {:eid-type     {{:eid 1001} :map, {:eid 1002} :map},
          :eid-watchers {}
-         :idx-ave  #{[{:prim :a} {:prim 1} {:eid 1001}]
-                     [{:prim :b} {:prim 2} {:eid 1001}]
-                     [{:prim :c} {:eid 1002} {:eid 1001}]
-                     [{:prim :d} {:prim 4} {:eid 1002}]},
-         :idx-eav  #{[{:eid 1001} {:prim :a} {:prim 1}]
-                     [{:eid 1001} {:prim :b} {:prim 2}]
-                     [{:eid 1001} {:prim :c} {:eid 1002}]
-                     [{:eid 1002} {:prim :d} {:prim 4}]},
-         :idx-vea  #{[{:eid 1002} {:eid 1001} {:prim :c}]
-                     [{:prim 1} {:eid 1001} {:prim :a}]
-                     [{:prim 2} {:eid 1001} {:prim :b}]
-                     [{:prim 4} {:eid 1002} {:prim :d}]}})
+         :idx-ave      #{[{:prim :a} {:prim 1} {:eid 1001}]
+                         [{:prim :b} {:prim 2} {:eid 1001}]
+                         [{:prim :c} {:eid 1002} {:eid 1001}]
+                         [{:prim :d} {:prim 4} {:eid 1002}]},
+         :idx-eav      #{[{:eid 1001} {:prim :a} {:prim 1}]
+                         [{:eid 1001} {:prim :b} {:prim 2}]
+                         [{:eid 1001} {:prim :c} {:eid 1002}]
+                         [{:eid 1002} {:prim :d} {:prim 4}]},
+         :idx-vea      #{[{:eid 1002} {:eid 1001} {:prim :c}]
+                         [{:prim 1} {:eid 1001} {:prim :a}]
+                         [{:prim 2} {:eid 1001} {:prim :b}]
+                         [{:prim 4} {:eid 1002} {:prim :d}]}})
       (is= edn-val (td/eid->edn root-eid)))))
 
 (dotest
@@ -286,15 +293,15 @@
     (let [edn-val  [1 2 3]
           root-eid (td/add-entity-edn edn-val)]
       (is= (td/walk-compact (deref *tdb*))
-        {:eid-type {{:eid 1001} :array},
+        {:eid-type     {{:eid 1001} :array},
          :eid-watchers {}
-         :idx-ave  #{[{:idx 0} {:prim 1} {:eid 1001}] [{:idx 1} {:prim 2} {:eid 1001}]
-                     [{:idx 2} {:prim 3} {:eid 1001}]},
-         :idx-eav  #{[{:eid 1001} {:idx 0} {:prim 1}]
-                     [{:eid 1001} {:idx 1} {:prim 2}]
-                     [{:eid 1001} {:idx 2} {:prim 3}]},
-         :idx-vea  #{[{:prim 1} {:eid 1001} {:idx 0}] [{:prim 2} {:eid 1001} {:idx 1}]
-                     [{:prim 3} {:eid 1001} {:idx 2}]}})
+         :idx-ave      #{[{:idx 0} {:prim 1} {:eid 1001}] [{:idx 1} {:prim 2} {:eid 1001}]
+                         [{:idx 2} {:prim 3} {:eid 1001}]},
+         :idx-eav      #{[{:eid 1001} {:idx 0} {:prim 1}]
+                         [{:eid 1001} {:idx 1} {:prim 2}]
+                         [{:eid 1001} {:idx 2} {:prim 3}]},
+         :idx-vea      #{[{:prim 1} {:eid 1001} {:idx 0}] [{:prim 2} {:eid 1001} {:idx 1}]
+                         [{:prim 3} {:eid 1001} {:idx 2}]}})
       (is= edn-val (td/eid->edn root-eid)))))
 
 (dotest
@@ -303,22 +310,22 @@
     (let [edn-val  {:a 1 :b 2 :c [10 11 12]}
           root-eid (td/add-entity-edn edn-val)]
       (is= (td/walk-compact (deref *tdb*))
-        {:eid-type {{:eid 1001} :map, {:eid 1002} :array},
+        {:eid-type     {{:eid 1001} :map, {:eid 1002} :array},
          :eid-watchers {}
-         :idx-ave  #{[{:idx 0} {:prim 10} {:eid 1002}] [{:idx 1} {:prim 11} {:eid 1002}]
-                     [{:idx 2} {:prim 12} {:eid 1002}] [{:prim :a} {:prim 1} {:eid 1001}]
-                     [{:prim :b} {:prim 2} {:eid 1001}]
-                     [{:prim :c} {:eid 1002} {:eid 1001}]},
-         :idx-eav  #{[{:eid 1001} {:prim :a} {:prim 1}]
-                     [{:eid 1001} {:prim :b} {:prim 2}]
-                     [{:eid 1001} {:prim :c} {:eid 1002}]
-                     [{:eid 1002} {:idx 0} {:prim 10}]
-                     [{:eid 1002} {:idx 1} {:prim 11}]
-                     [{:eid 1002} {:idx 2} {:prim 12}]},
-         :idx-vea  #{[{:eid 1002} {:eid 1001} {:prim :c}]
-                     [{:prim 1} {:eid 1001} {:prim :a}]
-                     [{:prim 2} {:eid 1001} {:prim :b}] [{:prim 10} {:eid 1002} {:idx 0}]
-                     [{:prim 11} {:eid 1002} {:idx 1}] [{:prim 12} {:eid 1002} {:idx 2}]}})
+         :idx-ave      #{[{:idx 0} {:prim 10} {:eid 1002}] [{:idx 1} {:prim 11} {:eid 1002}]
+                         [{:idx 2} {:prim 12} {:eid 1002}] [{:prim :a} {:prim 1} {:eid 1001}]
+                         [{:prim :b} {:prim 2} {:eid 1001}]
+                         [{:prim :c} {:eid 1002} {:eid 1001}]},
+         :idx-eav      #{[{:eid 1001} {:prim :a} {:prim 1}]
+                         [{:eid 1001} {:prim :b} {:prim 2}]
+                         [{:eid 1001} {:prim :c} {:eid 1002}]
+                         [{:eid 1002} {:idx 0} {:prim 10}]
+                         [{:eid 1002} {:idx 1} {:prim 11}]
+                         [{:eid 1002} {:idx 2} {:prim 12}]},
+         :idx-vea      #{[{:eid 1002} {:eid 1001} {:prim :c}]
+                         [{:prim 1} {:eid 1001} {:prim :a}]
+                         [{:prim 2} {:eid 1001} {:prim :b}] [{:prim 10} {:eid 1002} {:idx 0}]
+                         [{:prim 11} {:eid 1002} {:idx 1}] [{:prim 12} {:eid 1002} {:idx 2}]}})
       (is= edn-val (td/eid->edn root-eid))
       (is= (td/eid->edn 1002) [10 11 12]))))
 
@@ -337,43 +344,43 @@
       (doseq [m data]
         (td/add-entity-edn m))
       (is= (td/walk-compact @*tdb*) ; #todo error: missing :array
-        { :eid-watchers {}
-         :eid-type {{:eid 1001} :map,
-                    {:eid 1002} :map,
-                    {:eid 1003} :map,
-                    {:eid 1004} :map,
-                    {:eid 1005} :map,
-                    {:eid 1006} :map,
-                    {:eid 1007} :map,
-                    {:eid 1008} :map,
-                    {:eid 1009} :map},
-         :idx-ave  #{[{:prim :a} {:prim 1} {:eid 1001}]
-                     [{:prim :a} {:prim 2} {:eid 1002}]
-                     [{:prim :a} {:prim 3} {:eid 1003}]
-                     [{:prim :b} {:prim 1} {:eid 1004}]
-                     [{:prim :b} {:prim 2} {:eid 1005}]
-                     [{:prim :b} {:prim 3} {:eid 1006}]
-                     [{:prim :c} {:prim 1} {:eid 1007}]
-                     [{:prim :c} {:prim 2} {:eid 1008}]
-                     [{:prim :c} {:prim 3} {:eid 1009}]},
-         :idx-eav  #{[{:eid 1001} {:prim :a} {:prim 1}]
-                     [{:eid 1002} {:prim :a} {:prim 2}]
-                     [{:eid 1003} {:prim :a} {:prim 3}]
-                     [{:eid 1004} {:prim :b} {:prim 1}]
-                     [{:eid 1005} {:prim :b} {:prim 2}]
-                     [{:eid 1006} {:prim :b} {:prim 3}]
-                     [{:eid 1007} {:prim :c} {:prim 1}]
-                     [{:eid 1008} {:prim :c} {:prim 2}]
-                     [{:eid 1009} {:prim :c} {:prim 3}]},
-         :idx-vea  #{[{:prim 1} {:eid 1001} {:prim :a}]
-                     [{:prim 1} {:eid 1004} {:prim :b}]
-                     [{:prim 1} {:eid 1007} {:prim :c}]
-                     [{:prim 2} {:eid 1002} {:prim :a}]
-                     [{:prim 2} {:eid 1005} {:prim :b}]
-                     [{:prim 2} {:eid 1008} {:prim :c}]
-                     [{:prim 3} {:eid 1003} {:prim :a}]
-                     [{:prim 3} {:eid 1006} {:prim :b}]
-                     [{:prim 3} {:eid 1009} {:prim :c}]}})
+        {:eid-watchers {}
+         :eid-type     {{:eid 1001} :map,
+                        {:eid 1002} :map,
+                        {:eid 1003} :map,
+                        {:eid 1004} :map,
+                        {:eid 1005} :map,
+                        {:eid 1006} :map,
+                        {:eid 1007} :map,
+                        {:eid 1008} :map,
+                        {:eid 1009} :map},
+         :idx-ave      #{[{:prim :a} {:prim 1} {:eid 1001}]
+                         [{:prim :a} {:prim 2} {:eid 1002}]
+                         [{:prim :a} {:prim 3} {:eid 1003}]
+                         [{:prim :b} {:prim 1} {:eid 1004}]
+                         [{:prim :b} {:prim 2} {:eid 1005}]
+                         [{:prim :b} {:prim 3} {:eid 1006}]
+                         [{:prim :c} {:prim 1} {:eid 1007}]
+                         [{:prim :c} {:prim 2} {:eid 1008}]
+                         [{:prim :c} {:prim 3} {:eid 1009}]},
+         :idx-eav      #{[{:eid 1001} {:prim :a} {:prim 1}]
+                         [{:eid 1002} {:prim :a} {:prim 2}]
+                         [{:eid 1003} {:prim :a} {:prim 3}]
+                         [{:eid 1004} {:prim :b} {:prim 1}]
+                         [{:eid 1005} {:prim :b} {:prim 2}]
+                         [{:eid 1006} {:prim :b} {:prim 3}]
+                         [{:eid 1007} {:prim :c} {:prim 1}]
+                         [{:eid 1008} {:prim :c} {:prim 2}]
+                         [{:eid 1009} {:prim :c} {:prim 3}]},
+         :idx-vea      #{[{:prim 1} {:eid 1001} {:prim :a}]
+                         [{:prim 1} {:eid 1004} {:prim :b}]
+                         [{:prim 1} {:eid 1007} {:prim :c}]
+                         [{:prim 2} {:eid 1002} {:prim :a}]
+                         [{:prim 2} {:eid 1005} {:prim :b}]
+                         [{:prim 2} {:eid 1008} {:prim :c}]
+                         [{:prim 3} {:eid 1003} {:prim :a}]
+                         [{:prim 3} {:eid 1006} {:prim :b}]
+                         [{:prim 3} {:eid 1009} {:prim :c}]}})
       ;---------------------------------------------------------------------------------------------------
       (is= (td/walk-compact (lookup [(->Eid 1003) nil nil]))
         [[{:eid 1003} {:prim :a} {:prim 3}]])
@@ -1427,11 +1434,11 @@
       ; (newline)
       ; (println ":1425-enter-----------------------------------------------------------------------------")
       (binding [td/*tdb-deltas* (atom {:add [] :remove []})] ; #todo kludgy!  clean up
-        (td/remove-triple-impl [ 1001 :a 1]))
+        (td/remove-triple-impl [1001 :a 1]))
       ; (println ":1425-leave-----------------------------------------------------------------------------")
       (is= (td/eid->edn root-eid) {:b {:c 3, :d [4 5 6]}})
       (binding [td/*tdb-deltas* (atom {:add [] :remove []})]
-        (td/remove-triple-impl [ 1002 :d (->Eid 1003)]))
+        (td/remove-triple-impl [1002 :d (->Eid 1003)]))
       (is= (td/eid->edn root-eid) {:b {:c 3}}))))
 
 (dotest
@@ -1635,6 +1642,9 @@
 
 (def ^:dynamic *result* nil)
 (dotest
+  ; (spyx (swap! *result* append :a))
+  ; (spyx *result*)
+
   (is= {:a 1} (assoc nil :a 1))
   (is= nil (dissoc nil :a))
   (is= {:a {:b 12}} (assoc-in nil [:a :b] 12)) ; replaces nil with nested maps as req'd
@@ -1663,6 +1673,8 @@
                            :remove [[{:eid 1001} {:prim :a} {:prim 1}]]}]])))))
 
 
+(comment  ; <<comment>>
+  )       ; <<comment>>
 
 
 

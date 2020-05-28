@@ -14,7 +14,7 @@
              [tupelo.data]
              ))
   (:require
-    [tupelo.core :as t :refer [spy spyx spyxx spyx-pretty with-spy-indent spyq spydiv  ->true
+    [tupelo.core :as t :refer [spy spyx spyxx spyx-pretty with-spy-indent spyq spydiv ->true
                                grab glue map-entry indexed only only2 xfirst xsecond xthird xlast xrest not-empty? map-plain?
                                it-> cond-it-> forv vals->map fetch-in let-spy sym->kw with-map-vals vals->map
                                keep-if drop-if append prepend ->sym ->kw kw->sym validate dissoc-in
@@ -143,9 +143,9 @@
 (def PrimRaw (s/maybe ; maybe nil
                (s/cond-pre s/Num s/Str s/Keyword s/Bool s/Symbol))) ; instant, uuid, Time ID (TID) (as strings?)
 
-(def EidArg (s/cond-pre Eid EidRaw ))
-(def IdxArg (s/cond-pre Idx IdxRaw ))
-(def PrimArg (s/cond-pre Prim PrimRaw ))
+(def EidArg (s/cond-pre Eid EidRaw))
+(def IdxArg (s/cond-pre Idx IdxRaw))
+(def PrimArg (s/cond-pre Prim PrimRaw))
 
 ;-----------------------------------------------------------------------------
 (s/defn ^:no-doc tagmap? :- s/Bool
@@ -319,11 +319,11 @@
     ; #todo add `immutible` field
     ; #todo add `metadata` map from [e a v] => KeyMap  (or just [e a] since it is unique).
     ; Watch out for rerack! => not on array indexes.
-    {:eid-type (t/sorted-map-generic) ; source type of entity (:map :array :set)
+    {:eid-type     (t/sorted-map-generic) ; source type of entity (:map :array :set)
      :eid-watchers {} ; from Eid to set of callback fns
-     :idx-eav  (index/empty-index)
-     :idx-ave  (index/empty-index)
-     :idx-vea  (index/empty-index)}))
+     :idx-eav      (index/empty-index)
+     :idx-ave      (index/empty-index)
+     :idx-vea      (index/empty-index)}))
 
 (s/defn entity-watch-add
   [eid :- EidArg
@@ -335,7 +335,7 @@
 
 (s/defn entity-watch-remove
   [eid :- EidArg
-   key :- s/Keyword ]
+   key :- s/Keyword]
   (let [teid (coerce->Eid eid)]
     (swap! *tdb* (fn [tdb]
                    (t/dissoc-in tdb [:eid-watchers teid key])))))
@@ -343,8 +343,8 @@
 (s/defn entity-watchers-notify
   "Calls all watchers"
   [eid :- EidArg
-   & args ]
-  (let [teid (coerce->Eid eid)
+   & args]
+  (let [teid         (coerce->Eid eid)
         watchers-map (get-in (deref *tdb*) [:eid-watchers teid])]
     ; Called for side effects. Must be eager/imperative. We use (forv ...) for ease of testing
     (forv [[watch-key watcher-fn] watchers-map]
@@ -363,13 +363,21 @@
                         :remove (keep-if #(= eid (xfirst %)) triples-removed)}]
         (entity-watchers-notify eid eid-deltas)))))
 
+(defn ^:no-doc with-entity-watchers-impl
+  "Execute forms saving delta triples, then notify watchers"
+  [forms]
+  `(binding [tupelo.data/*tdb-deltas* (atom {:add [] :remove []})]
+     ; (spyx :with-entity-watchers--enter tupelo.data/*tdb-deltas*)
+     (let [wrapped-forms-fn# (fn [] ~@forms)
+           result#           (wrapped-forms-fn#) ; was (do ~@forms)
+           ]
+       (entity-watchers-dispatch @tupelo.data/*tdb-deltas*)
+       ; (spyx :with-entity-watchers--leave tupelo.data/*tdb-deltas*)
+       result#)))
+
 (defmacro ^:no-doc with-entity-watchers
   "Execute forms saving delta triples, then notify watchers"
-  [& forms]
-  `(binding [*tdb-deltas* (atom {:add [] :remove []})]
-     (let [result# (do ~@forms)]
-       (entity-watchers-dispatch (deref *tdb-deltas*))
-       result#)))
+  [& forms] (with-entity-watchers-impl forms))
 
 ;***************************************************************************************************
 ; NOTE: every Pair [e a] is unique, so the eav index could be a sorted map {[e a] v}. This implies that
@@ -476,7 +484,7 @@
           (update it :idx-eav index/remove-entry [e a v])
           (update it :idx-vea index/remove-entry [v e a])
           (update it :idx-ave index/remove-entry [a v e]))))
-    (swap! *tdb-deltas* update :remove t/append triple-eav)
+    (swap! tupelo.data/*tdb-deltas* update :remove t/append triple-eav)
     triple-eav))
 
 (s/defn ^:no-doc db-add-triple
@@ -492,7 +500,8 @@
           (update it :idx-eav index/add-entry [e a v])
           (update it :idx-vea index/add-entry [v e a])
           (update it :idx-ave index/add-entry [a v e]))))
-    (swap! *tdb-deltas* update :add t/append triple-eav)
+    ; (spyx :db-add-triple tupelo.data/*tdb-deltas*)
+    (swap! tupelo.data/*tdb-deltas* update :add t/append triple-eav)
     triple-eav))
 
 ; #todo need to handle sets
@@ -526,7 +535,7 @@
 
 (s/defn eid->edn :- s/Any ; #todo reimplement in terms of walk-entity ???
   "Returns the EDN subtree rooted at a eid."
-  [eid-in :- EidArg  ; (s/pred Eid s/Int) ; #todo fix
+  [eid-in :- EidArg ; (s/pred Eid s/Int) ; #todo fix
    ]
   (eid->edn-impl ; #todo fix crutch
     (coerce->Eid eid-in)))
@@ -726,6 +735,7 @@
 
 (s/defn ^:no-doc add-entity-edn-impl :- Eid ; #todo maybe rename:  load-edn->eid  ???
   [entity-edn :- s/Any]
+  ; (spyx :add-entity-edn-impl tupelo.data/*tdb-deltas*)
   ;(spydiv)
   ;(newline)
   ;(spyx-pretty entity-edn)
@@ -757,10 +767,13 @@
         :else (throw (ex-info "unknown value found" (vals->map entity-edn))))
       teid)))
 
-(s/defn add-entity-edn :- EidRaw
+; (s/defn add-entity-edn :- EidRaw
+(defn add-entity-edn
   "Add the EDN entity (map, array, or set) to the db, returning the EID"
-  [entity-edn :- tsk/Collection]
-  (with-entity-watchers
+  [entity-edn] ; [entity-edn :- tsk/Collection]
+  ; (spyx :add-entity-edn--enter tupelo.data/*tdb-deltas*)
+  (tupelo.data/with-entity-watchers ; #todo file CLJS bug:  breaks w/o ns for this macro
+    ; (spyx :add-entity-edn--1 tupelo.data/*tdb-deltas*)
     (<val (add-entity-edn-impl entity-edn))))
 
 ;-----------------------------------------------------------------------------
@@ -795,7 +808,7 @@
         (throw (ex-info "entity not found" (vals->map eid-in))))
       (swap! *tdb* dissoc-in [:eid-type teid])
       (doseq [triple-eav eav-triples]
-        (remove-triple-impl triple-eav)) )))
+        (remove-triple-impl triple-eav)))))
 
 (s/defn ^:no-doc entity-map-entry-remove-impl
   [eid    ; :- #todo fix
@@ -817,7 +830,7 @@
 
 (s/defn entity-map-entry-remove
   "Recursively removes an attr-val pair from a map entity"
-  [eid    :- EidArg
+  [eid :- EidArg
    attr :- s/Any] ; #todo add db arg version
   (with-entity-watchers
     (entity-map-entry-remove-impl eid attr)))
@@ -909,8 +922,8 @@
    idx :- IdxArg
    delta-fn] ; #todo add db arg version
   (assert (fn? delta-fn)) ; #todo can do in Schema?
-  (let [teid (coerce->Eid eid)
-        tidx (coerce->Idx idx)
+  (let [teid      (coerce->Eid eid)
+        tidx      (coerce->Idx idx)
         edn-value (nth (eid->edn teid) idx)
         edn-next  (delta-fn edn-value)]
     (with-entity-watchers
@@ -1032,7 +1045,7 @@
           ; >>          (spyx :eval-with-tagged-params env-map)
           eval-result (eval-with-env-map env-map pred)]
       ; (spyx :eval-with-tagged-params eval-result)
-      eval-result ))) ; #todo unify rest params on forms!!!
+      eval-result))) ; #todo unify rest params on forms!!!
 
 (s/defn ^:no-doc match-triples+pred
   [qspec-list :- [tsk/Triple]
