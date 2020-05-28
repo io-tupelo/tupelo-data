@@ -356,7 +356,7 @@
         triples-removed (grab :remove tdb-deltas)
         triples-all     (glue triples-added triples-removed)
         eids-changed    (set (mapv xfirst triples-all))
-        ] ; #todo refactor using group-by
+        ] ; #todo refactor using group-by and set/intersect
     ; Called for side effects. Must be eager/imperative. We use (forv ...) for ease of testing
     (forv [eid eids-changed]
       (let [eid-deltas {:add    (keep-if #(= eid (xfirst %)) triples-added)
