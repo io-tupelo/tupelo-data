@@ -648,7 +648,7 @@
   [eid :- EidArg
    attr :- PrimRaw
    val :- s/Any] ; #todo add db arg version
-  (with-entity-watchers
+  (tupelo.data/with-entity-watchers ; #todo file CLJS bug:  breaks w/o ns for this macro
     (entity-map-entry-add-impl
       (coerce->Eid eid)
       attr ; #todo (coerce->Prim) ???
@@ -699,7 +699,7 @@
   [eid :- EidArg
    idx :- IdxArg
    val :- s/Any] ; #todo add db arg version
-  (with-entity-watchers
+  (tupelo.data/with-entity-watchers ; #todo file CLJS bug:  breaks w/o ns for this macro
     (entity-array-elem-add-impl eid idx val)))
 
 (s/defn entity-set-elem-add-impl
@@ -730,7 +730,7 @@
   "Adds a new element to an existing set entity."
   [eid :- EidArg
    val :- s/Any] ; #todo add db arg version
-  (with-entity-watchers
+  (tupelo.data/with-entity-watchers ; #todo file CLJS bug:  breaks w/o ns for this macro
     (entity-set-elem-add-impl (coerce->Eid eid) val)))
 
 (s/defn ^:no-doc add-entity-edn-impl :- Eid ; #todo maybe rename:  load-edn->eid  ???
@@ -832,7 +832,7 @@
   "Recursively removes an attr-val pair from a map entity"
   [eid :- EidArg
    attr :- s/Any] ; #todo add db arg version
-  (with-entity-watchers
+  (tupelo.data/with-entity-watchers ; #todo file CLJS bug:  breaks w/o ns for this macro
     (entity-map-entry-remove-impl eid attr)))
 
 (s/defn ^:no-doc entity-array-elem-remove-impl
@@ -864,7 +864,7 @@
   "Recursively removes an index location from an array entity"
   [eid :- EidArg
    idx :- IdxArg] ; #todo add db arg version
-  (with-entity-watchers
+  (tupelo.data/with-entity-watchers ; #todo file CLJS bug:  breaks w/o ns for this macro
     (entity-array-elem-remove-impl eid idx)))
 
 (s/defn ^:no-doc entity-set-elem-remove-impl
@@ -889,7 +889,7 @@
   "Recursively removes an attr-val pair from a set entity"
   [eid :- EidArg
    attr :- s/Any] ; #todo add db arg version
-  (with-entity-watchers
+  (tupelo.data/with-entity-watchers ; #todo file CLJS bug:  breaks w/o ns for this macro
     (entity-set-elem-remove-impl eid attr)))
 
 (s/defn entity-remove
@@ -900,7 +900,7 @@
         vea-triples (index/prefix-match->seq [teid] idx-vea)]
     (when (not-empty? vea-triples)
       (throw (ex-info "entity not root" (vals->map eid-in))))
-    (with-entity-watchers
+    (tupelo.data/with-entity-watchers ; #todo file CLJS bug:  breaks w/o ns for this macro
       (entity-remove-impl eid-in))))
 
 (s/defn entity-map-entry-update
@@ -912,7 +912,7 @@
   (let [teid     (coerce->Eid eid)
         edn-curr (grab attr (eid->edn teid))
         edn-next (delta-fn edn-curr)]
-    (with-entity-watchers
+    (tupelo.data/with-entity-watchers ; #todo file CLJS bug:  breaks w/o ns for this macro
       (entity-map-entry-remove-impl teid attr)
       (entity-map-entry-add-impl teid attr edn-next))))
 
@@ -926,7 +926,7 @@
         tidx      (coerce->Idx idx)
         edn-value (nth (eid->edn teid) idx)
         edn-next  (delta-fn edn-value)]
-    (with-entity-watchers
+    (tupelo.data/with-entity-watchers ; #todo file CLJS bug:  breaks w/o ns for this macro
       (entity-array-elem-remove-impl {:eid teid :idx tidx :rerack false})
       (entity-array-elem-add-impl teid tidx edn-next))))
 
@@ -941,7 +941,7 @@
         >>       (when-not (contains? edn-set value)
                    (throw (ex-info "Set element not found!" (vals->map value))))
         edn-next (delta-fn value)]
-    (with-entity-watchers
+    (tupelo.data/with-entity-watchers ; #todo file CLJS bug:  breaks w/o ns for this macro
       (entity-set-elem-remove-impl teid value)
       (entity-set-elem-add-impl teid edn-next))))
 
