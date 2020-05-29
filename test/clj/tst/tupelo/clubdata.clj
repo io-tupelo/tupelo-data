@@ -17,13 +17,15 @@
     [tupelo.data :as td :refer [with-tdb new-tdb eid-count-reset lookup match-triples match-triples->tagged search-triple
                                 *tdb* ->Eid Eid? ->Idx Idx? ->Prim Prim? ->Param Param?
                                 ]]
-    [tupelo.csv :as csv]
-    [tupelo.string :as ts]
-    [tupelo.parse :as parse]
+    [clojure.string :as str]
     [clojure.tools.reader.edn :as edn]
-    [tupelo.schema :as tsk]
     [schema.core :as s]
-    [clojure.string :as str]) )
+    [tupelo.csv :as csv]
+    [tupelo.parse :as parse]
+    [tupelo.profile :as prof]
+    [tupelo.schema :as tsk]
+    [tupelo.string :as ts]
+    ) )
 
 
 (when false
@@ -84,18 +86,18 @@
         bookings   (mapv normalize-booking
                      (edn/read-string (slurp (io/resource "bookings.edn"))))
 
-        fac3       (vec (take 3 facilities))
-        memb3      (vec (take 3 members))
-        book3      (vec (take 3 bookings))]
+        facilities-3       (vec (take 3 facilities))
+        members-3      (vec (take 3 members))
+        bookings-3      (vec (take 3 bookings))]
     (spyx (count facilities))
     (spyx (count members))
     (spyx (count bookings))
 
 (when false
-      (nl) (spyx-pretty fac3)
-      (nl) (spyx-pretty memb3)
-      (nl) (spyx-pretty book3))
-    (is= fac3 [{:facid              0,
+      (nl) (spyx-pretty facilities-3)
+      (nl) (spyx-pretty members-3)
+      (nl) (spyx-pretty bookings-3))
+    (is= facilities-3 [{:facid              0,
                 :guestcost          25.0,
                 :initialoutlay      10000.0,
                 :membercost         5.0,
@@ -114,7 +116,7 @@
                 :monthlymaintenance 50.0,
                 :name               "Badminton Court"}])
 
-    (is= memb3 [{:address       "<nowhere>",
+    (is= members-3 [{:address       "<nowhere>",
                  :firstname     "GUEST",
                  :joindate      "2012-07-01 00:00:00",
                  :memid         0,
@@ -139,7 +141,7 @@
                  :telephone     "555-555-5555",
                  :zipcode       "4321"}])
 
-    (is= book3 [{:bookid    0,
+    (is= bookings-3 [{:bookid    0,
                  :facid     3,
                  :memid     1,
                  :slots     2,
@@ -163,21 +165,27 @@
             >> (println :-----fac)
             root-memb    (td/add-entity-edn members)
             >> (println :-----memb)
-            root-book    (td/add-entity-edn bookings)
+            root-book (td/add-entity-edn (take 2200 bookings))
             >> (println :-----book)
-            eid0         (grab :eid (only (td/match [{:eid ? :facid 0}])))
-            eid0b        (grab :eid (only (td/match [{:eid ? :name "Tennis Court 1"}])))
-            >>           (spyx [eid0 eid0b])
-            fac0         (td/eid->edn eid0)
-            ;bookings-tc1 (td/match [{:facid facid :name "Tennis Court 1"}
-            ;                        {:facid facid :memid memid :starttime ?}
-            ;                        {:memid memid :firstname ?}])
+            eid0  (td/match [{:eid ? :facid 0}])
+            >> (spyx eid0)
+            eid0b (grab :eid (only (td/match [{:eid ? :name "Tennis Court 1"}])))
+            >> (spyx eid0b)
+
+            fac0         (td/eid->edn eid0b)
+            bookings-tc1 (prof/with-timer-print :match-big-0
+                           (td/match [{:facid facid :name "Tennis Court 1"}
+                                      {:facid facid :memid memid :starttime ?}
+                                      {:memid memid :firstname ?}]))
+            guests-tc1 (set (mapv #(grab :firstname %) bookings-tc1))
             ]
         (spyx fac0)
-        ; (spyx-pretty bookings-tc1)
+        (spyx-pretty (take 5 bookings-tc1))
+        (spyx  guests-tc1)
 
         )
       )
+    (prof/print-profile-stats)
     ))
 
 

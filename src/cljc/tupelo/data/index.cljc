@@ -11,6 +11,7 @@
     [schema.core :as s]
     [tupelo.schema :as tsk]
     [tupelo.lexical :as lex]
+    [tupelo.profile :as prof :refer [defnp ]]
     [tupelo.core :as t :refer [spy spyx spyxx spyx-pretty grab glue map-entry indexed
                                grab forv vals->map fetch-in ]]
     ))
@@ -73,20 +74,21 @@
       "
   [match-val :- tsk/Vec
    lex-set :- Index]
-  (let [[smaller-set found-val larger-set] (avl/split-key match-val lex-set)
-        result (if (t/not-nil? found-val)
-                 {:smaller smaller-set
-                  :matches (avl/sorted-set found-val)
-                  :larger  larger-set}
-                 (let [[matches-seq larger-seq] (clojure.core/split-with #(prefix-match? match-val %) larger-set)]
+  (prof/with-timer-accum :split-key-prefix
+    (let [[smaller-set found-val larger-set] (avl/split-key match-val lex-set)
+          result (if (t/not-nil? found-val)
                    {:smaller smaller-set
-                    :matches (->index matches-seq)
-                    :larger  (->index larger-seq)}))]
-    (when false
-      (s/validate Index (grab :smaller result))
-      (s/validate Index (grab :matches result))
-      (s/validate Index (grab :larger result)))
-    result))
+                    :matches (avl/sorted-set found-val)
+                    :larger  larger-set}
+                   (let [[matches-seq larger-seq] (clojure.core/split-with #(prefix-match? match-val %) larger-set)]
+                     {:smaller smaller-set
+                      :matches (->index matches-seq)
+                      :larger  (->index larger-seq)}))]
+      (when false
+        (s/validate Index (grab :smaller result))
+        (s/validate Index (grab :matches result))
+        (s/validate Index (grab :larger result)))
+      result)))
 
 (s/defn prefix-match->index :- Index
   "Return the `:matches` values found via `split-key-prefix`."

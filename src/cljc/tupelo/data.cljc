@@ -21,6 +21,7 @@
                                ]]
     [tupelo.data.index :as index]
     [tupelo.misc :as misc]
+    [tupelo.profile :as prof]
     [tupelo.schema :as tsk]
     [tupelo.tag :as tt :refer [IVal ITag ITagMap ->tagmap <tag <val untagged]]
     [tupelo.set :as tset]
@@ -452,8 +453,9 @@
 (s/defn ^:no-doc new-eid :- EidRaw ; #todo maybe return Eid record???
   "Returns the next integer EID"
   [] (let [result (swap! eid-counter inc)]
-       (when (zero? (rem result 10))
-         (println :new-eid result) )
+       (when (zero? (rem result 1000))
+         (println :new-eid result :size-eav (count (grab :idx-eav @*tdb*)))
+         (prof/print-profile-stats))
        result))
 
 (s/defn ^:no-doc array->tagidx-map :- {Idx s/Any}
@@ -476,36 +478,42 @@
 (s/defn ^:no-doc db-remove-triple
   [triple-eav]
   ; (spy :db-remove-triple--enter triple-eav)
-  (let [[e a v] triple-eav]
-    ; detect missing data
-    (let [found (index/prefix-match->seq [e a] (grab :idx-eav (deref *tdb*)))]
-      (when (not= 1 (count found))
-        (throw (ex-info "Illegal DB state detected" (vals->map triple-eav found)))))
-    (swap! *tdb*
-      (fn [tdb]
-        (it-> tdb
-          (update it :idx-eav index/remove-entry [e a v])
-          (update it :idx-vea index/remove-entry [v e a])
-          (update it :idx-ave index/remove-entry [a v e]))))
-    (swap! tupelo.data/*tdb-deltas* update :remove t/append triple-eav)
-    triple-eav))
+  (prof/with-timer-accum :db-remove-triple
+    (let [[e a v] triple-eav]
+      ;(when  (zero? (rem (count (grab :idx-eav @*tdb*)) 1000))
+      ;  (spyx :db-remove-triple triple-eav ) )
+      ; detect missing data
+      (let [found (index/prefix-match->seq [e a] (grab :idx-eav (deref *tdb*)))]
+        (when (not= 1 (count found))
+          (throw (ex-info "Illegal DB state detected" (vals->map triple-eav found)))))
+      (swap! *tdb*
+        (fn [tdb]
+          (it-> tdb
+            (update it :idx-eav index/remove-entry [e a v])
+            (update it :idx-vea index/remove-entry [v e a])
+            (update it :idx-ave index/remove-entry [a v e]))))
+      (swap! tupelo.data/*tdb-deltas* update :remove t/append triple-eav)
+      triple-eav)))
 
 (s/defn ^:no-doc db-add-triple
   [triple-eav]
-  (let [[e a v] triple-eav]
-    ; detect semantic error
-    (let [found (index/prefix-match->seq [e a] (grab :idx-eav (deref *tdb*)))]
-      (when (pos? (count found))
-        (throw (ex-info "Illegal DB state detected" (vals->map triple-eav found)))))
-    (swap! *tdb*
-      (fn [tdb]
-        (it-> tdb
-          (update it :idx-eav index/add-entry [e a v])
-          (update it :idx-vea index/add-entry [v e a])
-          (update it :idx-ave index/add-entry [a v e]))))
-    ; (spyx :db-add-triple tupelo.data/*tdb-deltas*)
-    (swap! tupelo.data/*tdb-deltas* update :add t/append triple-eav)
-    triple-eav))
+  (prof/with-timer-accum :db-add-triple
+    (let [[e a v] triple-eav]
+      ;(when (zero? (rem (count (grab :idx-eav @*tdb*)) 1000))
+      ;  (spyx :db-add-triple triple-eav ) )
+      ; detect semantic error
+      (let [found (index/prefix-match->seq [e a] (grab :idx-eav (deref *tdb*)))]
+        (when (pos? (count found))
+          (throw (ex-info "Illegal DB state detected" (vals->map triple-eav found)))))
+      (swap! *tdb*
+        (fn [tdb]
+          (it-> tdb
+            (update it :idx-eav index/add-entry [e a v])
+            (update it :idx-vea index/add-entry [v e a])
+            (update it :idx-ave index/add-entry [a v e]))))
+      ; (spyx :db-add-triple tupelo.data/*tdb-deltas*)
+      (swap! tupelo.data/*tdb-deltas* update :add t/append triple-eav)
+      triple-eav)))
 
 ; #todo need to handle sets
 (s/defn ^:no-doc eid->edn-impl :- s/Any
@@ -603,19 +611,20 @@
    (lookup (deref *tdb*) triple))
   ([db :- TdbType
     triple :- tsk/Triple]
-   (let [[e a v] triple
-         known-flgs    (mapv #(misc/boolean->binary (t/not-nil? %)) triple)
-         found-entries (cond
-                         (= known-flgs [1 0 0]) (map-eav->eav (index/prefix-match->seq [e] (grab :idx-eav db)))
-                         (= known-flgs [0 1 0]) (map-ave->eav (index/prefix-match->seq [a] (grab :idx-ave db)))
-                         (= known-flgs [0 0 1]) (map-vea->eav (index/prefix-match->seq [v] (grab :idx-vea db)))
-                         (= known-flgs [0 1 1]) (map-ave->eav (index/prefix-match->seq [a v] (grab :idx-ave db)))
-                         (= known-flgs [1 0 1]) (map-vea->eav (index/prefix-match->seq [v e] (grab :idx-vea db)))
-                         (= known-flgs [1 1 0]) (map-eav->eav (index/prefix-match->seq [e a] (grab :idx-eav db)))
-                         (= known-flgs [1 1 1]) (map-eav->eav (index/prefix-match->seq [e a v] (grab :idx-eav db)))
-                         (= known-flgs [0 0 0]) (map-eav->eav (seq (grab :idx-eav db))) ; everything matches
-                         :else (throw (ex-info "invalid known-flags" (vals->map triple known-flgs))))]
-     found-entries)))
+   (prof/with-timer-accum :lookup
+     (let [[e a v] triple
+           known-flgs    (mapv #(misc/boolean->binary (t/not-nil? %)) triple)
+           found-entries (cond
+                           (= known-flgs [1 0 0]) (map-eav->eav (index/prefix-match->seq [e] (grab :idx-eav db)))
+                           (= known-flgs [0 1 0]) (map-ave->eav (index/prefix-match->seq [a] (grab :idx-ave db)))
+                           (= known-flgs [0 0 1]) (map-vea->eav (index/prefix-match->seq [v] (grab :idx-vea db)))
+                           (= known-flgs [0 1 1]) (map-ave->eav (index/prefix-match->seq [a v] (grab :idx-ave db)))
+                           (= known-flgs [1 0 1]) (map-vea->eav (index/prefix-match->seq [v e] (grab :idx-vea db)))
+                           (= known-flgs [1 1 0]) (map-eav->eav (index/prefix-match->seq [e a] (grab :idx-eav db)))
+                           (= known-flgs [1 1 1]) (map-eav->eav (index/prefix-match->seq [e a v] (grab :idx-eav db)))
+                           (= known-flgs [0 0 0]) (map-eav->eav (seq (grab :idx-eav db))) ; everything matches
+                           :else (throw (ex-info "invalid known-flags" (vals->map triple known-flgs))))]
+       found-entries))))
 
 ;-----------------------------------------------------------------------------
 (declare add-entity-edn-impl)
@@ -659,51 +668,61 @@
 
 (s/defn ^:no-doc array-entity-rerack
   [eid :- Eid] ; #todo make all require db param
-  (when (not= :array (eid->type eid))
-    (throw (ex-info "non-array found" (vals->map eid))))
-  (let [idx-eav      (grab :idx-eav (deref *tdb*))
-        triples-orig (index/prefix-match->seq [eid] idx-eav)
-        vals         (mapv xthird triples-orig)
-        triples-new  (forv [[idx val] (indexed vals)]
-                       [eid (->Idx idx) val])]
-    (doseq [triple triples-orig]
-      (db-remove-triple triple))
-    (doseq [triple triples-new]
-      (db-add-triple triple))))
+  (with-spy-indent
+    (spyx :array-entity-rerack )
+    (when (not= :array (eid->type eid))
+      (throw (ex-info "non-array found" (vals->map eid))))
+    (let [idx-eav      (grab :idx-eav (deref *tdb*))
+          triples-orig (index/prefix-match->seq [eid] idx-eav)
+          vals         (mapv xthird triples-orig)
+          triples-new  (forv [[idx val] (indexed vals)]
+                         [eid (->Idx idx) val])]
+      (doseq [triple triples-orig]
+        (db-remove-triple triple))
+      (doseq [triple triples-new]
+        (db-add-triple triple)))))
 
 ; #todo need entity-array-elem-prepend
 ; #todo need entity-array-elem-append
 (s/defn ^:no-doc entity-array-elem-add-impl
-  [eid-in :- EidArg
-   idx-in :- IdxArg
-   val-in :- s/Any] ; #todo add db arg version
-  (with-spy-indent
-    (let [teid        (coerce->Eid eid-in)
-          tidx        (coerce->Idx idx-in)
-          tval        (if (primitive? val-in)
-                        (->Prim val-in)
-                        (add-entity-edn-impl val-in))
-          entity-type (eid->type teid)
-          idx-eav     (grab :idx-eav (deref *tdb*))
-          ea-triples  (index/prefix-match->seq [teid tidx] idx-eav)]
-      (when-not (= :array entity-type)
-        (throw (ex-info "non array type found" (vals->map teid entity-type))))
-      (when (not-empty? ea-triples)
-        (throw (ex-info "pre-existing element found" (vals->map teid idx-in ea-triples))))
-      ;(newline)
-      ;(spyx-pretty entity-type)
-      ;(spyx-pretty val-in)
-      (db-add-triple [teid tidx tval])
-      (array-entity-rerack teid)
-      teid)))
+  ([eid-in :- EidArg
+    idx-in :- IdxArg
+    val-in :- s/Any] (entity-array-elem-add-impl {:rerack true} eid-in idx-in val-in ) )
+  ([ctx  :- tsk/KeyMap
+    eid-in :- EidArg
+    idx-in :- IdxArg
+    val-in :- s/Any] ; #todo add db arg version
+   (with-map-vals ctx [:rerack]
+     (with-spy-indent
+       (let [teid        (coerce->Eid eid-in)
+             tidx        (coerce->Idx idx-in)
+             tval        (if (primitive? val-in)
+                           (->Prim val-in)
+                           (add-entity-edn-impl val-in))
+             entity-type (eid->type teid)
+             idx-eav     (grab :idx-eav (deref *tdb*))
+             ea-triples  (index/prefix-match->seq [teid tidx] idx-eav)]
+         (when-not (= :array entity-type)
+           (throw (ex-info "non array type found" (vals->map teid entity-type))))
+         (when (not-empty? ea-triples)
+           (throw (ex-info "pre-existing element found" (vals->map teid idx-in ea-triples))))
+         ;(newline)
+         ;(spyx-pretty entity-type)
+         ;(spyx-pretty val-in)
+         (db-add-triple [teid tidx tval])
+         (when rerack
+           (array-entity-rerack teid))
+         teid)))))
 
 (s/defn entity-array-elem-add
   "Adds a new idx-val pair to an existing map entity. "
   [eid :- EidArg
    idx :- IdxArg
    val :- s/Any] ; #todo add db arg version
-  (tupelo.data/with-entity-watchers ; #todo file CLJS bug:  breaks w/o ns for this macro
-    (entity-array-elem-add-impl eid idx val)))
+  (with-spy-indent
+    (spy :entity-array-elem-add)
+    (tupelo.data/with-entity-watchers ; #todo file CLJS bug:  breaks w/o ns for this macro
+      (entity-array-elem-add-impl eid idx val))))
 
 (s/defn entity-set-elem-add-impl
   "Adds a new element to an existing set entity."
@@ -765,7 +784,7 @@
                                (entity-set-elem-add-impl teid k-in))
 
         (= :array entity-type) (doseq [[idx val] (indexed entity-edn)]
-                                 (entity-array-elem-add-impl teid idx val))
+                                 (entity-array-elem-add-impl {:rerack false} teid idx val))
 
         :else (throw (ex-info "unknown value found" (vals->map entity-edn))))
       teid)))
@@ -775,9 +794,10 @@
   "Add the EDN entity (map, array, or set) to the db, returning the EID"
   [entity-edn] ; [entity-edn :- tsk/Collection]
   ; (spyx :add-entity-edn--enter tupelo.data/*tdb-deltas*)
-  (tupelo.data/with-entity-watchers ; #todo file CLJS bug:  breaks w/o ns for this macro
-    ; (spyx :add-entity-edn--1 tupelo.data/*tdb-deltas*)
-    (<val (add-entity-edn-impl entity-edn))))
+  (prof/with-timer-accum :add-entity-edn
+    (tupelo.data/with-entity-watchers ; #todo file CLJS bug:  breaks w/o ns for this macro
+      ; (spyx :add-entity-edn--1 tupelo.data/*tdb-deltas*)
+      (<val (add-entity-edn-impl entity-edn)))))
 
 ;-----------------------------------------------------------------------------
 ; #todo (defn update-triple [triple-eav fn] ...)
@@ -1286,10 +1306,11 @@
 (defn match-fn
   [& args] ; #todo doc qspecs format
   ; #todo need a linter to catch nonsensical qspecs (attr <> keyword for example)
-  (let [unwrapped-query-results (untag-match-results
-                                  (match->tagged args))]
-    ; (spyx unwrapped-query-results)
-    unwrapped-query-results))
+  (prof/with-timer-accum :match-fn
+    (let [unwrapped-query-results (untag-match-results
+                                    (match->tagged args))]
+      ; (spyx unwrapped-query-results)
+      unwrapped-query-results)))
 
 (defn ^:no-doc match-impl
   [qspecs]
