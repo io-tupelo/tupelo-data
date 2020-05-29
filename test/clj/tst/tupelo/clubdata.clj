@@ -30,7 +30,7 @@
         >> (println memb-str)
         memb-entities (csv/parse->entities memb-str)
         ]
-    ; (spyx-pretty memb-entities)
+    (spyx-pretty memb-entities)
     )
   )
 
