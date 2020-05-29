@@ -22,15 +22,20 @@
 
 
 (dotest
-  #_(let [fac-str (ts/quotes->double (slurp (io/resource "facilities.csv")))
-        fac-entities (csv/parse->entities fac-str) ]
-    (println fac-str)
-    (spyx-pretty fac-entities) )
-  (let [memb-str (ts/quotes->double (slurp (io/resource "members.csv")))
-        >> (println memb-str)
-        memb-entities (csv/parse->entities memb-str)
-        ]
-    (spyx-pretty memb-entities)
-    )
-  )
-
+  (when true
+    (let [fac-str      (ts/quotes->double (slurp (io/resource "facilities.csv")))
+          fac-entities (csv/parse->entities fac-str)]
+      ; (println fac-str)
+      ; (spyx-pretty fac-entities)
+      (spit "resources/facilities.edn" (t/pretty-str (unlazy fac-entities))))
+    (let [memb-str      (ts/quotes->double (slurp (io/resource "members.csv")))
+          ;  >>            (println memb-str)
+          memb-entities (csv/parse->entities memb-str)]
+      ; (spyx-pretty memb-entities)
+      (spit "resources/members.edn" (t/pretty-str (unlazy memb-entities))))
+    (let [book-str      (ts/quotes->double (slurp (io/resource "bookings.csv")))
+          ; >> (println book-str)
+          book-entities (csv/parse->entities book-str)]
+      ; (spyx-pretty book-entities)
+      (spit "resources/bookings.edn" (t/pretty-str (unlazy book-entities))))
+    ))
