@@ -451,7 +451,10 @@
 
 (s/defn ^:no-doc new-eid :- EidRaw ; #todo maybe return Eid record???
   "Returns the next integer EID"
-  [] (swap! eid-counter inc))
+  [] (let [result (swap! eid-counter inc)]
+       (when (zero? (rem result 10))
+         (println :new-eid result) )
+       result))
 
 (s/defn ^:no-doc array->tagidx-map :- {Idx s/Any}
   [edn-array :- tsk/List]

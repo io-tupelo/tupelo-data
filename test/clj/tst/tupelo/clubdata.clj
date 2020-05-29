@@ -12,17 +12,22 @@
                           throws? throws-not? define-fixture]]
     [tupelo.core :as t :refer [spy spyx spyxx spy-pretty spyx-pretty spyq unlazy let-spy with-spy-indent
                                only only2 forv glue grab nl keep-if drop-if ->sym xfirst xsecond xthird not-nil?
-                               it-> fetch-in with-map-vals map-plain? append prepend
+                               it-> cond-it-> fetch-in with-map-vals map-plain? append prepend
                                ]]
     [tupelo.data :as td :refer [with-tdb new-tdb eid-count-reset lookup match-triples match-triples->tagged search-triple
                                 *tdb* ->Eid Eid? ->Idx Idx? ->Prim Prim? ->Param Param?
                                 ]]
     [tupelo.csv :as csv]
-    [tupelo.string :as ts]) )
+    [tupelo.string :as ts]
+    [tupelo.parse :as parse]
+    [clojure.tools.reader.edn :as edn]
+    [tupelo.schema :as tsk]
+    [schema.core :as s]
+    [clojure.string :as str]) )
 
 
-(dotest
-  (when true
+(when false
+  (dotest
     (let [fac-str      (ts/quotes->double (slurp (io/resource "facilities.csv")))
           fac-entities (csv/parse->entities fac-str)]
       ; (println fac-str)
@@ -37,5 +42,144 @@
           ; >> (println book-str)
           book-entities (csv/parse->entities book-str)]
       ; (spyx-pretty book-entities)
-      (spit "resources/bookings.edn" (t/pretty-str (unlazy book-entities))))
+      (spit "resources/bookings.edn" (t/pretty-str (unlazy book-entities))))))
+
+(s/defn normalize-facility :- tsk/KeyMap
+  [arg :- tsk/KeyMap]
+  (glue
+    arg
+    (t/map-vals
+      (t/submap-by-keys arg [:facid ])
+      parse/parse-int)
+    (t/map-vals
+      (t/submap-by-keys arg [:guestcost :initialoutlay :membercost :monthlymaintenance])
+      parse/parse-float)))
+
+(s/defn normalize-member :- tsk/KeyMap
+  [arg :- tsk/KeyMap]
+  (glue
+    arg
+    (t/map-vals
+      (t/submap-by-keys arg [:memid])
+      parse/parse-int)
+    (t/map-vals
+      (t/submap-by-keys arg [:recommendedby])
+      (fn [arg]
+        (cond-it-> arg
+          (ts/lowercase= it "null") nil)))))
+
+(s/defn normalize-booking :- tsk/KeyMap
+  [arg :- tsk/KeyMap]
+  (glue
+    arg
+    (t/map-vals
+      (t/submap-by-keys arg [:bookid :facid :memid :slots  ])
+      parse/parse-int)))
+
+(dotest-focus
+  (let [facilities (mapv normalize-facility
+                     (edn/read-string (slurp (io/resource "facilities.edn"))))
+        members    (mapv normalize-member
+                     (edn/read-string (slurp (io/resource "members.edn"))))
+        bookings   (mapv normalize-booking
+                     (edn/read-string (slurp (io/resource "bookings.edn"))))
+
+        fac3       (vec (take 3 facilities))
+        memb3      (vec (take 3 members))
+        book3      (vec (take 3 bookings))]
+    (spyx (count facilities))
+    (spyx (count members))
+    (spyx (count bookings))
+
+(when false
+      (nl) (spyx-pretty fac3)
+      (nl) (spyx-pretty memb3)
+      (nl) (spyx-pretty book3))
+    (is= fac3 [{:facid              0,
+                :guestcost          25.0,
+                :initialoutlay      10000.0,
+                :membercost         5.0,
+                :monthlymaintenance 200.0,
+                :name               "Tennis Court 1"}
+               {:facid              1,
+                :guestcost          25.0,
+                :initialoutlay      8000.0,
+                :membercost         5.0,
+                :monthlymaintenance 200.0,
+                :name               "Tennis Court 2"}
+               {:facid              2,
+                :guestcost          15.5,
+                :initialoutlay      4000.0,
+                :membercost         0.0,
+                :monthlymaintenance 50.0,
+                :name               "Badminton Court"}])
+
+    (is= memb3 [{:address       "<nowhere>",
+                 :firstname     "GUEST",
+                 :joindate      "2012-07-01 00:00:00",
+                 :memid         0,
+                 :recommendedby nil,
+                 :surname       "GUEST",
+                 :telephone     "000 000-0000",
+                 :zipcode       "0"}
+                {:address       "8 Bloomsbury Close; Boston",
+                 :firstname     "Darren",
+                 :joindate      "2012-07-02 12:02:05",
+                 :memid         1,
+                 :recommendedby nil,
+                 :surname       "Smith",
+                 :telephone     "555-555-5555",
+                 :zipcode       "4321"}
+                {:address       "8 Bloomsbury Close; New York",
+                 :firstname     "Tracy",
+                 :joindate      "2012-07-02 12:08:23",
+                 :memid         2,
+                 :recommendedby nil,
+                 :surname       "Smith",
+                 :telephone     "555-555-5555",
+                 :zipcode       "4321"}])
+
+    (is= book3 [{:bookid    0,
+                 :facid     3,
+                 :memid     1,
+                 :slots     2,
+                 :starttime "2012-07-03 11:00:00"}
+                {:bookid    1,
+                 :facid     4,
+                 :memid     1,
+                 :slots     2,
+                 :starttime "2012-07-03 08:00:00"}
+                {:bookid    2,
+                 :facid     6,
+                 :memid     0,
+                 :slots     2,
+                 :starttime "2012-07-03 18:00:00"}])
+
+    (eid-count-reset)
+    (with-tdb (new-tdb)
+      (let [
+            >> (println :-----start)
+            root-fac     (td/add-entity-edn facilities)
+            >> (println :-----fac)
+            root-memb    (td/add-entity-edn members)
+            >> (println :-----memb)
+            root-book    (td/add-entity-edn bookings)
+            >> (println :-----book)
+            eid0         (grab :eid (only (td/match [{:eid ? :facid 0}])))
+            eid0b        (grab :eid (only (td/match [{:eid ? :name "Tennis Court 1"}])))
+            >>           (spyx [eid0 eid0b])
+            fac0         (td/eid->edn eid0)
+            ;bookings-tc1 (td/match [{:facid facid :name "Tennis Court 1"}
+            ;                        {:facid facid :memid memid :starttime ?}
+            ;                        {:memid memid :firstname ?}])
+            ]
+        (spyx fac0)
+        ; (spyx-pretty bookings-tc1)
+
+        )
+      )
     ))
+
+
+
+
