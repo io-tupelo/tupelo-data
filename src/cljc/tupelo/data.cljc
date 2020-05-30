@@ -977,35 +977,35 @@
       (get env elem)
       elem)))
 
-(s/defn ^:no-doc match-triples-impl :- s/Any
+(s/defn ^:no-doc match-triples-impl-0 :- s/Any
   [query-result env qspec-list]
   (t/with-spy-indent
-    (when false
+    (when true
       (println :---------------------------------------------------------------------------------------------------)
       (spyx-pretty env)
-      (spyx-pretty qspec-list)
-      (spyx-pretty @query-result)
+      ; (spyx-pretty qspec-list)
+      ; (spyx-pretty @query-result)
       (newline))
     (if (empty? qspec-list)
       (swap! query-result t/append env)
       (let [qspec-curr         (xfirst qspec-list)
             qspec-rest         (xrest qspec-list)
             qspec-curr-env     (apply-env env qspec-curr)
-            ;>>                 (spyx qspec-curr)
-            ;>>                 (spyx qspec-curr-env)
+            >>                 (spyx qspec-curr)
+            >>                 (spyx qspec-curr-env)
 
             {idxs-param :idxs-true
              idxs-other :idxs-false} (vec/pred-index Param? qspec-curr-env)
             qspec-lookup       (vec/set-lax qspec-curr-env idxs-param nil)
-            ;>>                 (spyx idxs-param)
-            ;>>                 (spyx idxs-other)
-            ;>>                 (spyx qspec-lookup)
+            >>                 (spyx idxs-param)
+            >>                 (spyx idxs-other)
+            >>                 (spyx qspec-lookup)
 
             params             (vec/get qspec-curr idxs-param)
             found-triples      (lookup qspec-lookup)
             param-frames-found (mapv #(vec/get % idxs-param) found-triples)
             env-frames-found   (mapv #(zipmap params %) param-frames-found)]
-        (when false
+        (when true
           (spyx params)
           (spyx-pretty found-triples)
           (spyx-pretty param-frames-found)
@@ -1013,7 +1013,75 @@
 
         (forv [env-frame env-frames-found]
           (let [env-next (glue env env-frame)]
-            (match-triples-impl query-result env-next qspec-rest)))))))
+            (match-triples-impl-0 query-result env-next qspec-rest)))))))
+
+(defn ^:no-doc  sort-qspec-list
+  [env qspec-list]
+  (prof/with-timer-accum :sort-qspec-list
+    (let [qspec-list-scored (forv [qspec-curr qspec-list]
+                              (let [qspec-curr-env    (apply-env env qspec-curr)
+                                    ; >>                (spyx qspec-curr)
+                                    ; >>                (spyx qspec-curr-env)
+
+                                    {idxs-param :idxs-true
+                                     idxs-other :idxs-false} (vec/pred-index Param? qspec-curr-env)
+                                    qspec-lookup      (vec/set-lax qspec-curr-env idxs-param nil)
+                                    ; >>                (spyx idxs-param)
+                                    ; >>                (spyx idxs-other)
+                                    ; >>                (spyx qspec-lookup)
+
+                                    found-triples     (lookup qspec-lookup)
+                                    found-triples-num (count found-triples)
+                                    ]
+                                ; (spyx-pretty found-triples-num)
+                                {:cost found-triples-num :qspec qspec-curr}))
+          qspec-list-sorted (vec (sort-by :cost qspec-list-scored))
+          result            (mapv #(grab :qspec %) qspec-list-sorted)
+          ]
+      ; (spyx-pretty qspec-list-sorted)
+      result)))
+
+(s/defn ^:no-doc match-triples-impl :- s/Any
+  [query-result env qspec-list]
+  (prof/with-timer-accum :match-triples-impl
+    (t/with-spy-indent
+      (when false
+        (println :---------------------------------------------------------------------------------------------------)
+        (spyx-pretty env)
+        ; (spyx-pretty qspec-list)
+        ; (spyx-pretty @query-result)
+        (newline))
+      (if (empty? qspec-list)
+        (swap! query-result t/append env)
+        (do
+          (let [qspec-list (sort-qspec-list env qspec-list)]
+            ; (spyx-pretty qspec-list)
+            (let [qspec-curr         (xfirst qspec-list)
+                  qspec-rest         (xrest qspec-list)
+                  qspec-curr-env     (apply-env env qspec-curr)
+                  ; >>                 (spyx qspec-curr)
+                  ; >>                 (spyx qspec-curr-env)
+
+                  {idxs-param :idxs-true
+                   idxs-other :idxs-false} (vec/pred-index Param? qspec-curr-env)
+                  qspec-lookup       (vec/set-lax qspec-curr-env idxs-param nil)
+                  ; >>                 (spyx idxs-param)
+                  ; >>                 (spyx idxs-other)
+                  ; >>                 (spyx qspec-lookup)
+
+                  params             (vec/get qspec-curr idxs-param)
+                  found-triples      (lookup qspec-lookup)
+                  param-frames-found (mapv #(vec/get % idxs-param) found-triples)
+                  env-frames-found   (mapv #(zipmap params %) param-frames-found)]
+              (when false
+                (spyx params)
+                (spyx-pretty found-triples)
+                (spyx-pretty param-frames-found)
+                (spyx-pretty env-frames-found))
+
+              (forv [env-frame env-frames-found]
+                (let [env-next (glue env env-frame)]
+                  (match-triples-impl query-result env-next qspec-rest))))))))))
 
 (s/defn ^:no-doc untag-match-result :- s/Any ; #todo fix, was tsk/KeyMap
   [resmap :- tsk/Map]
@@ -1027,11 +1095,13 @@
 
 (s/defn ^:no-doc match-triples->tagged
   [qspec-list-in :- [tsk/Triple]]
-  (let [qspec-list    (walk-tagmap-reader qspec-list-in)
-        query-results (atom [])]
-    (match-triples-impl query-results {} qspec-list)
-    ; (spyx-pretty :query-triples--results @query-results)
-    @query-results))
+  (with-spy-indent
+    (let [qspec-list    (walk-tagmap-reader qspec-list-in)
+          query-results (atom [])]
+      ; (spyx-pretty :match-triples->tagged qspec-list)
+      (match-triples-impl query-results {} qspec-list)
+      ; (spyx-pretty :query-triples--results @query-results)
+      @query-results)))
 
 (s/defn match-triples :- s/Any ; #todo fix, was [tsk/KeyMap]
   [qspec-list :- [tsk/Triple]]
@@ -1258,13 +1328,13 @@
         pred-specs   (keep-if #(and (not (search-triple-form? %))
                                  (fn? %))
                        query-specs)
-        ;>>           (spyx-pretty maps-in)
-        ;>>           (spyx triple-forms)
-        ;>>           (spyx pred-specs)
+        ; >>           (spyx-pretty maps-in)
+        ; >>           (spyx triple-forms)
+        ; >>           (spyx pred-specs)
         keep-pred    (if (not-empty? pred-specs)
                        (only pred-specs)
                        ->true)
-        ;>>           (spyx keep-pred)
+        ; >>           (spyx keep-pred)
         ; #todo add ability to have multiple simple preds that can be pushed deeper in the query to
         ; #todo eliminate failing matches asap
 

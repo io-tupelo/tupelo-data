@@ -158,6 +158,7 @@
                  :starttime "2012-07-03 18:00:00"}])
 
     (eid-count-reset)
+    (prof/timer-stats-reset)
     (with-tdb (new-tdb)
       (let [
             >> (println :-----start)
@@ -165,21 +166,23 @@
             >> (println :-----fac)
             root-memb    (td/add-entity-edn members)
             >> (println :-----memb)
-            root-book (td/add-entity-edn (take 2200 bookings))
+            root-book (td/add-entity-edn (take 9900 bookings))
             >> (println :-----book)
-            eid0  (td/match [{:eid ? :facid 0}])
-            >> (spyx eid0)
-            eid0b (grab :eid (only (td/match [{:eid ? :name "Tennis Court 1"}])))
-            >> (spyx eid0b)
 
-            fac0         (td/eid->edn eid0b)
+            ;eid0  (td/match [{:eid ? :facid 0}])
+            ;>> (spyx (take 9 eid0))
+
+            ;eid0b (grab :eid (only (td/match [{:eid ? :name "Tennis Court 1"}])))
+            ;>> (spyx eid0b)
+            ;  fac0         (td/eid->edn eid0b)
+            ; (spyx fac0)
+
             bookings-tc1 (prof/with-timer-print :match-big-0
                            (td/match [{:facid facid :name "Tennis Court 1"}
                                       {:facid facid :memid memid :starttime ?}
                                       {:memid memid :firstname ?}]))
             guests-tc1 (set (mapv #(grab :firstname %) bookings-tc1))
             ]
-        (spyx fac0)
         (spyx-pretty (take 5 bookings-tc1))
         (spyx  guests-tc1)
 
