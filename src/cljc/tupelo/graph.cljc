@@ -70,13 +70,22 @@
   (new-grf))
 
 (s/defn new-node :- tsk/KeyMap
-  ([] (new-node nil))
-  ([tag] (let [nid (new-nid)]
-           {:nid   nid
-            :tag   tag
-            :props {}
-            :rels  {:in  []
-                    :out []}})))
+  [ctx]
+  {:nid   (new-nid)
+   :tag   (t/get-or-nil ctx :tag)
+   :props (dissoc ctx :tag)
+   :rels  {:from  []
+           :to []}})
+
+(s/defn new-rel :- tsk/KeyMap
+  [ctx]
+  (let [nid-from (grab :from ctx)
+        nid-to   (grab :to ctx)]
+    {:rid   (new-rid)
+     :tag   (grab :tag ctx)
+     :from  nid-from
+     :to    nid-to
+     :props (dissoc ctx :tag :from :to) }))
 
 (s/defn add-node
   "Add a node to the graph"
@@ -84,12 +93,38 @@
   ([grf   ; atom
     ctx :- tsk/KeyMap]
    (assert (= clojure.lang.Atom (type grf)))
-   (swap! grf (fn [it]
-                (let [tag  (t/get-or-nil ctx :tag)
-                      node (new-node tag)
-                      nid  (grab :nid node)]
-                  (assoc-in it [:nodes nid] node))))))
+   (let [node (new-node ctx)
+         nid  (grab :nid node)]
+     (swap! grf (fn [it]
+                  (assoc-in it [:nodes nid] node)))
+     nid)))
 
+(s/defn get-node :- tsk/KeyMap
+  [nid :- s/Int]
+  (fetch-in @*grf* [:nodes nid]))
+
+(s/defn add-rel
+  "Add a relationship to the graph"
+  ([ctx :- tsk/KeyMap] (add-rel *grf* ctx))
+  ([grf   ; atom
+    ctx :- tsk/KeyMap]
+   (assert (= clojure.lang.Atom (type grf)))
+   (let [rel (new-rel ctx)
+         rid (grab :rid rel)
+         nid-from (grab :from ctx)
+         nid-to   (grab :to ctx)
+         ]
+     (swap! grf (fn [state]
+                  (it-> state
+                    (assoc-in it [:rels rid] rel)
+                    (update-in it [:nodes nid-from :rels :from] append rid)
+                    (update-in it [:nodes nid-to :rels :to] append rid)
+                    ) ))
+     rid)))
+
+(s/defn get-rel
+  [rid]
+  (fetch-in @*grf* [:rels rid]))
 
 
 

@@ -24,7 +24,8 @@
                                only only2 forv glue grab nl keep-if drop-if ->sym xfirst xsecond xthird not-nil?
                                it-> fetch-in with-map-vals map-plain? append prepend
                                ]]
-    [tupelo.graph :as g :refer [with-grf new-grf new-grf-reset id-reset *grf*
+    [tupelo.graph :as g :refer [with-grf new-grf new-grf-reset id-reset *grf* add-node get-node
+                                add-rel get-rel
                                 ]]
     )
   #?(:clj (:import [tupelo.data Eid Idx Prim Param]))
@@ -104,11 +105,45 @@
 (comment  ; <<comment>>
   )       ; <<comment>>
 
-(dotest
+(dotest-focus
   (g/with-grf (new-grf-reset)
-    (g/add-node {:tag :person})
-    (spyx-pretty @*grf*))
-  )
+    (let [nid-jack (g/add-node {:tag :person :name "Jack"})
+          nid-jill (g/add-node {:tag :person :name "Jill"})
+          rid-1    (g/add-rel {:tag   :likes
+                               :from  nid-jack
+                               :to    nid-jill
+                               :since "Monday"})
+          rid-2    (g/add-rel {:tag   :tolerates
+                               :from  nid-jill
+                               :to    nid-jack
+                               :since "forever"}) ]
+      (is= nid-jack 1001)
+      (is= nid-jill 1002)
+      (is= rid-1 2001)
+      (is= rid-2 2002)
+      (is= (get-node nid-jack) {:nid   1001
+                                :tag   :person
+                                :props {:name "Jack"}
+                                :rels  {:from [2001]
+                                        :to   [2002]}})
+      (is= (get-node nid-jill) {:nid   1002
+                                :tag   :person
+                                :props {:name "Jill"}
+                                :rels  {:from [2002]
+                                        :to   [2001]}})
+      (is= (get-rel rid-1)
+        {:rid   2001
+         :tag   :likes
+         :from  1001
+         :to    1002
+         :props {:since "Monday"}})
+      (is= (get-rel rid-2)
+        {:rid   2002
+         :tag   :tolerates
+         :from  1002
+         :to    1001
+         :props {:since "forever"}})
+      )))
 
 
 
