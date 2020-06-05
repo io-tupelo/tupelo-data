@@ -669,7 +669,7 @@
 (s/defn ^:no-doc array-entity-rerack
   [eid :- Eid] ; #todo make all require db param
   (with-spy-indent
-    (spyx :array-entity-rerack )
+    ; (spyx :array-entity-rerack )
     (when (not= :array (eid->type eid))
       (throw (ex-info "non-array found" (vals->map eid))))
     (let [idx-eav      (grab :idx-eav (deref *tdb*))
@@ -720,7 +720,7 @@
    idx :- IdxArg
    val :- s/Any] ; #todo add db arg version
   (with-spy-indent
-    (spy :entity-array-elem-add)
+    ; (spy :entity-array-elem-add)
     (tupelo.data/with-entity-watchers ; #todo file CLJS bug:  breaks w/o ns for this macro
       (entity-array-elem-add-impl eid idx val))))
 

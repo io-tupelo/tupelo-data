@@ -30,6 +30,7 @@
                                 ]]
     [tupelo.data.index :as index]
     [tupelo.tag :as tt :refer [IVal ITag ITagMap ->tagmap <tag <val]]
+    [tupelo.profile :as prof]
     )
   #?(:clj (:import [tupelo.data Eid Idx Prim Param]))
   )
