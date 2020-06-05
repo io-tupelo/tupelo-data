@@ -4,7 +4,8 @@
 ;   the root of this distribution.  By using this software in any fashion, you are agreeing to be
 ;   bound by the terms of this license.  You must not remove this notice, or any other, from this
 ;   software.
-(ns tst.tupelo.graph
+(ns  ^:test-refresh/focus
+  tst.tupelo.graph
   ;---------------------------------------------------------------------------------------------------
   ;   https://code.thheller.com/blog/shadow-cljs/2019/10/12/clojurescript-macros.html
   ;   http://blog.fikesfarm.com/posts/2015-12-18-clojurescript-macro-tower-and-loop.html
@@ -105,7 +106,7 @@
 (comment  ; <<comment>>
   )       ; <<comment>>
 
-(dotest-focus
+(dotest
   (g/with-grf (new-grf-reset)
     (let [nid-jack (g/add-node {:tag :person :name "Jack"})
           nid-jill (g/add-node {:tag :person :name "Jill"})
@@ -143,17 +144,26 @@
          :from  1002
          :to    1001
          :props {:since "forever"}})
+      (comment (clojure.core/deref *grf*) ;=>
+        {:nodes {1001 {:nid   1001,
+                       :tag   :person,
+                       :props {:name "Jack"},
+                       :rels  {:from [2001], :to [2002]}},
+                 1002 {:nid   1002,
+                       :tag   :person,
+                       :props {:name "Jill"},
+                       :rels  {:from [2002], :to [2001]}}},
+         :rels  {2001 {:rid   2001,
+                       :tag   :likes,
+                       :from  1001,
+                       :to    1002,
+                       :props {:since "Monday"}},
+                 2002 {:rid   2002,
+                       :tag   :tolerates,
+                       :from  1002,
+                       :to    1001,
+                       :props {:since "forever"}}}})
       )))
-
-
-
-
-
-
-
-
-
-
 
 
 
