@@ -25,8 +25,8 @@
                                only only2 forv glue grab nl keep-if drop-if ->sym xfirst xsecond xthird not-nil?
                                it-> fetch-in with-map-vals map-plain? append prepend
                                ]]
-    [tupelo.graph :as g :refer [with-grf new-grf new-grf-reset id-reset *grf* add-node get-node
-                                add-rel get-rel
+    [tupelo.graph :as g :refer [with-grf new-grf new-grf-reset id-reset *grf* add-node nid->node
+                                add-rel rid->rel
                                 ]]
     )
   #?(:clj (:import [tupelo.data Eid Idx Prim Param]))
@@ -122,23 +122,23 @@
       (is= nid-jill 1002)
       (is= rid-1 2001)
       (is= rid-2 2002)
-      (is= (get-node nid-jack) {:nid   1001
+      (is= (nid->node nid-jack) {:nid  1001
                                 :tag   :person
                                 :props {:name "Jack"}
                                 :rels  {:from [2001]
                                         :to   [2002]}})
-      (is= (get-node nid-jill) {:nid   1002
+      (is= (nid->node nid-jill) {:nid  1002
                                 :tag   :person
                                 :props {:name "Jill"}
                                 :rels  {:from [2002]
                                         :to   [2001]}})
-      (is= (get-rel rid-1)
+      (is= (rid->rel rid-1)
         {:rid   2001
          :tag   :likes
          :from  1001
          :to    1002
          :props {:since "Monday"}})
-      (is= (get-rel rid-2)
+      (is= (rid->rel rid-2)
         {:rid   2002
          :tag   :tolerates
          :from  1002

@@ -99,7 +99,7 @@
                   (assoc-in it [:nodes nid] node)))
      nid)))
 
-(s/defn get-node :- tsk/KeyMap
+(s/defn nid->node :- tsk/KeyMap
   [nid :- s/Int]
   (fetch-in @*grf* [:nodes nid]))
 
@@ -122,7 +122,7 @@
                     ) ))
      rid)))
 
-(s/defn get-rel
+(s/defn rid->rel
   [rid]
   (fetch-in @*grf* [:rels rid]))
 
