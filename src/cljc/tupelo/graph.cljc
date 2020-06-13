@@ -21,10 +21,9 @@
                                ]]
     [tupelo.data.index :as index]
     [tupelo.schema :as tsk]
-    [clojure.set :as set]
-    [clojure.walk :as walk]
+    [tupelo.set :as set]
     [schema.core :as s]
-    ) )
+    ))
 
 #?(:cljs (enable-console-print!))
 
@@ -99,10 +98,6 @@
                   (assoc-in it [:nodes nid] node)))
      nid)))
 
-(s/defn nid->node :- tsk/KeyMap
-  [nid :- s/Int]
-  (fetch-in @*grf* [:nodes nid]))
-
 (s/defn add-rel
   "Add a relationship to the graph"
   ([ctx :- tsk/KeyMap] (add-rel *grf* ctx))
@@ -122,9 +117,59 @@
                     ) ))
      rid)))
 
+(s/defn nid->node :- tsk/KeyMap
+  [nid :- s/Int]
+  (fetch-in @*grf* [:nodes nid]))
+
 (s/defn rid->rel
   [rid]
   (fetch-in @*grf* [:rels rid]))
+
+(declare nid->bush  rid->bush)
+
+(s/defn ^:no-doc nid->bush-impl
+  [ctx]
+  (with-spy-indent
+    (spy :-----------------------------)
+    (with-map-vals ctx [nid depth nids-used rids-used]
+      (spyx [nid depth nids-used rids-used])
+      (if (t/contains-elem? nids-used nid)
+        {:nid nid}
+        (let-spy
+          [depth-new      (dec depth)
+           node           (nid->node nid)
+           rids-from      (set (fetch-in node [:rels :from]))
+           rids-loop      (apply set/remove rids-from rids-used)
+           nids-used-new  (set/add nids-used nid)
+           rids-used-new  (apply set/add rids-used rids-from)
+           ctx-base       {:depth     depth-new
+                           :nids-used nids-used-new
+                           :rids-used rids-used-new}
+
+           rels-from-bush (forv [rid rids-loop]
+                            (with-spy-indent
+                              (spy :-----------------------------)
+                              (let-spy
+                                [rel      (rid->rel rid)
+                                 nid-kid  (grab :to rel)
+                                 kid-node (nid->bush-impl (glue ctx-base {:nid nid-kid}))
+                                 result   (it-> rel
+                                            (dissoc it :from)
+                                            (glue it {:to kid-node}))]
+                                result)))
+           node-bush      (assoc-in node [:rels :from] rels-from-bush)]
+          node-bush
+          )))))
+
+(def default-bush-depth 9) ; #todo kludge for convenience
+(s/defn nid->bush
+  ([nid :- s/Int] (nid->bush nid default-bush-depth))
+  ([nid :- s/Int
+    depth :- s/Int]
+   (nid->bush-impl {:nid       nid
+                    :depth     depth
+                    :nids-used #{}
+                    :rids-used #{}})))
 
 
 

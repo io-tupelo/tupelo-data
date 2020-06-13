@@ -26,7 +26,7 @@
                                it-> fetch-in with-map-vals map-plain? append prepend
                                ]]
     [tupelo.graph :as g :refer [with-grf new-grf new-grf-reset id-reset *grf* add-node nid->node
-                                add-rel rid->rel
+                                add-rel rid->rel nid->bush
                                 ]]
     )
   #?(:clj (:import [tupelo.data Eid Idx Prim Param]))
@@ -113,11 +113,11 @@
           rid-1    (g/add-rel {:tag   :likes
                                :from  nid-jack
                                :to    nid-jill
-                               :since "Monday"})
+                               :since "forever"})
           rid-2    (g/add-rel {:tag   :tolerates
                                :from  nid-jill
                                :to    nid-jack
-                               :since "forever"}) ]
+                               :since "Monday"}) ]
       (is= nid-jack 1001)
       (is= nid-jill 1002)
       (is= rid-1 2001)
@@ -163,6 +163,41 @@
                        :from  1002,
                        :to    1001,
                        :props {:since "forever"}}}})
+      (spyx-pretty (nid->bush 1001))
+      {:nid   1001
+       :tag   :person
+       :props {:name "Jack"}
+       :rels  {:from [{:rid   2001
+                       :tag   :likes
+                       :props {:since "forever"}
+                       :to    {:nid   1002
+                               :tag   :person
+                               :props {:name "Jill"}
+                               :rels  {:from
+                                           [{:rid   2002
+                                             :tag   :tolerates
+                                             :to    {:nid 1001}
+                                             :props {:since "Monday"}}]
+                                       :to [2001]}}}]
+               :to   [2002]}}
+
+      {:nid   1001,
+       :tag   :person,
+       :props {:name "Jack"},
+       :rels  {:from [{:rid   2001,
+                       :tag   :likes,
+                       :props {:since "forever"}
+                       :to    {:nid   1002,
+                               :tag   :person,
+                               :props {:name "Jill"},
+                               :rels  {:from [{:rid   2002,
+                                               :tag   :tolerates,
+                                               :to    {:nid 1001},
+                                               :props {:since "Monday"}}],
+                                       :to   [2001]}}
+                       }],
+               :to   [2002]}}
+
       )))
 
 
