@@ -4,7 +4,8 @@
 ;   the root of this distribution.  By using this software in any fashion, you are agreeing to be
 ;   bound by the terms of this license.  You must not remove this notice, or any other, from this
 ;   software.
-(ns tst.tupelo.data
+(ns ^:test-refresh/focus
+  tst.tupelo.data
   ;---------------------------------------------------------------------------------------------------
   ;   https://code.thheller.com/blog/shadow-cljs/2019/10/12/clojurescript-macros.html
   ;   http://blog.fikesfarm.com/posts/2015-12-18-clojurescript-macro-tower-and-loop.html
@@ -1391,7 +1392,11 @@
            {:name "tim" :date "4-4-4444" :zip-acc "54221" :id 3 :zip-pref "11456"}])))))
 
 (dotest
+  (s/set-fn-validation! false )
   (td/eid-count-reset)
+  ;(prof/with-timer-print :terminator)
+  (prn :terminator-start)
+  (prof/timer-stats-reset)
   (td/with-tdb (td/new-tdb)
     (let [root-eid (td/add-entity-edn skynet-widgets)
           results  (td/match
@@ -1404,7 +1409,9 @@
         [{:description "Resistance Infiltrator" :widget-code "Model-101" :producer-code "Cyberdyne" :wtc "t800"}
          {:description "Resistance Infiltrator" :widget-code "Model-102" :producer-code "Cyberdyne" :wtc "t800"}
          {:description "Mimetic polyalloy" :widget-code "Model-201" :producer-code "Cyberdyne" :wtc "t1000"}
-         {:description "Boom!" :widget-code "Dynamite" :producer-code "ACME" :wtc "c40"}]))))
+         {:description "Boom!" :widget-code "Dynamite" :producer-code "ACME" :wtc "c40"}])))
+  (prof/print-profile-stats)
+  )
 
 ;---------------------------------------------------------------------------------------------------
 (dotest

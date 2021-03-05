@@ -19,16 +19,16 @@
                                it-> cond-it-> forv vals->map fetch-in let-spy sym->kw with-map-vals vals->map
                                keep-if drop-if append prepend ->sym ->kw kw->sym validate dissoc-in
                                ]]
+    [clojure.set :as set]
+    [clojure.walk :as walk]
+    [schema.core :as s]
     [tupelo.data.index :as index]
     [tupelo.misc :as misc]
     [tupelo.profile :as prof]
     [tupelo.schema :as tsk]
-    [tupelo.tag :as tt :refer [IVal ITag ITagMap ->tagmap <tag <val untagged]]
     [tupelo.set :as tset]
-    [clojure.set :as set]
+    [tupelo.tag :as tt :refer [IVal ITag ITagMap ->tagmap <tag <val untagged]]
     [tupelo.vec :as vec]
-    [clojure.walk :as walk]
-    [schema.core :as s]
     )
   )
 
@@ -660,27 +660,29 @@
   [eid :- EidArg
    attr :- PrimRaw
    val :- s/Any] ; #todo add db arg version
-  (tupelo.data/with-entity-watchers ; #todo file CLJS bug:  breaks w/o ns for this macro
-    (entity-map-entry-add-impl
-      (coerce->Eid eid)
-      attr ; #todo (coerce->Prim) ???
-      val)))
+  (prof/with-timer-accum :entity-map-entry-add
+    (tupelo.data/with-entity-watchers ; #todo file CLJS bug:  breaks w/o ns for this macro
+      (entity-map-entry-add-impl
+        (coerce->Eid eid)
+        attr ; #todo (coerce->Prim) ???
+        val))))
 
 (s/defn ^:no-doc array-entity-rerack
   [eid :- Eid] ; #todo make all require db param
-  (with-spy-indent
-    ; (spyx :array-entity-rerack )
-    (when (not= :array (eid->type eid))
-      (throw (ex-info "non-array found" (vals->map eid))))
-    (let [idx-eav      (grab :idx-eav (deref *tdb*))
-          triples-orig (index/prefix-match->seq [eid] idx-eav)
-          vals         (mapv xthird triples-orig)
-          triples-new  (forv [[idx val] (indexed vals)]
-                         [eid (->Idx idx) val])]
-      (doseq [triple triples-orig]
-        (db-remove-triple triple))
-      (doseq [triple triples-new]
-        (db-add-triple triple)))))
+  (prof/with-timer-accum :array-entity-rerack
+    (with-spy-indent
+      ; (spyx :array-entity-rerack )
+      (when (not= :array (eid->type eid))
+        (throw (ex-info "non-array found" (vals->map eid))))
+      (let [idx-eav      (grab :idx-eav (deref *tdb*))
+            triples-orig (index/prefix-match->seq [eid] idx-eav)
+            vals         (mapv xthird triples-orig)
+            triples-new  (forv [[idx val] (indexed vals)]
+                           [eid (->Idx idx) val])]
+        (doseq [triple triples-orig]
+          (db-remove-triple triple))
+        (doseq [triple triples-new]
+          (db-add-triple triple))))))
 
 ; #todo need entity-array-elem-prepend
 ; #todo need entity-array-elem-append
@@ -719,10 +721,11 @@
   [eid :- EidArg
    idx :- IdxArg
    val :- s/Any] ; #todo add db arg version
-  (with-spy-indent
-    ; (spy :entity-array-elem-add)
-    (tupelo.data/with-entity-watchers ; #todo file CLJS bug:  breaks w/o ns for this macro
-      (entity-array-elem-add-impl eid idx val))))
+  (prof/with-timer-accum :entity-array-elem-add
+    (with-spy-indent
+      ; (spy :entity-array-elem-add)
+      (tupelo.data/with-entity-watchers ; #todo file CLJS bug:  breaks w/o ns for this macro
+        (entity-array-elem-add-impl eid idx val)))))
 
 (s/defn entity-set-elem-add-impl
   "Adds a new element to an existing set entity."
@@ -752,8 +755,9 @@
   "Adds a new element to an existing set entity."
   [eid :- EidArg
    val :- s/Any] ; #todo add db arg version
-  (tupelo.data/with-entity-watchers ; #todo file CLJS bug:  breaks w/o ns for this macro
-    (entity-set-elem-add-impl (coerce->Eid eid) val)))
+  (prof/with-timer-accum :entity-set-elem-add
+    (tupelo.data/with-entity-watchers ; #todo file CLJS bug:  breaks w/o ns for this macro
+      (entity-set-elem-add-impl (coerce->Eid eid) val))))
 
 (s/defn ^:no-doc add-entity-edn-impl :- Eid ; #todo maybe rename:  load-edn->eid  ???
   [entity-edn :- s/Any]

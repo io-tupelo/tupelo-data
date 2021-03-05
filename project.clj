@@ -8,8 +8,8 @@
   :deploy-repositories [["clojars" "http://beta.clojars.org/repo/"]]
   :dependencies
   [
-   [criterium "0.4.5"]
-   [org.clojure/clojure "1.10.2-alpha1"]
+   [criterium "0.4.6"]
+   [org.clojure/clojure "1.10.3"]
    [org.clojure/data.avl "0.1.0"]
    [prismatic/schema "1.1.12"]
    [tupelo "0.9.214"]

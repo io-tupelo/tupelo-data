@@ -4,7 +4,8 @@
 ;   the root of this distribution.  By using this software in any fashion, you are agreeing to be
 ;   bound by the terms of this license.  You must not remove this notice, or any other, from this
 ;   software.
-(ns tst.tupelo.clubdata
+(ns     ; ^:test-refresh/focus
+  tst.tupelo.clubdata
   (:require
     [clojure.test] ; sometimes this is required - not sure why
     [clojure.java.io :as io]
@@ -89,7 +90,7 @@
         members-3    (vec (take 3 members))
         bookings-3   (vec (take 3 bookings))]
 
-    (when false
+    (when true
       (spyx (count facilities))
       (spyx (count members))
       (spyx (count bookings)))
@@ -99,67 +100,69 @@
       (nl) (spyx-pretty members-3)
       (nl) (spyx-pretty bookings-3))
 
-    (is= facilities-3 [{:facid              0,
-                        :guestcost          25.0,
-                        :initialoutlay      10000.0,
-                        :membercost         5.0,
-                        :monthlymaintenance 200.0,
-                        :name               "Tennis Court 1"}
-                       {:facid              1,
-                        :guestcost          25.0,
-                        :initialoutlay      8000.0,
-                        :membercost         5.0,
-                        :monthlymaintenance 200.0,
-                        :name               "Tennis Court 2"}
-                       {:facid              2,
-                        :guestcost          15.5,
-                        :initialoutlay      4000.0,
-                        :membercost         0.0,
-                        :monthlymaintenance 50.0,
-                        :name               "Badminton Court"}])
+    ;(is= facilities-3 [{:facid              0,
+    ;                    :guestcost          25.0,
+    ;                    :initialoutlay      10000.0,
+    ;                    :membercost         5.0,
+    ;                    :monthlymaintenance 200.0,
+    ;                    :name               "Tennis Court 1"}
+    ;                   {:facid              1,
+    ;                    :guestcost          25.0,
+    ;                    :initialoutlay      8000.0,
+    ;                    :membercost         5.0,
+    ;                    :monthlymaintenance 200.0,
+    ;                    :name               "Tennis Court 2"}
+    ;                   {:facid              2,
+    ;                    :guestcost          15.5,
+    ;                    :initialoutlay      4000.0,
+    ;                    :membercost         0.0,
+    ;                    :monthlymaintenance 50.0,
+    ;                    :name               "Badminton Court"}])
+    ;
+    ;(is= members-3 [{:address       "<nowhere>",
+    ;                 :firstname     "GUEST",
+    ;                 :joindate      "2012-07-01 00:00:00",
+    ;                 :memid         0,
+    ;                 :recommendedby nil,
+    ;                 :surname       "GUEST",
+    ;                 :telephone     "000 000-0000",
+    ;                 :zipcode       "0"}
+    ;                {:address       "8 Bloomsbury Close; Boston",
+    ;                 :firstname     "Darren",
+    ;                 :joindate      "2012-07-02 12:02:05",
+    ;                 :memid         1,
+    ;                 :recommendedby nil,
+    ;                 :surname       "Smith",
+    ;                 :telephone     "555-555-5555",
+    ;                 :zipcode       "4321"}
+    ;                {:address       "8 Bloomsbury Close; New York",
+    ;                 :firstname     "Tracy",
+    ;                 :joindate      "2012-07-02 12:08:23",
+    ;                 :memid         2,
+    ;                 :recommendedby nil,
+    ;                 :surname       "Smith",
+    ;                 :telephone     "555-555-5555",
+    ;                 :zipcode       "4321"}])
+    ;
+    ;(is= bookings-3 [{:bookid    0,
+    ;                  :facid     3,
+    ;                  :memid     1,
+    ;                  :slots     2,
+    ;                  :starttime "2012-07-03 11:00:00"}
+    ;                 {:bookid    1,
+    ;                  :facid     4,
+    ;                  :memid     1,
+    ;                  :slots     2,
+    ;                  :starttime "2012-07-03 08:00:00"}
+    ;                 {:bookid    2,
+    ;                  :facid     6,
+    ;                  :memid     0,
+    ;                  :slots     2,
+    ;                  :starttime "2012-07-03 18:00:00"}])
 
-    (is= members-3 [{:address       "<nowhere>",
-                     :firstname     "GUEST",
-                     :joindate      "2012-07-01 00:00:00",
-                     :memid         0,
-                     :recommendedby nil,
-                     :surname       "GUEST",
-                     :telephone     "000 000-0000",
-                     :zipcode       "0"}
-                    {:address       "8 Bloomsbury Close; Boston",
-                     :firstname     "Darren",
-                     :joindate      "2012-07-02 12:02:05",
-                     :memid         1,
-                     :recommendedby nil,
-                     :surname       "Smith",
-                     :telephone     "555-555-5555",
-                     :zipcode       "4321"}
-                    {:address       "8 Bloomsbury Close; New York",
-                     :firstname     "Tracy",
-                     :joindate      "2012-07-02 12:08:23",
-                     :memid         2,
-                     :recommendedby nil,
-                     :surname       "Smith",
-                     :telephone     "555-555-5555",
-                     :zipcode       "4321"}])
-
-    (is= bookings-3 [{:bookid    0,
-                      :facid     3,
-                      :memid     1,
-                      :slots     2,
-                      :starttime "2012-07-03 11:00:00"}
-                     {:bookid    1,
-                      :facid     4,
-                      :memid     1,
-                      :slots     2,
-                      :starttime "2012-07-03 08:00:00"}
-                     {:bookid    2,
-                      :facid     6,
-                      :memid     0,
-                      :slots     2,
-                      :starttime "2012-07-03 18:00:00"}])
-
-    (when false
+    (when true
+      (s/set-fn-validation! false )
+      (prn :test-start)
       (eid-count-reset)
       (prof/timer-stats-reset)
       (with-tdb (new-tdb)
@@ -172,7 +175,9 @@
                              (td/add-entity-edn members))
               >>           (println :-----memb)
               root-book    (prof/with-timer-print :load-bookings
-                             (td/add-entity-edn (take 99 bookings)))
+                             ; (td/add-entity-edn (take 99 bookings))
+                             (td/add-entity-edn  bookings)
+                             )
               >>           (println :-----book)
 
               ;eid0  (td/match [{:eid ? :facid 0}])
@@ -189,14 +194,12 @@
                                         {:memid memid :firstname ?}]))
               guests-tc1   (set (mapv #(grab :firstname %) bookings-tc1))
               ]
-          (spyx-pretty (take 5 bookings-tc1))
+          (spyx (count bookings-tc1))
+          (spyx-pretty (take 9 bookings-tc1))
           (spyx guests-tc1)
 
           )
         )
       (prof/print-profile-stats)
       )))
-
-
-
 

@@ -4,7 +4,7 @@
 ;   the root of this distribution.  By using this software in any fashion, you are agreeing to be
 ;   bound by the terms of this license.  You must not remove this notice, or any other, from this
 ;   software.
-(ns  ^:test-refresh/focus
+(ns     ; ^:test-refresh/focus
   tst.tupelo.graph
   ;---------------------------------------------------------------------------------------------------
   ;   https://code.thheller.com/blog/shadow-cljs/2019/10/12/clojurescript-macros.html
@@ -110,14 +110,14 @@
   (g/with-grf (new-grf-reset)
     (let [nid-jack (g/add-node {:tag :person :name "Jack"})
           nid-jill (g/add-node {:tag :person :name "Jill"})
-          rid-1    (g/add-rel {:tag   :likes
-                               :from  nid-jack
-                               :to    nid-jill
-                               :since "forever"})
-          rid-2    (g/add-rel {:tag   :tolerates
-                               :from  nid-jill
-                               :to    nid-jack
-                               :since "Monday"}) ]
+          rid-1    (g/add-rel {:tag     :likes
+                               :rid-out nid-jack
+                               :to      nid-jill
+                               :since   "forever"})
+          rid-2    (g/add-rel {:tag     :tolerates
+                               :rid-out nid-jill
+                               :to      nid-jack
+                               :since   "Monday"}) ]
       (is= nid-jack 1001)
       (is= nid-jill 1002)
       (is= rid-1 2001)
@@ -125,78 +125,62 @@
       (is= (nid->node nid-jack) {:nid  1001
                                 :tag   :person
                                 :props {:name "Jack"}
-                                :rels  {:from [2001]
-                                        :to   [2002]}})
+                                :rels  {:rid-out [2001]
+                                        :to      [2002]}})
       (is= (nid->node nid-jill) {:nid  1002
                                 :tag   :person
                                 :props {:name "Jill"}
-                                :rels  {:from [2002]
-                                        :to   [2001]}})
+                                :rels  {:rid-out [2002]
+                                        :to      [2001]}})
       (is= (rid->rel rid-1)
-        {:rid   2001
-         :tag   :likes
-         :from  1001
-         :to    1002
-         :props {:since "Monday"}})
+        {:rid     2001
+         :tag     :likes
+         :rid-out 1001
+         :to      1002
+         :props   {:since "Monday"}})
       (is= (rid->rel rid-2)
-        {:rid   2002
-         :tag   :tolerates
-         :from  1002
-         :to    1001
-         :props {:since "forever"}})
+        {:rid     2002
+         :tag     :tolerates
+         :rid-out 1002
+         :to      1001
+         :props   {:since "forever"}})
       (comment (clojure.core/deref *grf*) ;=>
         {:nodes {1001 {:nid   1001,
                        :tag   :person,
                        :props {:name "Jack"},
-                       :rels  {:from [2001], :to [2002]}},
+                       :rels  {:rid-out [2001], :to [2002]}},
                  1002 {:nid   1002,
                        :tag   :person,
                        :props {:name "Jill"},
-                       :rels  {:from [2002], :to [2001]}}},
-         :rels  {2001 {:rid   2001,
-                       :tag   :likes,
-                       :from  1001,
-                       :to    1002,
-                       :props {:since "Monday"}},
-                 2002 {:rid   2002,
-                       :tag   :tolerates,
-                       :from  1002,
-                       :to    1001,
-                       :props {:since "forever"}}}})
+                       :rels  {:rid-out [2002], :to [2001]}}},
+         :rels  {2001 {:rid     2001,
+                       :tag     :likes,
+                       :rid-out 1001,
+                       :to      1002,
+                       :props   {:since "Monday"}},
+                 2002 {:rid     2002,
+                       :tag     :tolerates,
+                       :rid-out 1002,
+                       :to      1001,
+                       :props   {:since "forever"}}}})
       (spyx-pretty (nid->bush 1001))
       {:nid   1001
        :tag   :person
        :props {:name "Jack"}
-       :rels  {:from [{:rid   2001
-                       :tag   :likes
-                       :props {:since "forever"}
-                       :to    {:nid   1002
+       :rels  {:to      [2002]
+               :rid-out [{:rid 2001
+                       :tag    :likes
+                       :props  {:since "forever"}
+                       :to     {:nid   1002
                                :tag   :person
                                :props {:name "Jill"}
-                               :rels  {:from
-                                           [{:rid   2002
-                                             :tag   :tolerates
-                                             :to    {:nid 1001}
-                                             :props {:since "Monday"}}]
-                                       :to [2001]}}}]
-               :to   [2002]}}
+                               :rels  {:rid-out [{:rid 2002
+                                               :tag    :tolerates
+                                               :to     {:nid 1001}
+                                               :props  {:since "Monday"}}]
+                                       :to      [2001]}}}]}}
 
-      {:nid   1001,
-       :tag   :person,
-       :props {:name "Jack"},
-       :rels  {:from [{:rid   2001,
-                       :tag   :likes,
-                       :props {:since "forever"}
-                       :to    {:nid   1002,
-                               :tag   :person,
-                               :props {:name "Jill"},
-                               :rels  {:from [{:rid   2002,
-                                               :tag   :tolerates,
-                                               :to    {:nid 1001},
-                                               :props {:since "Monday"}}],
-                                       :to   [2001]}}
-                       }],
-               :to   [2002]}}
+
 
       )))
 

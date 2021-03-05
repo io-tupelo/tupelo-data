@@ -19,7 +19,6 @@
                                it-> cond-it-> forv vals->map fetch-in let-spy sym->kw with-map-vals vals->map
                                keep-if drop-if append prepend ->sym ->kw kw->sym validate dissoc-in
                                ]]
-    [tupelo.data.index :as index]
     [tupelo.schema :as tsk]
     [tupelo.set :as set]
     [schema.core :as s]
@@ -73,18 +72,18 @@
   {:nid   (new-nid)
    :tag   (t/get-or-nil ctx :tag)
    :props (dissoc ctx :tag)
-   :rels  {:from  []
+   :rels  {:rid-out  []
            :to []}})
 
 (s/defn new-rel :- tsk/KeyMap
   [ctx]
-  (let [nid-from (grab :from ctx)
+  (let [nid-from (grab :rid-out ctx)
         nid-to   (grab :to ctx)]
-    {:rid   (new-rid)
-     :tag   (grab :tag ctx)
-     :from  nid-from
-     :to    nid-to
-     :props (dissoc ctx :tag :from :to) }))
+    {:rid     (new-rid)
+     :tag     (grab :tag ctx)
+     :rid-out nid-from
+     :to      nid-to
+     :props   (dissoc ctx :tag :rid-out :to) }))
 
 (s/defn add-node
   "Add a node to the graph"
@@ -106,13 +105,13 @@
    (assert (= clojure.lang.Atom (type grf)))
    (let [rel (new-rel ctx)
          rid (grab :rid rel)
-         nid-from (grab :from ctx)
+         nid-from (grab :rid-out ctx)
          nid-to   (grab :to ctx)
          ]
      (swap! grf (fn [state]
                   (it-> state
                     (assoc-in it [:rels rid] rel)
-                    (update-in it [:nodes nid-from :rels :from] append rid)
+                    (update-in it [:nodes nid-from :rels :rid-out] append rid)
                     (update-in it [:nodes nid-to :rels :to] append rid)
                     ) ))
      rid)))
@@ -138,7 +137,7 @@
         (let-spy
           [depth-new      (dec depth)
            node           (nid->node nid)
-           rids-from      (set (fetch-in node [:rels :from]))
+           rids-from      (set (fetch-in node [:rels :rid-out]))
            rids-loop      (apply set/remove rids-from rids-used)
            nids-used-new  (set/add nids-used nid)
            rids-used-new  (apply set/add rids-used rids-from)
@@ -154,10 +153,10 @@
                                  nid-kid  (grab :to rel)
                                  kid-node (nid->bush-impl (glue ctx-base {:nid nid-kid}))
                                  result   (it-> rel
-                                            (dissoc it :from)
+                                            (dissoc it :rid-out)
                                             (glue it {:to kid-node}))]
                                 result)))
-           node-bush      (assoc-in node [:rels :from] rels-from-bush)]
+           node-bush      (assoc-in node [:rels :rid-out] rels-from-bush)]
           node-bush
           )))))
 
